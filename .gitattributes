@@ -1,0 +1,25 @@
+# Line endings: the team works on Windows and Linux.
+# The repository always stores LF. Windows teammates get CRLF in their working
+# tree automatically, so nobody sees "every file modified" after a fresh clone.
+* text=auto eol=lf
+
+# Windows-only scripts must keep CRLF or cmd.exe will not run them.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Images and documents: never rewrite these as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.zip binary
+
+# Keep lock files out of diffs and merge conflicts.
+package-lock.json -diff
