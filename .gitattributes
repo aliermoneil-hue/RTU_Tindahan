@@ -21,5 +21,7 @@
 *.pptx binary
 *.zip binary
 
-# Keep lock files out of diffs and merge conflicts.
-package-lock.json -diff
+# Lock files: keep them DIFFABLE in pull requests (a reviewer should see a
+# dependency change) but never text-merge one - a half-merged lock file is
+# broken. Regenerate it instead with `npm install` and commit the result.
+package-lock.json -merge
