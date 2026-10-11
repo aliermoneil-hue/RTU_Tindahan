@@ -150,6 +150,16 @@ package versions.
 
 Both servers must be running at the same time during development.
 
+> **Use the same Node.js version as the rest of the team.** The committed
+> `package-lock.json` was generated with npm 10, which is what ships with
+> Node 20 and 22. A newer npm rewrites it with extra metadata that npm 10 then
+> strips back out, so the file shows as modified after every install and turns
+> into noise in your pull request. If `git status` reports
+> `frontend/package-lock.json` modified and you did **not** add a dependency,
+> undo it and keep working:
+>
+>     git checkout -- frontend/package-lock.json
+
 ### 4.4 Database installation (PostgreSQL)
 
 The approved stack uses PostgreSQL. The scaffold currently points Django at
