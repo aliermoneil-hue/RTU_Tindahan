@@ -63,6 +63,8 @@ Base path: `/api/v1`
 
 | Method | Endpoint | Access | Requirement |
 | --- | --- | --- | --- |
+| GET | `/` | Public | Service index |
+| GET | `/health/` | Public | RL-01 availability check |
 | POST | `/auth/register/` | Public | AV-01 to AV-04, PR-02 |
 | POST | `/auth/verify-email/` | Public | AV-03 |
 | POST | `/auth/resend-verification/` | Public | AV-03 |
