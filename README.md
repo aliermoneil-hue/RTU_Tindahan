@@ -77,7 +77,11 @@ Full rationale: `docs/RTU-Tindahan-Tech-Stack.txt`.
 | Node.js | 20 LTS or later | https://nodejs.org/ | `node --version` |
 | npm | ships with Node.js | — | `npm --version` |
 | Git | 2.30 or later | https://git-scm.com/downloads | `git --version` |
-| PostgreSQL | 15 or later | https://www.postgresql.org/download/ | `psql --version` |
+| PostgreSQL | 15 or later (optional for local development) | https://www.postgresql.org/download/ | `psql --version` |
+
+PostgreSQL is the approved database for the deployed build, but local
+development can use SQLite with no database server at all. See
+`docs/TEAM-SETUP.md` for the short version.
 
 On Windows, use the installer from python.org and **tick "Add python.exe to
 PATH"** on the first screen. If you skip it, `python` will not be recognised
@@ -127,6 +131,13 @@ It must print `5.2.18`. Then create your environment file and start the server:
     python manage.py migrate
     python manage.py runserver
 
+Leaving `POSTGRES_DB=` empty in `.env` uses SQLite, so the two commands above
+work immediately. To use PostgreSQL, see section 4.4.
+
+Seed the four demo accounts (development only):
+
+    python manage.py seed_demo_users
+
 Backend runs at http://localhost:8000
 
 > Every `pip install` and `python manage.py` command must run with the virtual
@@ -160,32 +171,53 @@ Both servers must be running at the same time during development.
 >
 >     git checkout -- frontend/package-lock.json
 
-### 4.4 Database installation (PostgreSQL)
+### 4.4 Database installation (PostgreSQL, optional)
 
-The approved stack uses PostgreSQL. The scaffold currently points Django at
-SQLite so that the backend runs before anyone has set up a database server.
-The psycopg driver is already installed, so only the server and the settings
-remain.
+The approved stack uses PostgreSQL. Local development defaults to SQLite
+because it needs no server. `backend/.env` and `backend/config/settings.py`
+already read both, so switching is a `.env` change only.
 
 1. Install PostgreSQL. Remember the password you set for the `postgres`
    superuser during installation.
-2. Create the database and its user:
+2. Create the login role and the database **owned by that role**:
 
         psql -U postgres
 
    Then at the `postgres=#` prompt:
 
-        CREATE DATABASE rtu_tindahan;
-        CREATE USER rtu_tindahan WITH PASSWORD 'choose-a-password';
-        GRANT ALL PRIVILEGES ON DATABASE rtu_tindahan TO rtu_tindahan;
+        CREATE ROLE rtu_tindahan LOGIN PASSWORD 'choose-a-password';
+        CREATE DATABASE rtu_tindahan OWNER rtu_tindahan;
         \q
 
-3. Put those same values into `backend/.env`.
-4. Point the `DATABASES` setting in `backend/config/settings.py` at those
-   variables. This is not done yet — see section 6.
-5. Run the migrations against the new database:
+   Creating the database with `OWNER rtu_tindahan` matters. If it is owned by
+   `postgres`, migrations fail with `permission denied for schema public`.
+
+3. Put those values into `backend/.env` and set `POSTGRES_DB`:
+
+        POSTGRES_DB=rtu_tindahan
+        POSTGRES_USER=rtu_tindahan
+        POSTGRES_PASSWORD=choose-a-password
+        POSTGRES_HOST=localhost
+        POSTGRES_PORT=5432
+
+   Use the port the server actually listens on. Check it in pgAdmin under
+   server properties; it is not always 5432.
+
+4. Run the migrations and seed the demo accounts:
 
         python manage.py migrate
+        python manage.py seed_demo_users
+
+If you already created the database without the owner, fix it as the
+`postgres` superuser:
+
+        ALTER DATABASE rtu_tindahan OWNER TO rtu_tindahan;
+
+Then connect to the `rtu_tindahan` database and run:
+
+        GRANT ALL ON SCHEMA public TO rtu_tindahan;
+
+Full details and troubleshooting: `docs/TEAM-SETUP.md`.
 
 ### 4.5 Running the whole system
 
@@ -211,6 +243,8 @@ the backend on port 8000.
 | `No module named 'django'` | `pip install` ran outside the venv | Activate the venv, then `pip install -r requirements.txt` again |
 | `npm ERR! ... EBADENGINE` | Node.js is too old | Install Node 20 LTS or later |
 | `psql: command not found` | PostgreSQL tools are not on PATH | On Windows, tick "Command Line Tools" in the PostgreSQL installer |
+| `manage.py` hangs after "System check identified no issues" | `.env` points at PostgreSQL and the connection is blocked | Check `POSTGRES_PORT`, or set `POSTGRES_DB=` to use SQLite |
+| `permission denied for schema public` | The database is owned by `postgres`, not `rtu_tindahan` | `ALTER DATABASE rtu_tindahan OWNER TO rtu_tindahan;` then `GRANT ALL ON SCHEMA public TO rtu_tindahan;` |
 | `Error: That port is already in use` | Something already runs on 8000 or 5173 | Stop the other process, or run `python manage.py runserver 8001` |
 
 If an error is not in this table, paste the **full** message into the group
@@ -235,16 +269,23 @@ does not remove it from history.
 
 ---
 
-## 6. Still to be wired up
+## 6. Current status and next work
 
-These are known gaps in the scaffold, each a good first task:
+Sprint 1 is merged into `main`: environment-driven settings, the custom user
+model with five roles, RTU email verification, token auth, server-side
+permissions, 34 tests, and the health endpoint. See
+`docs/SPRINT-1-FOUNDATION.md`.
 
-- [ ] Read `SECRET_KEY`, `DEBUG`, and database settings from `.env` instead of the hardcoded defaults in `backend/config/settings.py`
-- [ ] Add `rest_framework` and `corsheaders` to `INSTALLED_APPS` in `backend/config/settings.py`
-- [ ] Create a PostgreSQL database and run the first migration against it
-- [ ] Install and configure Tailwind CSS with the RTU Tindahan theme colours
+Sprint 2 — catalog and listings:
+
+- [ ] Catalog models: `Category`, `Listing`, `ListingPhoto`, Django admin, category seed
+- [ ] Listings API: create, edit, photos, my listings, status transitions
+- [ ] Browse: keyword search, category/price filters, sort, Newest / Best-Selling / Small Sellers
+- [ ] AI screening stub and moderator queue
+- [ ] Frontend: Tailwind, router, auth screens, listing screens
 - [ ] Move the approved documents from the CapStone folder into `docs/`
-- [ ] Port the working HTML prototype into React components
+
+Team onboarding and database troubleshooting: `docs/TEAM-SETUP.md`.
 
 ---
 
