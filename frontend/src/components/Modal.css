@@ -1,0 +1,32 @@
+/* POP-UP */
+.modal {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 0;
+  width: min(480px, calc(100vw - 32px));
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+.modal::backdrop {
+  background: rgba(13, 22, 40, 0.6);
+}
+.modal-body {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.modal h2 {
+  font-size: 20px;
+}
+.modal ul {
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.modal-row {
+  display: flex;
+  justify-content: flex-end;
+}

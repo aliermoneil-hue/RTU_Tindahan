@@ -1,0 +1,28 @@
+/* ABOUT: benefit cards and the three steps. */
+.about-intro {
+  max-width: 68ch;
+}
+.about-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.about-card b {
+  font-size: 16px;
+}
+.about-how {
+  margin-top: 34px;
+}
+.about-step {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.about-step .pill {
+  align-self: flex-start;
+}
+.about-step b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

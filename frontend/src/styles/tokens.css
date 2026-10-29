@@ -1,0 +1,51 @@
+/* TOKENS: the RTU Tindahan colors, copied from the prototype's brand theme (css/styles.css, last section).
+   Light values are on :root. The dark values replace them when the page has data-theme="dark". */
+:root {
+  --navy: #1a2f57;
+  --navy2: #26427a;
+  --blue: #1f3a6e;
+  --blue-ink: #ffffff;
+  --yellow: #ffbd59;
+  --yellow-ink: #1a2f57;
+  --coral: #c25a5a;
+  --coral-ink: #a63f3f;
+  --bg: #f5f4f0;
+  --card: #ffffff;
+  --ink: #16223d;
+  --muted: #566176;
+  --line: #dcdfe7;
+  --soft: #eceff5;
+  --green: #1d7a50;
+  --red: #a63f3f;
+  --ring: #1a2f57;
+  --awning: repeating-linear-gradient(
+    90deg,
+    #ffbd59 0 22px,
+    #fffaf0 22px 44px,
+    #c25a5a 44px 66px,
+    #fffaf0 66px 88px
+  );
+  --shadow: 0 1px 2px rgba(26, 47, 87, 0.06), 0 6px 18px rgba(26, 47, 87, 0.07);
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --navy: #1a2f57;
+  --navy2: #2b4780;
+  --blue: #a9c0ef;
+  --blue-ink: #0d1628;
+  --coral: #d97a7a;
+  --coral-ink: #f0a0a0;
+  --bg: #0d1628;
+  --card: #15223d;
+  --ink: #f1f4fa;
+  --muted: #a6b2c9;
+  --line: #2a3b5e;
+  --soft: #1e2f50;
+  --green: #6fcf97;
+  --red: #f0a0a0;
+  --ring: #ffbd59;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.25);
+  color-scheme: dark;
+}

@@ -1,0 +1,129 @@
+/* PAGES: the small pages (guest sections, sign in, create account, verify help). */
+.page {
+  padding-block: clamp(28px, 4vw, 56px);
+  flex: 1;
+}
+.page-narrow {
+  max-width: 560px;
+}
+.page-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.page-head h1 {
+  font-size: clamp(26px, 3.4vw, 38px);
+}
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: none;
+}
+:root[data-theme='dark'] .back {
+  color: var(--yellow);
+}
+.back .ico {
+  transform: rotate(180deg);
+}
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  padding: 34px 20px;
+}
+.empty .ico {
+  width: 28px;
+  height: 28px;
+  color: var(--blue);
+}
+.tips-card {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tips-card ul,
+.steps-list {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Forms */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.field label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.field .hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+.input {
+  font: inherit;
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(255, 189, 89, 0.55);
+}
+.input[aria-invalid='true'] {
+  border-color: var(--coral-ink);
+}
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 14px;
+}
+.err {
+  color: var(--coral-ink);
+  font-weight: 600;
+  font-size: 13px;
+}
+.notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 11px;
+  font-size: 13px;
+  background: #fff2d6;
+  border: 1px solid #f2cf86;
+  color: #3a2a00;
+}
+:root[data-theme='dark'] .notice {
+  background: #2f2a1c;
+  border-color: #5b4b22;
+  color: #f1e4c2;
+}
+.form-foot {
+  font-size: 13px;
+}
+.form-foot a {
+  font-weight: 700;
+  text-decoration: underline;
+}

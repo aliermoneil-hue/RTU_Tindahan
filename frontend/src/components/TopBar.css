@@ -1,0 +1,111 @@
+/* TOP BAR: navy bar with the scalloped awning edge, like the prototype's .pub-top. */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px clamp(16px, 4.45vw, 64px);
+  background: var(--navy);
+  color: #fff;
+}
+.topbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -10px;
+  height: 10px;
+  background: var(--awning);
+  -webkit-mask: radial-gradient(11px 10px at 50% 0, #000 98%, transparent 100%) 0 0 / 22px 100% repeat-x;
+  mask: radial-gradient(11px 10px at 50% 0, #000 98%, transparent 100%) 0 0 / 22px 100% repeat-x;
+  pointer-events: none;
+}
+.topbar-logo {
+  flex: none;
+  display: inline-flex;
+}
+.topbar-logo img {
+  height: 52px;
+  width: auto;
+}
+.topbar nav {
+  display: flex;
+  gap: 4px;
+  margin-left: 18px;
+}
+.topbar nav button {
+  background: none;
+  border: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  color: #d8e0ef;
+}
+.topbar nav button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+.topbar nav button.on {
+  color: var(--yellow);
+  background: rgba(255, 255, 255, 0.1);
+}
+.topbar-grow {
+  flex: 1;
+}
+.topbar-theme {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: #d8e0ef;
+}
+.topbar-theme:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.topbar .btn {
+  white-space: nowrap;
+}
+.topbar .btn.ghost {
+  background: transparent;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+.topbar .btn.ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #fff;
+  filter: none;
+}
+.topbar .btn.yellow:hover {
+  background: #ffcb80;
+  filter: none;
+}
+.topbar :focus-visible {
+  outline-color: var(--yellow);
+}
+@media (max-width: 700px) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .topbar-logo img {
+    height: 42px;
+  }
+  .topbar nav {
+    order: 5;
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+  }
+  .topbar::after {
+    height: 8px;
+    bottom: -8px;
+  }
+}

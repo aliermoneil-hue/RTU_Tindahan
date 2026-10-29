@@ -1,0 +1,50 @@
+/* HELP: question list (native details elements) and the side card. */
+.help-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 18px;
+}
+.help-faq {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.help-q summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.help-q summary::-webkit-details-marker {
+  display: none;
+}
+.help-q summary .ico {
+  transition: transform 0.2s;
+}
+.help-q[open] summary .ico {
+  transform: rotate(180deg);
+}
+.help-q p {
+  margin-top: 10px;
+}
+.help-aside {
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.help-aside b {
+  font-size: 16px;
+}
+.help-aside a:not(.btn) {
+  text-decoration: underline;
+}
+@media (max-width: 900px) {
+  .help-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

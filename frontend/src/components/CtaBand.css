@@ -1,0 +1,39 @@
+/* CLOSING BAND */
+.cta-band {
+  background: var(--navy);
+  color: #fff;
+  padding-block: clamp(26px, 4vw, 44px);
+}
+.cta-in {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  align-items: center;
+  justify-content: space-between;
+}
+.cta-band h2 {
+  color: #fff;
+  font-size: clamp(20px, 2.6vw, 28px);
+}
+.cta-band p {
+  opacity: 0.85;
+  margin-top: 4px;
+}
+.cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.cta-band .btn.ghost {
+  background: transparent;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+.cta-band .btn.ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #fff;
+  filter: none;
+}
+.cta-band :focus-visible {
+  outline-color: var(--yellow);
+}

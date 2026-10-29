@@ -1,0 +1,53 @@
+/* INSIGHTS: category tiles that link to a page, and the meetup tips. */
+.ins-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 14px;
+}
+.ins-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.ins-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(26, 47, 87, 0.12);
+}
+.ins-tile b {
+  font-size: 15px;
+}
+.ins-note {
+  margin-top: auto;
+  padding-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  color: var(--blue);
+}
+:root[data-theme='dark'] .ins-note {
+  color: var(--yellow);
+}
+.ins-tips {
+  margin-top: 30px;
+}
+.ins-tips h3 {
+  font-size: 18px;
+}
+.ins-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ins-tip b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ins-tile {
+    transition: none;
+  }
+}
