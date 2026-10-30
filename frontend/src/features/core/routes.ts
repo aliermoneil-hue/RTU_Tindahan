@@ -1,0 +1,74 @@
+import type { IconName } from '@/common/components/icons'
+import type { Role } from '@/common/types'
+
+/**
+ * PAGE REGISTRY
+ * ---------------------------------------------------------------
+ * One list that describes every signed-in page. The sidebar menu, the
+ * placeholder pages and the page titles are all built from it.
+ *
+ * To add a page to the sidebar: add an entry here, then add its component
+ * in AppRoutes.tsx. `backend` tells us if an API exists for it yet.
+ */
+export type NavSection = 'BUY' | 'SELL' | 'COMMUNITY' | 'ADMIN'
+
+export interface PageInfo {
+  path: string
+  title: string
+  icon: IconName
+  /** Which sidebar group it belongs to. Omit for pages not in the sidebar. */
+  section?: NavSection
+  /** Short description of the prototype page this will become. */
+  about: string
+  /** 'missing' = the Django backend has no endpoint for this yet. */
+  backend: 'missing' | 'available'
+}
+
+export const APP_PAGES: PageInfo[] = [
+  { path: 'marketplace', title: 'Marketplace', icon: 'home', section: 'BUY', backend: 'missing',
+    about: 'Category tiles and the latest listings from verified RTU sellers.' },
+  { path: 'browse', title: 'Browse All', icon: 'grid', section: 'BUY', backend: 'missing',
+    about: 'Search, filter and sort every listing.' },
+  { path: 'orders', title: 'My Orders', icon: 'bag', section: 'BUY', backend: 'missing',
+    about: 'Your requests and pickups, grouped by status.' },
+  { path: 'student-sellers', title: 'Student Sellers', icon: 'user', section: 'BUY', backend: 'missing',
+    about: 'Listings posted by RTU students.' },
+  { path: 'store', title: 'Official RTU Store', icon: 'shield', section: 'BUY', backend: 'missing',
+    about: 'Uniforms, books and merchandise published by RTU staff.' },
+  { path: 'create', title: 'Sell an item', icon: 'tag', section: 'SELL', backend: 'missing',
+    about: 'The form for posting an item or service.' },
+  { path: 'shop', title: 'My shop', icon: 'eye', section: 'SELL', backend: 'missing',
+    about: 'Your listings and the requests you received.' },
+  { path: 'forum', title: 'Forum', icon: 'mega', section: 'COMMUNITY', backend: 'missing',
+    about: 'Campus discussion board.' },
+  { path: 'moderation', title: 'Listing approval', icon: 'shield', section: 'ADMIN', backend: 'missing',
+    about: 'Staff review of new listings.' },
+  { path: 'users', title: 'Users and audit', icon: 'user', section: 'ADMIN', backend: 'missing',
+    about: 'Account management and the audit log.' },
+  { path: 'transactions', title: 'Transactions', icon: 'bag', section: 'ADMIN', backend: 'missing',
+    about: 'Completed pickups and CSV export.' },
+  { path: 'forum-reports', title: 'Forum Reports', icon: 'flag', section: 'ADMIN', backend: 'missing',
+    about: 'Reported forum posts.' },
+  { path: 'staff', title: 'Staff tools', icon: 'edit', section: 'ADMIN', backend: 'missing',
+    about: 'Backup, restore and other staff utilities.' },
+  // Pages reached from the top bar (not in the sidebar):
+  { path: 'messages', title: 'Messages', icon: 'msg', backend: 'missing',
+    about: 'Chat with sellers and the Official RTU Store.' },
+  { path: 'cart', title: 'Request cart', icon: 'cart', backend: 'missing',
+    about: 'Reserve items for a campus meetup.' },
+  { path: 'favorites', title: 'Favorites', icon: 'heart', backend: 'missing',
+    about: 'Listings you saved.' },
+  { path: 'profile', title: 'My profile', icon: 'user', backend: 'available',
+    about: 'Your account details. The backend already supports reading and editing them (GET/PATCH /auth/me/).' },
+]
+
+export const NAV_SECTIONS: NavSection[] = ['BUY', 'SELL', 'COMMUNITY', 'ADMIN']
+
+export function findPage(path: string): PageInfo | undefined {
+  return APP_PAGES.find((p) => p.path === path)
+}
+
+/** Staff roles see the ADMIN group in the sidebar (same rule as the prototype's moderator). */
+export function canSeeAdmin(role: Role): boolean {
+  return role === 'moderator' || role === 'administrator'
+}

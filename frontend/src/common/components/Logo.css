@@ -1,0 +1,68 @@
+/* ==========================================================================
+   LOGO
+   ========================================================================== */
+/* RULE: .logo  (LOGO)
+   TARGETS: the logo button in the guest top bar and the sidebar (data-go="home"): <button class="logo"> containing .logo-mark and the name.
+   EFFECT: flex row with 9px gap, no button background or border, left aligned text, inherits the text color. */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+}
+/* RULE: .logo-mark
+   TARGETS: the small yellow "RTU" square inside the logo button. EFFECT: 30px by 30px, 8px rounded corners, yellow background with dark text, 800 weight 12px text centered with CSS Grid (display grid, place-items center), slightly tighter letter spacing. */
+.logo-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--yellow);
+  color: var(--yellow-ink);
+  font-weight: 800;
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+  letter-spacing: -0.02em;
+}
+/* RULE: .logo-img  (added: the real RTU Tindahan logo picture, img/logo.png)
+   TARGETS: the <img class="logo-img"> that replaced the yellow RTU square and the text name in every logo button and the footer.
+   EFFECT: height 46px (width follows the picture), rounded corners, never squeezed by flex. Bigger versions are set for the sidebar, the sign-in and sign-up panels, and the footer below. */
+.logo-img {
+  display: block;
+  height: 52px;
+  width: auto;
+  border-radius: 8px;
+  flex: none;
+}
+
+.side .logo-img {
+  height: 60px;
+}
+.split .l .logo-img {
+  height: 72px;
+}
+.sitefoot .logo-img {
+  height: 56px;
+}
+@media (max-width: 600px) {
+  .pub-top .logo-img {
+    height: 38px;
+  }
+}
+/* RULE: .logo b  TARGETS: the bold "RTU Tindahan" name inside .logo. EFFECT: 15px, shown as its own line (display block), line height 1.1. */
+.logo b {
+  font-size: 15px;
+  display: block;
+  line-height: 1.1;
+}
+/* RULE: .logo div > span  TARGETS: the small "PASIG CAMPUS" line under the name (a span that is a direct child of the div inside .logo). EFFECT: 10px, 70 percent opacity, own line, letter spacing 0.04em. */
+.logo div > span {
+  font-size: 10px;
+  opacity: 0.7;
+  display: block;
+  letter-spacing: 0.04em;
+}

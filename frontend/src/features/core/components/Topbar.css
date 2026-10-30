@@ -1,0 +1,110 @@
+/* TOP BAR for signed-in pages (prototype: .top, .search, .userbtn, .menu-btn) */
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 24px;
+  background: var(--card);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.top::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -10px;
+  height: 10px;
+  background: var(--awning);
+  -webkit-mask: radial-gradient(11px 10px at 50% 0, #000 98%, transparent 100%) 0 0 / 22px 100% repeat-x;
+  mask: radial-gradient(11px 10px at 50% 0, #000 98%, transparent 100%) 0 0 / 22px 100% repeat-x;
+  pointer-events: none;
+}
+.menu-btn {
+  display: none;
+  background: var(--soft);
+  border: 0;
+  border-radius: 9px;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: var(--navy);
+}
+:root[data-theme='dark'] .menu-btn {
+  color: var(--yellow);
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--soft);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 7px 11px;
+  flex: 1;
+  max-width: 520px;
+  min-width: 0;
+}
+.search input {
+  border: 0;
+  background: none;
+  outline: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.search input::placeholder {
+  color: #667187;
+}
+.search:focus-within {
+  background: var(--card);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(255, 189, 89, 0.55);
+}
+.top .iconbtn svg {
+  width: 18px;
+  height: 18px;
+}
+.userbtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  padding: 3px 6px;
+  border-radius: 10px;
+  text-align: left;
+}
+.userbtn:hover {
+  background: var(--soft);
+}
+.userbtn-text b {
+  font-size: 12px;
+  display: block;
+  line-height: 1.15;
+}
+.userbtn-text span {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+@media (max-width: 900px) {
+  .top {
+    padding: 10px 14px;
+  }
+  .menu-btn {
+    display: grid;
+  }
+  .userbtn-text {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .top {
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  .search {
+    padding: 6px 9px;
+  }
+}
