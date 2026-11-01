@@ -17,3 +17,10 @@ Rules:
   `docs/archive/` rather than deleting them.
 - Never put survey responses with respondent names in this repository unless
   the team has agreed it is necessary.
+
+Current files:
+
+    docs/
+    ├── SPRINT-1-FOUNDATION.md   Backend foundation: auth, roles, permissions
+    ├── TEAM-SETUP.md            Windows setup and troubleshooting
+    └── ADMIN-FRONTEND.md        Admin screens and the /api/v1/admin/ endpoints

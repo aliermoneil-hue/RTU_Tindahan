@@ -64,3 +64,16 @@ class IsAdministrator(IsActiveAccount):
             and user.can_sign_in
             and (user.role == User.Role.ADMINISTRATOR or user.is_superuser)
         )
+
+
+class IsBackOffice(IsVerifiedUser):
+    """Any role that works in the admin front end: Office Staff, Moderator, Administrator."""
+
+    message = "Only Office Staff, Moderators, and Administrators may open the admin area."
+
+    def has_permission(self, request, view):
+        return super().has_permission(request, view) and request.user.role in {
+            User.Role.OFFICE_STAFF,
+            User.Role.MODERATOR,
+            User.Role.ADMINISTRATOR,
+        }

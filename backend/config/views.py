@@ -25,6 +25,8 @@ def api_root(request):
                 "login": f"{base}/auth/login/",
                 "logout": f"{base}/auth/logout/",
                 "me": f"{base}/auth/me/",
+                "admin_summary": f"{base}/admin/summary/",
+                "admin_users": f"{base}/admin/users/",
                 "health": request.build_absolute_uri("/health/"),
                 "admin": request.build_absolute_uri("/admin/"),
             },
