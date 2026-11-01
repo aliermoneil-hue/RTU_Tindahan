@@ -214,3 +214,64 @@ class ListingPhoto(models.Model):
 
     def __str__(self):
         return f"Photo for {self.listing.title}"
+
+
+class ListingVariant(models.Model):
+    """A size or type of a listing. Stock lives here, not on the listing."""
+
+    listing = models.ForeignKey(
+        Listing, on_delete=models.CASCADE, related_name="variants"
+    )
+    name = models.CharField(max_length=80, help_text="e.g. Small, Medium, A4.")
+    sku = models.CharField(max_length=64, blank=True)
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Leave blank to use the listing price.",
+    )
+
+    # Stock state. Changes only through the stock ledger in apps.store.
+    on_hand = models.PositiveIntegerField(default=0)
+    available = models.PositiveIntegerField(default=0)
+    low_stock_threshold = models.PositiveIntegerField(null=True, blank=True)
+
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+        indexes = [models.Index(fields=["listing", "is_active"])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["listing", "name"],
+                name="catalog_unique_variant_name_per_listing",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(available__lte=models.F("on_hand")),
+                name="catalog_variant_available_lte_on_hand",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.listing.title} — {self.name}"
+
+    @property
+    def reserved(self):
+        return self.on_hand - self.available
+
+    @property
+    def unit_price(self):
+        return self.price if self.price is not None else self.listing.price
+
+    @property
+    def is_low_stock(self):
+        threshold = self.low_stock_threshold
+        if threshold is None:
+            from apps.store.models import StoreSetting
+
+            threshold = StoreSetting.get_solo().low_stock_threshold
+        return self.available <= threshold
