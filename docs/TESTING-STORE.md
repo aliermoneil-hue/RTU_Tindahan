@@ -1,5 +1,9 @@
 # Testing the Official Store core
 
+> New to the flow? Start with the step-by-step ordering walkthrough:
+> `docs/TUTORIAL-OFFICIAL-STORE.md`.
+
+
 This branch has **models, services, and admin only**. There is no store API and
 no React screens yet. Test through Django Admin and the Django shell.
 
