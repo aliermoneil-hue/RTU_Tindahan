@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Icon } from '@/common/components/Icon'
 import { Link, navigate } from '@/common/router/router'
 import { useTheme } from '@/common/hooks/useTheme'
-import { useAuth } from '@/features/auth'
+import { useAuth } from '@/features/authentication'
 import type { User } from '@/common/types'
 import './Topbar.css'
 

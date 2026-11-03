@@ -6,9 +6,10 @@ import type { User } from '@/common/types'
  * AUTH CONTEXT
  * ---------------------------------------------------------------
  * Keeps "who is signed in" for the whole app. Any component can call
- *   const { user, login, logout } = useAuth()
+ *   const { user, login, register, logout } = useAuth()
  * It talks to the EXISTING backend endpoints only:
  *   POST /auth/login/   -> { token, user }
+ *   POST /auth/register/ -> { token, user }
  *   GET  /auth/me/      -> user          (used to restore a session)
  *   POST /auth/logout/  -> 204
  */
@@ -18,6 +19,8 @@ interface AuthValue {
   /** true while we check a saved token when the page first loads */
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
+  /** Creates an account with RTU email verification. Returns { token, user }. */
+  register: (data: { email: string; display_name: string; password: string; password_confirm: string; member_type: 'student' | 'faculty' | 'personnel'; college: string; year_level: number | null; contact_number: string; privacy_consent: boolean }) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -56,6 +59,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user)
   }, [])
 
+  const register = useCallback(async (data: {
+    email: string
+    display_name: string
+    password: string
+    password_confirm: string
+    member_type: 'student' | 'faculty' | 'personnel'
+    college: string
+    year_level: number | null
+    contact_number: string
+    privacy_consent: boolean
+  }) => {
+    const result = await apiFetch<{ token: string; user: User }>('/auth/register/', {
+      method: 'POST',
+      body: data,
+    })
+    setToken(result.token)
+    setUser(result.user)
+  }, [])
+
   const logout = useCallback(async () => {
     try {
       await apiFetch<void>('/auth/logout/', { method: 'POST' })
@@ -66,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
-  const value = useMemo(() => ({ user, isLoading, login, logout }), [user, isLoading, login, logout])
+  const value = useMemo(() => ({ user, isLoading, login, register, logout }), [user, isLoading, login, register, logout])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

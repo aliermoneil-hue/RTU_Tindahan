@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '@/common/components/Icon'
-import { Button } from '@/common/components/Button'
-import { navigate } from '@/common/router/router'
 import { ICON_PATHS, type IconName } from '@/common/components/icons'
 import './HeroCarousel.css'
 

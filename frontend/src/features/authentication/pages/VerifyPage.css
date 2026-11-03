@@ -1,0 +1,145 @@
+/* ==========================================================================
+   VERIFY / REGISTER PAGE — three-step sign up, split layout matching prototype
+   Left panel (navy): logo, headline, progress steps, note
+   Right panel (light bg): step counter, form
+   ========================================================================== */
+
+/* Left panel: navy background, white text */
+.split.rev .l {
+  background: var(--navy);
+  color: #fff;
+  padding: 36px clamp(20px, 5vw, 64px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Logo button in left panel */
+.split.rev .l .logo {
+  align-self: center;
+  margin-bottom: clamp(8px, 2vw, 16px);
+}
+
+/* Logo image in left panel */
+.split.rev .l .logo-img {
+  height: 72px;
+  width: auto;
+  border-radius: 8px;
+  flex: none;
+  display: block;
+}
+
+/* Eyebrow label above the headline */
+.split.rev .l .eyebrow {
+  color: var(--yellow);
+}
+
+/* Big headline on the left panel */
+.split.rev .l h1 {
+  font-size: clamp(28px, 5vw, 48px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+}
+
+/* Progress step indicators */
+.split.rev .l .step-row {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.split.rev .l .step-row .avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.split.rev .l .step-row .avatar svg {
+  display: block;
+}
+
+/* Bottom note in left panel */
+.split.rev .l .note.blue {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
+  color: #fff;
+  padding: 12px 14px;
+  border-radius: 11px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.split.rev .l .note.blue span {
+  flex: 1;
+}
+
+/* Right panel: form area, light background */
+.split.rev .r {
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Step counter row on right panel - matches prototype inline structure */
+.split.rev .r > .row {
+  margin-bottom: 14px;
+  width: 100%;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Demo code styling */
+.demo-code {
+  letter-spacing: 0.25em;
+  font-size: 15px;
+}
+
+/* Mobile: stack panels vertically */
+@media (max-width: 768px) {
+  .split.rev {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+  .split.rev .l {
+    padding: 24px clamp(16px, 4vw, 48px);
+    gap: 16px;
+  }
+  .split.rev .r {
+    padding: 24px clamp(16px, 4vw, 48px);
+  }
+}
+
+/* Landscape phones: prevent vertical overflow */
+@media (max-height: 600px) and (orientation: landscape) {
+  .split.rev {
+    min-height: auto;
+  }
+  .split.rev .l {
+    padding-top: clamp(12px, 2vh, 20px);
+    padding-bottom: clamp(12px, 2vh, 20px);
+    gap: 12px;
+  }
+  .split.rev .r {
+    padding-top: clamp(12px, 2vh, 20px);
+    padding-bottom: clamp(12px, 2vh, 20px);
+  }
+}

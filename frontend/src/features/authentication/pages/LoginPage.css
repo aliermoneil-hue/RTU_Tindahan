@@ -1,0 +1,201 @@
+/* ==========================================================================
+   LOGIN PAGE — split layout matching the prototype
+   ========================================================================== */
+
+/* Split container: left info panel + right form panel */
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* Create account page: reversed split with wider form panel */
+.split.rev {
+  grid-template-columns: 0.8fr 1.2fr;
+}
+
+/* Left panel: navy background, white text */
+/* No side padding so the carousel spans edge-to-edge */
+.split .l {
+  background: var(--navy);
+  color: #fff;
+  padding: 36px 0 clamp(8px, 2vw, 16px) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+/* Logo button in left panel */
+.split .l .logo {
+  align-self: center;
+  margin-bottom: clamp(8px, 2vw, 16px);
+}
+
+/* Bottom note: matches verify page note properties */
+.split .l .note.blue {
+  margin-top: auto;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
+  color: #fff;
+  padding: 12px 14px;
+  border-radius: 11px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.split .l .note.blue span {
+  flex: 1;
+}
+
+/* Info panel below the carousel — boxed text content */
+.info-panel {
+  padding: clamp(20px, 5vw, 10px);
+  margin: 0 clamp(20px, 5vw, 64px) clamp(8px, 2vw, 16px) clamp(20px, 5vw, 64px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Right panel: form, centered */
+.split .r {
+  padding: 36px clamp(16px, 4vw, 56px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Big headline on the left panel */
+.hero-h {
+  font-size: clamp(30px, 4.4vw, 52px);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+  color: #fff;
+}
+
+/* Mobile: stack panels vertically */
+@media (max-width: 768px) {
+  .split {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+  .split .l {
+    background: var(--navy);
+    color: #fff;
+    padding: clamp(16px, 3vh, 24px) 0 clamp(8px, 2vw, 16px) 0;
+    gap: 16px;
+  }
+  .split .r {
+    padding: clamp(16px, 3vh, 24px) clamp(16px, 4vw, 48px);
+  }
+  .info-panel {
+    margin: 0 clamp(16px, 4vw, 48px) clamp(8px, 2vw, 16px) clamp(16px, 4vw, 48px);
+    padding: 20px clamp(16px, 4vw, 48px);
+  }
+  .login-carousel {
+    margin-bottom: clamp(12px, 3vw, 24px);
+  }
+}
+
+/* ==========================================================================
+   LOGIN CAROUSEL — left panel only, auto-sliding, no controls
+   Seamless infinite loop driven by GSAP (see LoginCarousel in LoginPage.tsx).
+   Every card is centered here; GSAP slides, scales and fades each one so the
+   current card is large and its neighbours shrink away on either side.
+   Fully responsive — scales with any screen width
+   ========================================================================== */
+
+/* Negative margins pull the carousel back to the panel edges, overriding side padding */
+.login-carousel {
+  position: relative;
+  width: 100%;
+  min-height: 180px;           /* shorter minimum for small phones */
+  height: clamp(180px, 40vw, 400px);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-carousel-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* Cards are absolutely positioned inside the flex track, so they all start
+   centered; GSAP then drives xPercent / scale / opacity / filter / z-index. */
+.login-carousel-card {
+  position: absolute;
+  flex-shrink: 0;
+  width: clamp(200px, 40vw, 420px);
+  height: clamp(140px, 28vw, 300px);
+  border-radius: clamp(10px, 2vw, 20px);
+  overflow: hidden;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 0; /* GSAP takes over as soon as the carousel mounts */
+  will-change: transform, opacity;
+}
+
+.login-carousel-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Very small screens (phones portrait) */
+@media (max-width: 480px) {
+  .login-carousel {
+    min-height: 160px;
+    height: clamp(160px, 55vw, 260px);
+  }
+  .login-carousel-card {
+    width: clamp(140px, 70vw, 240px);
+    height: clamp(100px, 50vw, 170px);
+  }
+}
+
+/* Small tablets */
+@media (min-width: 481px) and (max-width: 768px) {
+  .login-carousel-card {
+    width: clamp(180px, 55vw, 320px);
+    height: clamp(130px, 40vw, 240px);
+  }
+}
+
+/* Larger screens */
+@media (min-width: 900px) {
+  .login-carousel-card {
+    width: clamp(280px, 42vw, 480px);
+    height: clamp(200px, 32vw, 380px);
+  }
+}
+
+/* Landscape phones — give the carousel more vertical room */
+@media (max-height: 500px) and (orientation: landscape) {
+  .login-carousel {
+    height: clamp(140px, 35vh, 260px);
+    min-height: 140px;
+  }
+  .login-carousel-card {
+    height: clamp(110px, 28vh, 200px);
+  }
+}

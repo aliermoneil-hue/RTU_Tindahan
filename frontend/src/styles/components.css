@@ -198,6 +198,16 @@ textarea.input {
   resize: vertical;
 }
 
+/* ----- ERROR MESSAGES ----- */
+.err {
+  color: var(--red);
+  font-size: 11.5px;
+  margin-top: 3px;
+}
+.border-red-500 {
+  border-color: var(--red) !important;
+}
+
 /* ----- AVATAR (initials circle) ----- */
 .avatar {
   width: 32px;

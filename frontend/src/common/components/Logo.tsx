@@ -1,4 +1,4 @@
-import logoImg from '@/assets/rtu-tindahan-logo.png'
+import logoImg from '@/assets/logo-removebg-preview.png'
 import './Logo.css'
 
 export function Logo() {

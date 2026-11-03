@@ -1,6 +1,6 @@
 /* Entry stylesheet: only imports the shared styles (loaded once from main.tsx).
    The old Vite-template rules that used to be here were removed because they
    forced the whole app into a narrow centered column. */
-@import './src/styles/variables.css';
-@import './src/styles/global.css';
-@import './src/styles/components.css';
+@import './styles/variables.css';
+@import './styles/global.css';
+@import './styles/components.css';

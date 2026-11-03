@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import logoImg from '@/assets/rtu-tindahan-logo.png'
+import logoImg from '@/assets/logo-removebg-preview.png'
 import { navigate } from '@/common/router/router'
 import './PubTop.css'
 

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { navigate, useRoute } from '@/common/router/router'
-import { LoginPage, useAuth } from '@/features/auth'
+import { LoginPage, VerifyPage, useAuth } from '@/features/authentication'
 import { AppLayout } from './layouts/AppLayout'
 import { PublicLayout } from './layouts/PublicLayout'
 import { LandingPage } from './pages/LandingPage'
@@ -43,28 +43,10 @@ export function AppRoutes() {
 
   // ----- visitor -----
   if (path === 'login') {
-    return (
-      <PublicLayout>
-        <LoginPage />
-      </PublicLayout>
-    )
+    return <LoginPage />
   }
   if (path === 'register') {
-    return (
-      <PublicLayout>
-        <div className="g-wrap" style={{ padding: '48px 0' }}>
-          <PlaceholderPage
-            page={{
-              path: 'register',
-              title: 'Create account',
-              icon: 'key',
-              about: 'The sign-up form with RTU email verification.',
-              backend: 'available',
-            }}
-          />
-        </div>
-      </PublicLayout>
-    )
+    return <VerifyPage />
   }
   return (
     <PublicLayout>
