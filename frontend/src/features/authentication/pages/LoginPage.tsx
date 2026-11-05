@@ -199,6 +199,7 @@ export function LoginPage() {
               View guidelines
             </button>
           </div>
+
           <LoginForm
             onSubmit={handleLogin}
             isLoading={isLoading}

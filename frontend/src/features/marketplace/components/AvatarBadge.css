@@ -1,0 +1,100 @@
+/* ==========================================================================
+   AVATAR & VERIFIED BADGE (prototype: .avw, .av-sm, .av-lg, .av-xl, .avatar.staff, .avimg, .vbadge)
+   ========================================================================== */
+
+.avw {
+  --av: 32px;
+  position: relative;
+  display: inline-block;
+  width: var(--av);
+  height: var(--av);
+  flex: none;
+}
+.avw.av-sm {
+  --av: 30px;
+}
+.avw.av-md {
+  --av: 32px;
+}
+.avw.av-lg {
+  --av: 48px;
+}
+.avw.av-xl {
+  --av: 96px;
+}
+.avw .avatar {
+  width: 100%;
+  height: 100%;
+  font-size: calc(var(--av) * 0.36);
+  overflow: hidden;
+}
+.avatar.staff {
+  background: var(--yellow);
+  color: var(--yellow-ink);
+}
+.avimg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.vbadge {
+  --b: clamp(13px, calc(var(--av) * 0.36), 24px);
+  position: absolute;
+  right: calc(var(--b) * -0.12);
+  bottom: calc(var(--b) * -0.12);
+  width: var(--b);
+  height: var(--b);
+  border-radius: 50%;
+  background: var(--navy);
+  color: #fff;
+  border: 2px solid var(--card);
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  z-index: 2;
+  outline-offset: 2px;
+}
+:root[data-theme='dark'] .vbadge {
+  background: var(--yellow);
+  color: var(--yellow-ink);
+}
+.vbadge .ico {
+  width: 74%;
+  height: 74%;
+  stroke-width: 3;
+}
+.vbadge[data-tip] {
+  cursor: help;
+}
+.vbadge[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: -6px;
+  background: #12233d;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 6px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(3px);
+  transition: opacity 0.12s, transform 0.12s, visibility 0.12s;
+  pointer-events: none;
+  z-index: 60;
+}
+.vbadge[data-tip]:hover::after,
+.vbadge[data-tip]:focus-visible::after,
+.vbadge[data-tip].tip-on::after {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+:root[data-theme='dark'] .vbadge[data-tip]::after {
+  background: #f5f5f5;
+  color: #111;
+}

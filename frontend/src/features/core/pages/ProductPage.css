@@ -1,0 +1,20 @@
+/* ==========================================================================
+   PRODUCT DETAIL PAGE (prototype: .pgrid2, .vopt, .qty)
+   ========================================================================== */
+
+.pgrid2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.vopt:disabled {
+  opacity: 0.5;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+@media (max-width: 900px) {
+  .pgrid2 {
+    grid-template-columns: 1fr;
+  }
+}

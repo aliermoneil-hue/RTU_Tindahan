@@ -1,0 +1,54 @@
+/* ==========================================================================
+   PRODUCT CARD & PHOTO TILE (prototype: .pcard, .photo, .heart, .srcpill)
+   ========================================================================== */
+
+.pcard {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(26, 47, 87, 0.05);
+  transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+}
+.pcard:hover {
+  border-color: #b9c3d8;
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+/* Border top color specifications:
+   - If sold by the school: Blue
+   - If student product: Yellow
+   - If service: Red
+*/
+.pcard.type-school,
+.pcard.src-school:not(.is-service) {
+  border-top: 4px solid var(--blue, #2251a3);
+}
+.pcard.type-student,
+.pcard.src-student:not(.is-service) {
+  border-top: 4px solid var(--yellow, #e5a712);
+}
+.pcard.type-service,
+.pcard.is-service,
+.pcard.src-service {
+  border-top: 4px solid var(--red, #b33939);
+}
+
+.pcard h4 {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pcard {
+    transition: none;
+  }
+}

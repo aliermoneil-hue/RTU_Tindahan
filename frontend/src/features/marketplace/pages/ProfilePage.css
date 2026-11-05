@@ -1,0 +1,20 @@
+/* ==========================================================================
+   PROFILE PAGE (prototype: .profile-two, .daypick)
+   ========================================================================== */
+
+.profile-two {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.3fr);
+  gap: 18px;
+  align-items: start;
+}
+.daypick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+@media (max-width: 1000px) {
+  .profile-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

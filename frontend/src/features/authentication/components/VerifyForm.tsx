@@ -21,16 +21,7 @@ interface Step1Data {
   email: string
   pass: string
   pass2: string
-}
-
-interface Step2Data {
-  email: string
   code: string
-  sent: boolean
-  busy: boolean
-  demo?: boolean
-  demoCode?: string
-  info?: string
 }
 
 interface VerifyFormProps {
@@ -46,12 +37,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
     email: '',
     pass: '',
     pass2: '',
-  })
-  const [step2, setStep2] = useState<Step2Data>({
-    email: '',
     code: '',
-    sent: false,
-    busy: false,
   })
   // Per-field errors shown below each input
   const [firstErr, setFirstErr] = useState<string | null>(null)
@@ -60,7 +46,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
   const [passErr, setPassErr] = useState<string | null>(null)
   const [pass2Err, setPass2Err] = useState<string | null>(null)
   const [codeErr, setCodeErr] = useState<string | null>(null)
-  const { register } = useAuth()
+  const { sendCode, verifyCode, otp } = useAuth()
 
   const clearAllErr = useCallback(() => {
     setFirstErr(null)
@@ -79,22 +65,22 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
     }
   }
 
-  // ---------------- STEP 1 ----------------
+  // -----------------------------------------------------------------------
+  // STEP 1: student account — name, program, RTU email, password
+  // -----------------------------------------------------------------------
   const handleStep1Submit = async (e: React.FormEvent) => {
     e.preventDefault()
     clearAllErr()
-    const { first, last, prog, email, pass, pass2 } = step1
+    const { first, last, email, pass, pass2 } = step1
 
-    if (!first.trim()) {
-      setFirstErr('Enter your first name.')
+    if (!first.trim() || !last.trim()) {
+      if (!first.trim()) setFirstErr('Enter your first name.')
+      if (!last.trim()) setLastErr('Enter your last name.')
       return
     }
-    if (!last.trim()) {
-      setLastErr('Enter your last name.')
-      return
-    }
-    if (!RTU_EMAIL.test(email)) {
-      setEmailErr('Use your RTU student email, like 2024-123456@rtu.edu.ph.')
+    const em = email.trim().toLowerCase()
+    if (!RTU_EMAIL.test(em)) {
+      setEmailErr('Use your student number email, like 2024-123456@rtu.edu.ph.')
       return
     }
     if (!pass) {
@@ -102,7 +88,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
       return
     }
     if (pass.length < 8) {
-      setPassErr('Password must be at least 8 characters.')
+      setPassErr('Choose a password with at least 8 characters.')
       return
     }
     if (!pass2) {
@@ -110,103 +96,102 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
       return
     }
     if (pass !== pass2) {
-      setPass2Err('Passwords do not match.')
+      setPass2Err('The two passwords do not match.')
       return
     }
 
     try {
-      await register({
-        email,
-        display_name: `${first.trim()} ${last.trim()}`,
-        password: pass,
-        password_confirm: pass2,
-        member_type: 'student',
-        college: prog,
-        year_level: null,
-        contact_number: '',
-        privacy_consent: true,
-      })
-      setStep2((prev) => ({ ...prev, email, sent: true }))
+      await sendCode(em, first.trim())
+      setStep1((prev) => ({ ...prev, email: em }))
       setStep(2)
+      window.scrollTo(0, 0)
     } catch (err) {
       setEmailErr(err instanceof Error ? err.message : 'Account creation failed. Try again.')
     }
   }
 
-  // ---------------- STEP 2 ----------------
+  // -----------------------------------------------------------------------
+  // STEP 2a: before code sent — "Send code" button
+  // -----------------------------------------------------------------------
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault()
     clearAllErr()
-    setStep2((prev) => ({ ...prev, busy: true }))
-    // Simulate sending code; the backend endpoint would be called here.
-    // For demo purposes, show a demo code.
-    setTimeout(() => {
-      setStep2((prev) => ({
-        ...prev,
-        busy: false,
-        demo: true,
-        demoCode: '123456',
-      }))
-    }, 1200)
+    try {
+      await sendCode(step1.email.trim().toLowerCase(), step1.first.trim())
+      window.scrollTo(0, 0)
+    } catch (err) {
+      setEmailErr(err instanceof Error ? err.message : 'Could not send code. Try again.')
+    }
   }
 
-  const handleResendCode = () => {
+  // -----------------------------------------------------------------------
+  // STEP 2b: code sent — enter the 6-digit code
+  // -----------------------------------------------------------------------
+  const handleResendCode = async () => {
     clearAllErr()
-    setStep2((prev) => ({ ...prev, busy: true }))
-    setTimeout(() => {
-      setStep2((prev) => ({
-        ...prev,
-        busy: false,
-        demo: true,
-        demoCode: '123456',
-      }))
-    }, 1200)
+    try {
+      await sendCode(step1.email.trim().toLowerCase(), step1.first.trim())
+    } catch (err) {
+      setEmailErr(err instanceof Error ? err.message : 'Could not resend code. Try again.')
+    }
   }
 
   const handleChangeEmail = () => {
     setStep(1)
+    setStep1((prev) => ({ ...prev, code: '' }))
   }
 
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault()
     clearAllErr()
-    if (!/^\d{6}$/.test(step2.code)) {
-      setCodeErr('Enter the 6-digit code.')
+    if (!/^\d{6}$/.test(step1.code)) {
+      setCodeErr('Enter the 6 digits from the email.')
       return
     }
     try {
-      await register({
-        email: step2.email,
-        display_name: `${step1.first.trim()} ${step1.last.trim()}`,
-        password: step1.pass,
-        password_confirm: step1.pass2,
-        member_type: 'student',
-        college: step1.prog,
-        year_level: null,
-        contact_number: '',
-        privacy_consent: true,
+      await verifyCode(step1.code, {
+        first: step1.first,
+        last: step1.last,
+        email: step1.email,
+        pass: step1.pass,
+        prog: step1.prog,
       })
       setStep(3)
       onStep3Complete?.()
     } catch (err) {
-      setEmailErr(err instanceof Error ? err.message : 'Code verification failed. Try again.')
+      setCodeErr(err instanceof Error ? err.message : 'Code verification failed. Try again.')
     }
   }
 
+  // -----------------------------------------------------------------------
+  // Helpers
+  // -----------------------------------------------------------------------
   const maskMail = (m: string) => {
     const p = String(m).split('@')
     return `${p[0].slice(0, 2)}***@${p[1] || ''}`
   }
 
+  // Keep step1 in sync with OTP email
+  const demoCode = otp?.code ?? null
+  const otpEmail = otp?.to ?? step1.email
+
   return (
     <form
-      onSubmit={
-        step === 1 ? handleStep1Submit : step === 2 ? handleSendCode : handleVerifyCode
-      }
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (step === 1) {
+          handleStep1Submit(e)
+        } else if (step === 2 && otp) {
+          handleVerifyCode(e)
+        } else if (step === 2 && !otp) {
+          handleSendCode(e)
+        }
+      }}
       className="stack"
       style={{ gap: 14, maxWidth: 560 }}
       noValidate
     >
+      {/* ============ STEP 1 ============ */}
       {step === 1 ? (
         <>
           <h1 style={{ fontSize: 26, letterSpacing: '-0.02em', marginBottom: 4 }}>
@@ -284,6 +269,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
                   setEmailErr(null)
                 }}
               />
+              <span className="tiny muted">Format: 4 digits, a dash, 6 digits, then @rtu.edu.ph</span>
               {emailErr && <p className="err" role="alert">{emailErr}</p>}
             </div>
             <div className="grid2">
@@ -320,6 +306,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
               </div>
             </div>
           </div>
+          <div className="err" role="alert">{emailErr}</div>
           <div className="row between wrap">
             <button
               type="button"
@@ -336,149 +323,153 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
             </span>
           </div>
         </>
-      ) : step === 2 && !step2.sent ? (
-        <>
-          <h1 style={{ fontSize: 26, letterSpacing: '-0.02em', marginBottom: 4 }}>
-            Confirm your RTU email
-          </h1>
-          <p className="small muted" style={{ marginBottom: 16 }}>
-            We will email a 6-digit code to <b>{maskMail(step1.email)}</b>. Open that inbox, copy
-            the code and enter it on the next screen.
-          </p>
-          <div className="card stack" style={{ gap: 12 }}>
-            <div className="note blue">
-              <Icon name="lock" size="sm" />
-              <span>
-                The code goes only to your RTU student-number email. It proves the account is really
-                yours.
-              </span>
-            </div>
-          </div>
-          <div className="row between wrap">
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={handleChangeEmail}
-            >
-              <Icon name="back" size="sm" /> Back
-            </button>
-            <button
-              className="btn lg"
-              type="submit"
-              disabled={step2.busy}
-            >
-              {step2.busy ? 'Sending...' : 'Send code'}
-            </button>
-          </div>
-        </>
-      ) : step === 2 && step2.sent ? (
-        <>
-          <h1 style={{ fontSize: 26, letterSpacing: '-0.02em', marginBottom: 4 }}>
-            Enter your code
-          </h1>
-          <p className="small muted" style={{ marginBottom: 16 }}>
-            We sent a 6-digit code to your RTU email{' '}
-            <b>{maskMail(step2.demo ? step2.email : step1.email)}</b>. It expires in 5 minutes.
-            Check your spam folder if you do not see it.
-          </p>
-          {step2.demo && (
-            <div className="note" role="status">
-              <Icon name="info" size="sm" />
-              <span>
-                <b>Demo mode.</b> No email service is connected, so nothing was emailed. Your code is{' '}
-                <b className="demo-code tnum" style={{ letterSpacing: '0.25em', fontSize: 15 }}>
-                  {step2.demoCode}
-                </b>
-              </span>
-            </div>
-          )}
-          <div className="card stack" style={{ gap: 12 }}>
-            <div className="field">
-              <label htmlFor="v-code">6-digit code</label>
-              <input
-                className={`input otp tnum ${codeErr ? 'border-red-500' : ''}`}
-                id="v-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                pattern="[0-9]*"
-                value={step2.code}
-                placeholder="000000"
-                onChange={(e) => {
-                  setStep2((prev) => ({ ...prev, code: e.target.value.replace(/\D/g, '') }))
-                  setCodeErr(null)
-                }}
-              />
-              {codeErr && <p className="err" role="alert">{codeErr}</p>}
-            </div>
-            <div className="row wrap">
-              <button
-                type="button"
-                className="link"
-                onClick={handleResendCode}
-              >
-                Send a new code
-              </button>
-              <span className="muted">·</span>
-              <button
-                type="button"
-                className="link"
-                onClick={handleChangeEmail}
-              >
-                Use a different RTU email
-              </button>
-            </div>
-          </div>
-          {step2.info && <div className="small" style={{ color: 'var(--green)' }}>{step2.info}</div>}
-          <div className="row between wrap">
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={handleChangeEmail}
-            >
-              <Icon name="back" size="sm" /> Back
-            </button>
-            <button className="btn lg" type="submit">
-              Verify and create account
-            </button>
-          </div>
-        </>
       ) : (
-        // STEP 3 - All set
+        // ============ STEP 2 ============
         <>
-          <div className="card stack" style={{ maxWidth: 560, gap: 14, alignItems: 'flex-start' }}>
-            <span
-              className="avatar"
-              style={{
-                background: 'var(--green-bg)',
-                color: 'var(--green)',
-                width: 46,
-                height: 46,
+          {!otp ? (
+            // Step 2 before code sent
+            <>
+              <h1 style={{ fontSize: 26, letterSpacing: '-0.02em', marginBottom: 4 }}>
+                Confirm your RTU email
+              </h1>
+              <p className="small muted" style={{ marginBottom: 16 }}>
+                We will email a 6-digit code to <b>{maskMail(step1.email)}</b>. Open that inbox,
+                copy the code and enter it on the next screen.
+              </p>
+              <div className="card stack" style={{ gap: 12 }}>
+                <div className="note blue">
+                  <Icon name="lock" size="sm" />
+                  <span>
+                    The code goes only to your RTU student-number email. It proves the account is
+                    really yours.
+                  </span>
+                </div>
+              </div>
+              <div className="err" role="alert">{emailErr}</div>
+              <div className="row between wrap">
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={handleChangeEmail}
+                >
+                  <Icon name="back" size="sm" /> Back
+                </button>
+                <button className="btn lg" type="button" onClick={handleSendCode}>
+                  Send code
+                </button>
+              </div>
+            </>
+          ) : (
+            // Step 2 after code sent — enter the code
+            <>
+              <h1 style={{ fontSize: 26, letterSpacing: '-0.02em', marginBottom: 4 }}>
+                Enter your code
+              </h1>
+              <p className="small muted" style={{ marginBottom: 16 }}>
+                We sent a 6-digit code to your RTU email <b>{maskMail(otpEmail)}</b>. It expires in
+                5 minutes. Check your spam folder if you do not see it.
+              </p>
+              {otp?.demo && (
+                <div className="note" role="status">
+                  <Icon name="info" size="sm" />
+                  <span>
+                    <b>Demo mode.</b> No email service is connected, so nothing was emailed. Your
+                    code is{' '}
+                    <b className="demo-code tnum" style={{ letterSpacing: '0.25em', fontSize: 15 }}>
+                      {demoCode}
+                    </b>
+                  </span>
+                </div>
+              )}
+              <div className="card stack" style={{ gap: 12 }}>
+                <div className="field">
+                  <label htmlFor="v-code">6-digit code</label>
+                  <input
+                    className={`input otp tnum ${codeErr ? 'border-red-500' : ''}`}
+                    id="v-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    pattern="[0-9]*"
+                    value={step1.code}
+                    placeholder="000000"
+                    onChange={(e) => {
+                      setStep1((prev) => ({ ...prev, code: e.target.value.replace(/\D/g, '') }))
+                      setCodeErr(null)
+                    }}
+                  />
+                  {codeErr && <p className="err" role="alert">{codeErr}</p>}
+                </div>
+                <div className="row wrap">
+                  <button
+                    type="button"
+                    className="link"
+                    onClick={handleResendCode}
+                  >
+                    Send a new code
+                  </button>
+                  <span className="muted">·</span>
+                  <button
+                    type="button"
+                    className="link"
+                    onClick={handleChangeEmail}
+                  >
+                    Use a different RTU email
+                  </button>
+                </div>
+              </div>
+              <div className="err" role="alert">{codeErr}</div>
+              <div className="row between wrap">
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={handleChangeEmail}
+                >
+                  <Icon name="back" size="sm" /> Back
+                </button>
+                <button className="btn lg" type="submit">
+                  Verify and create account
+                </button>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {/* ============ STEP 3 ============ */}
+      {step === 3 && (
+        <div className="card stack" style={{ maxWidth: 560, gap: 14, alignItems: 'flex-start' }}>
+          <span
+            className="avatar"
+            style={{
+              background: 'var(--green-bg)',
+              color: 'var(--green)',
+              width: 46,
+              height: 46,
+            }}
+          >
+            <Icon name="check" />
+          </span>
+          <h2 style={{ fontSize: 24 }}>Welcome, {step1.first.trim() || 'friend'}</h2>
+          <p className="muted">
+            Your RTU email is confirmed and your account is ready. You can buy from the marketplace
+            and sell from My shop. New listings are checked by RTU staff before they appear.
+          </p>
+          <div className="row wrap">
+            <button
+              className="btn"
+              onClick={() => {
+                navigate('marketplace', { replace: true })
+                onStep3Complete?.()
               }}
             >
-              <Icon name="check" />
-            </span>
-            <h2 style={{ fontSize: 24 }}>Welcome, {step1.first.trim() || 'friend'}</h2>
-            <p className="muted">
-              Your RTU email is confirmed and your account is ready. You can buy from the marketplace
-              and sell from My shop. New listings are checked by RTU staff before they appear.
-            </p>
-            <div className="row wrap">
-              <button
-                className="btn"
-                onClick={() => {
-                  navigate('marketplace', { replace: true })
-                  onStep3Complete?.()
-                }}
-              >
-                Go to marketplace
-              </button>
-              <button className="btn ghost" onClick={() => navigate('', { replace: true })}>
-                Back to homepage
-              </button>
-            </div>
+              Go to marketplace
+            </button>
+            <button className="btn ghost" onClick={() => navigate('', { replace: true })}>
+              Back to homepage
+            </button>
           </div>
-        </>
+        </div>
       )}
     </form>
   )

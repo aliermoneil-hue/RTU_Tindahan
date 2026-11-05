@@ -1,0 +1,103 @@
+/* ==========================================================================
+   CREATE / EDIT LISTING PAGE (prototype: .lt-row, .lt-card, .lt-ic, .chip, .daypick, .timepair, .create-two)
+   ========================================================================== */
+
+.create-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+  gap: 18px;
+  align-items: start;
+}
+.lt-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.lt-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.lt-card.on {
+  border-color: var(--navy);
+  background: #fffaf0;
+}
+:root[data-theme='dark'] .lt-card.on {
+  border-color: var(--yellow);
+  background: var(--soft);
+}
+.lt-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.lt-ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--soft);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 99px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.chip button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 2px;
+}
+.daypick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.timepair {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.timepair .tp {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.timepair .input {
+  padding-inline: 8px;
+  min-width: 0;
+}
+.timepair .tp-to {
+  padding-bottom: 12px;
+}
+@media (max-width: 1000px) {
+  .create-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 620px) {
+  .lt-row {
+    grid-template-columns: 1fr;
+  }
+}

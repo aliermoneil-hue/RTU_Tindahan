@@ -257,7 +257,10 @@ export function LandingPage() {
             </div>
             <aside className="card stack" style={{ gap: 10, alignSelf: 'start' }}>
               <b style={{ fontSize: 16 }}>Still stuck?</b>
-              <p className="small muted">These pages explain the rules and the sign-up steps.</p>
+              <p className="small muted">Open the full Help Center & User Manual for step-by-step instructions and policies.</p>
+              <button type="button" className="btn yellow block sm" onClick={() => navigate('help')}>
+                Open Help Center & Manual
+              </button>
               <button className="btn ghost" onClick={() => navigate('register')}>
                 <Icon name="key" size="sm" /> Need help verifying?
               </button>

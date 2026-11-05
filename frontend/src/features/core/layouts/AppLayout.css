@@ -3,11 +3,14 @@
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr);
   min-height: 100vh;
+  background: var(--bg, #f4f6fa);
 }
 .main {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg, #f4f6fa);
 }
 .page {
   padding: 28px 22px 22px;
@@ -17,6 +20,9 @@
   max-width: 1180px;
   width: 100%;
   flex: 1;
+  /* Ensure page fills at least the entire viewport so footer is below the fold and only shows on scroll */
+  min-height: 100vh;
+  box-sizing: border-box;
 }
 .page h1 {
   font-size: 28px;

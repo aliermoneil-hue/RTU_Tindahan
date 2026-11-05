@@ -1,0 +1,20 @@
+/* ==========================================================================
+   CART PAGE (prototype: .cart-two, .photo.cart-photo)
+   ========================================================================== */
+
+.cart-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.9fr);
+  gap: 18px;
+  align-items: start;
+}
+.photo.cart-photo {
+  width: 68px;
+  aspect-ratio: 1;
+  flex: none;
+}
+@media (max-width: 1000px) {
+  .cart-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -41,11 +41,6 @@ export function LoginForm({ onSubmit, isLoading, error, onForgotPassword }: Logi
     onSubmit({ email: trimmed, password })
   }
 
-  const loadDemoStaff = () => {
-    setEmail('admin@rtu.edu.ph')
-    setPassword('password1')
-  }
-
   return (
     <form onSubmit={handleSubmit} className="card stack" style={{ width: '100%', maxWidth: '400px', gap: 14 }} noValidate>
       <div>
@@ -97,16 +92,6 @@ export function LoginForm({ onSubmit, isLoading, error, onForgotPassword }: Logi
           Create and verify my RTU account
         </button>
       </p>
-      <div className="card flat stack" style={{ gap: 8, background: 'var(--bg)' }}>
-        <span className="tiny muted" style={{ fontWeight: 700, letterSpacing: '0.06em' }}>
-          RTU STAFF
-        </span>
-        <div className="row wrap">
-          <button type="button" className="btn ghost sm" onClick={loadDemoStaff}>
-            <Icon name="user" size="sm" /> Use the staff (admin) account
-          </button>
-        </div>
-      </div>
     </form>
   )
 }

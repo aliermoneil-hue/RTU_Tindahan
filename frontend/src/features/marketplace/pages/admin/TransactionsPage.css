@@ -1,0 +1,23 @@
+/* ==========================================================================
+   TRANSACTIONS PAGE (prototype: .txstat, .tx-filters)
+   ========================================================================== */
+
+.txstat {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+.tx-filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 2fr) repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+@media (max-width: 900px) {
+  .tx-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tx-filters .field:first-child {
+    grid-column: 1 / -1;
+  }
+}

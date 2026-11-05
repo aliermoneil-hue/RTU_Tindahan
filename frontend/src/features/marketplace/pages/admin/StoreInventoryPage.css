@@ -1,0 +1,22 @@
+/* ==========================================================================
+   BAO STORE INVENTORY PAGE (v1.6: Stock, Stock Ledger, Item Types, Windows & Limits, Daily Count)
+   ========================================================================== */
+
+.inv-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.inv-formula-card {
+  border-left: 4px solid var(--blue);
+}
+
+#inv-table td,
+#inv-table th {
+  vertical-align: middle;
+}
+
+#recon-table input.input {
+  margin: 0;
+}

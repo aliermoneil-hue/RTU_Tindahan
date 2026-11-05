@@ -25,8 +25,10 @@ export interface PageInfo {
 }
 
 export const APP_PAGES: PageInfo[] = [
-  { path: 'marketplace', title: 'Marketplace', icon: 'home', section: 'BUY', backend: 'missing',
+  { path: 'marketplace', title: 'Marketplace', icon: 'home', section: 'BUY', backend: 'available',
     about: 'Category tiles and the latest listings from verified RTU sellers.' },
+  { path: 'product', title: 'Product', icon: 'tag', backend: 'missing',
+    about: 'Listing detail page: photos, price, meetup point, and reserve button.' },
   { path: 'browse', title: 'Browse All', icon: 'grid', section: 'BUY', backend: 'missing',
     about: 'Search, filter and sort every listing.' },
   { path: 'orders', title: 'My Orders', icon: 'bag', section: 'BUY', backend: 'missing',
@@ -41,10 +43,16 @@ export const APP_PAGES: PageInfo[] = [
     about: 'Your listings and the requests you received.' },
   { path: 'forum', title: 'Forum', icon: 'mega', section: 'COMMUNITY', backend: 'missing',
     about: 'Campus discussion board.' },
+  { path: 'help', title: 'Help Center', icon: 'info', section: 'COMMUNITY', backend: 'missing',
+    about: 'Website user manual, pickup/delivery rules, policies, and frequently asked questions.' },
   { path: 'moderation', title: 'Listing approval', icon: 'shield', section: 'ADMIN', backend: 'missing',
     about: 'Staff review of new listings.' },
   { path: 'users', title: 'Users and audit', icon: 'user', section: 'ADMIN', backend: 'missing',
     about: 'Account management and the audit log.' },
+  { path: 'baoorders', title: 'Store orders', icon: 'bag', section: 'ADMIN', backend: 'missing',
+    about: 'BAO Official RTU Store tickets, face-to-face entry, order sheet, and email outbox.' },
+  { path: 'baostock', title: 'Store inventory', icon: 'tag', section: 'ADMIN', backend: 'missing',
+    about: 'BAO Official RTU Store stock ledger, item types, windows/limits, and daily count.' },
   { path: 'transactions', title: 'Transactions', icon: 'bag', section: 'ADMIN', backend: 'missing',
     about: 'Completed pickups and CSV export.' },
   { path: 'forum-reports', title: 'Forum Reports', icon: 'flag', section: 'ADMIN', backend: 'missing',

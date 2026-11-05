@@ -111,6 +111,13 @@ return (
         >
         Need Help?
         </button>
+        <button
+        type="button"
+        className="nav-tab"
+        onClick={() => handleAuth('help')}
+        >
+        Help Center
+        </button>
     </nav>
 
     <span className="pub-top-spacer" />

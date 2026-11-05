@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import type { User } from '@/common/types'
+import { GlobalOverlays } from '@/features/marketplace/components/GlobalOverlays'
 import { Sidebar } from '../components/Sidebar'
 import { Topbar } from '../components/Topbar'
 import { SiteFooter } from '../components/SiteFooter'
@@ -34,6 +35,7 @@ export function AppLayout({ user, activePath, children }: AppLayoutProps) {
         <main className="page">{children}</main>
         <SiteFooter variant="member" />
       </div>
+      <GlobalOverlays />
     </div>
   )
 }

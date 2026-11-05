@@ -124,7 +124,7 @@
    TARGETS: every .photo tile (the colored product picture boxes, see PHOTO TILES below) while the dark theme is on.
    EFFECT: Turns the colored gradients into grey. */
 :root[data-theme="dark"] .photo {
-  filter: grayscale(1);
+  filter: none;
 }
 
 /* ==========================================================================

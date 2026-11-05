@@ -1,0 +1,223 @@
+/* ==========================================================================
+   PHOTO UPLOADER & PRODUCT GALLERY (prototype: .upl, .uthumb, .uremove, .ubadge, .uadd, .gal-main, .gal-th)
+   ========================================================================== */
+
+.upl {
+  gap: 10px;
+}
+.uthumb {
+  position: relative;
+  width: 96px;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--soft);
+}
+.uthumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.uremove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.92);
+  color: #12233d;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+.uadjust {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(18, 35, 61, 0.85);
+  color: #fff;
+  border: 0;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 0.15s;
+}
+.uadjust:hover {
+  background: var(--blue, #2251a3);
+}
+.ubadge {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: rgba(18, 35, 61, 0.85);
+  color: #fff;
+  border: 0;
+  z-index: 2;
+}
+.btn-mini {
+  cursor: pointer;
+}
+.btn-mini:hover {
+  background: var(--yellow, #e5a712);
+  color: #12233d;
+}
+.uadd {
+  width: 96px;
+  height: 96px;
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  color: var(--muted);
+  text-align: center;
+}
+.uadd:hover,
+.uadd:focus-within {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.uadd.busy {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* --------------------------------------------------------------------------
+   IMAGE ADJUST / CROP MODAL
+   -------------------------------------------------------------------------- */
+.crop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(10, 20, 38, 0.75);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.crop-modal {
+  width: 100%;
+  max-width: 480px;
+  background: var(--card, #fff);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 16px 48px rgba(10, 20, 38, 0.28);
+}
+.crop-viewport {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  aspect-ratio: 4 / 3;
+  margin: 0 auto;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #111b2b;
+  cursor: grab;
+  border: 2px solid var(--blue, #2251a3);
+}
+.crop-viewport.is-dragging {
+  cursor: grabbing;
+}
+.crop-grid-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, rgba(255, 255, 255, 0.15) 1px, transparent 1px) 0 0 / 33.33% 100%,
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.15) 1px, transparent 1px) 0 0 / 100% 33.33%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+}
+
+.gal-main {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+}
+.gal-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.gal-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #12233d;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+.gal-th {
+  width: 68px;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--soft);
+  cursor: pointer;
+}
+.gal-th.on {
+  border-color: var(--yellow);
+}
+.gal-th img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.uorder-row {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  gap: 2px;
+  z-index: 2;
+}
+.uorder-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.92);
+  color: #12233d;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.uorder-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.uorder-btn:not(:disabled):hover {
+  background: var(--yellow, #e5a712);
+}

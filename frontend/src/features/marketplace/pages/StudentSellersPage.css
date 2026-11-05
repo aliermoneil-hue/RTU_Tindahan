@@ -1,0 +1,26 @@
+/* ==========================================================================
+   STUDENT SELLERS PAGE (prototype: .srchead, .heart.sfav-ico)
+   ========================================================================== */
+
+.srchead {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  border-radius: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-left: 6px solid var(--coral, #c25a5a);
+}
+.heart.sfav-ico {
+  position: static;
+  flex: none;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+}
+.heart.sfav-ico.on {
+  color: #d6336c;
+}
