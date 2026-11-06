@@ -1,0 +1,23 @@
+/* ==========================================================================
+   FORUM REPORTS PAGE (prototype: .fcol.wide, .frquote, .frmeta)
+   ========================================================================== */
+
+.fcol.wide {
+  max-width: 980px;
+}
+.frquote {
+  background: var(--soft);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.frmeta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}

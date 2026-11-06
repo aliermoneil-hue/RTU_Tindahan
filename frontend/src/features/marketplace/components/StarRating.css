@@ -1,0 +1,71 @@
+/* ==========================================================================
+   STAR RATING & REVIEW STARS (prototype: .stars, .stars-bg, .stars-fg, .rate-line, .star-in, .star-btn, .bar)
+   ========================================================================== */
+
+.stars {
+  position: relative;
+  display: inline-block;
+  line-height: 1;
+  letter-spacing: 1px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.stars.lg {
+  font-size: 18px;
+}
+.stars-bg {
+  color: var(--line);
+}
+.stars-fg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  color: var(--yellow);
+  white-space: nowrap;
+}
+.rate-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.rate-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.star-in {
+  gap: 4px;
+}
+.star-btn {
+  font-size: 28px;
+  line-height: 1;
+  border: 0;
+  background: none;
+  color: var(--line);
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.star-btn.on {
+  color: var(--yellow);
+}
+.star-btn:focus-visible {
+  outline: 2px solid var(--blue);
+  border-radius: 6px;
+}
+.bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 6px;
+  background: var(--soft);
+  overflow: hidden;
+}
+.bar > div {
+  height: 8px;
+  background: var(--yellow);
+  border-radius: 6px;
+}

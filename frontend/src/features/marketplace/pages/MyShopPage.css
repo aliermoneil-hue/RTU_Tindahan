@@ -1,0 +1,39 @@
+/* ==========================================================================
+   MY SHOP / SELLER DASHBOARD PAGE (prototype: .shop-tabs, .shop-rate-grid, .seller-overview-two)
+   ========================================================================== */
+
+.seller-overview-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 16px;
+}
+.shop-rate-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: 16px;
+  align-items: start;
+}
+.shop-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.shop-tabs .tab {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.shop-tabs .tab .pill {
+  margin-left: 4px;
+}
+@media (max-width: 1000px) {
+  .seller-overview-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .shop-rate-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

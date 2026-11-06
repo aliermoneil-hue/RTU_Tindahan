@@ -1,0 +1,311 @@
+/* ==========================================================================
+   HELP CENTER / WEBSITE USER MANUAL (Clean Shopee-Portal-Inspired Design)
+   ========================================================================== */
+
+.hc-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Clean Navy/Blue Search Hero */
+.hc-hero {
+  background: linear-gradient(135deg, var(--navy) 0%, #123163 65%, var(--blue) 100%);
+  color: #fff;
+  border-radius: 14px;
+  padding: 26px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 6px 20px rgba(10, 20, 38, 0.1);
+}
+.hc-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.hc-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 203, 5, 0.16);
+  color: var(--yellow);
+  border: 1px solid rgba(255, 203, 5, 0.32);
+  border-radius: 99px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.hc-hero h1 {
+  color: #fff;
+  font-size: clamp(20px, 2.6vw, 25px);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.hc-hero p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.84);
+  max-width: 62ch;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hc-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 10px;
+  padding: 8px 14px;
+  max-width: 580px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+}
+.hc-search-wrap input {
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #0f172a;
+  font-size: 13.5px;
+  flex: 1;
+  min-width: 0;
+}
+.hc-search-clear {
+  background: #f1f5f9;
+  color: #475569;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hc-quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.hc-quick-chip {
+  background: rgba(255, 255, 255, 0.13);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 99px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.hc-quick-chip:hover {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+/* Main two-column portal layout (no duplicate category card grid above) */
+.hc-layout {
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.hc-sidebar {
+  position: sticky;
+  top: 76px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px;
+}
+.hc-sidebar-head {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 4px 10px 8px;
+}
+.hc-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.hc-nav-btn:hover {
+  background: var(--soft);
+}
+.hc-nav-btn.on {
+  background: var(--soft);
+  color: var(--blue);
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+.hc-nav-ic {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.hc-nav-btn.on .hc-nav-ic {
+  background: var(--blue);
+  color: #fff;
+}
+.hc-nav-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Section header card */
+.hc-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 20px;
+}
+.hc-section-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--soft);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+/* Clean Guide Article Cards */
+.hc-topic-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hc-topic-card h3 {
+  margin: 0;
+  font-size: 15.5px;
+  color: var(--ink);
+}
+.hc-topic-summary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.hc-step-list {
+  margin: 2px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.hc-step-list li::marker {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+/* Expandable FAQ accordion */
+.hc-faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hc-faq-item {
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--card);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.hc-faq-item.open {
+  border-color: var(--blue);
+}
+.hc-faq-q {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  padding: 13px 16px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hc-faq-q:hover {
+  background: var(--soft);
+}
+.hc-faq-toggle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex: none;
+}
+.hc-faq-item.open .hc-faq-toggle {
+  background: var(--soft);
+  color: var(--blue);
+}
+.hc-faq-a {
+  padding: 12px 16px 15px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.6;
+  background: var(--bg);
+}
+
+/* Section Pager (Previous / Next section) */
+.hc-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+@media (max-width: 920px) {
+  .hc-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hc-sidebar {
+    position: static;
+  }
+}

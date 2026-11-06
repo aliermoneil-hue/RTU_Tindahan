@@ -1,0 +1,111 @@
+/* ==========================================================================
+  SITE FOOTER (matches prototype: navy guest footer)
+  ========================================================================== */
+
+.sitefoot {
+  margin-top: auto;
+  background: var(--navy);
+  border-top: 0;
+  color: #d8e0ef;
+  padding: 28px clamp(16px, 3vw, 28px) 18px;
+}
+
+.sitefoot .logo-img {
+  height: 56px;
+  border-radius: 0;
+}
+
+.sitefoot .sf-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 28px;
+  max-width: 1180px;
+}
+
+.sitefoot h3 {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--yellow);
+  margin-bottom: 10px;
+}
+
+.sitefoot ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sitefoot .sf-brand p {
+  margin-top: 10px;
+  max-width: 44ch;
+  color: #aebbd6;
+}
+
+.sitefoot .sf-base {
+  max-width: 1180px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  color: #aebbd6;
+}
+
+.flink {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #e8edf7;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.flink:hover {
+  color: var(--yellow);
+  text-decoration: underline;
+}
+
+/* Guest footer lines up with the landing page width */
+.sitefoot.sf-guest {
+  padding-inline: clamp(16px, 4.45vw, 64px);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.sitefoot.sf-guest .sf-grid,
+.sitefoot.sf-guest .sf-base {
+  max-width: 1360px;
+  margin-inline: auto;
+}
+
+/* Link hover on guest/footer */
+.sitefoot a {
+  color: #e8edf7;
+  text-decoration: none;
+}
+
+.sitefoot a:hover {
+  color: var(--yellow);
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .sitefoot .sf-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .sitefoot .sf-brand {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .sitefoot .sf-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}

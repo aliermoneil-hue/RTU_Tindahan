@@ -1,0 +1,27 @@
+/* ==========================================================================
+   USERS AND AUDIT PAGE (prototype: .adm-stats, .adm-stat, .adm-filters, .adm-tbl)
+   ========================================================================== */
+
+.adm-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+button.adm-stat {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+button.adm-stat:hover {
+  border-color: var(--blue);
+}
+.adm-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+.adm-tbl td,
+.adm-tbl th {
+  vertical-align: top;
+}

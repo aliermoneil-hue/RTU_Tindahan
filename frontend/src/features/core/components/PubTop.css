@@ -1,0 +1,212 @@
+/* ==========================================================================
+  PUBLIC PAGES (top bar and split layouts) — matches prototype exactly
+  ========================================================================== */
+
+/* RULE: .pub-top  (PUBLIC PAGES: top bar) */
+.pub-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px clamp(16px, 4.45vw, 64px);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--navy);
+  border-bottom: 0;
+  color: #fff;
+}
+
+/* RULE: .pub-top nav */
+.pub-top nav {
+  display: flex;
+  gap: 4px;
+  margin-left: 18px;
+}
+
+/* RULE: .pub-top nav button  (unselected tabs) */
+.pub-top nav button {
+  background: none;
+  border: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #d8e0ef;
+  white-space: nowrap;
+}
+
+/* RULE: .pub-top nav button:hover */
+.pub-top nav button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* RULE: .pub-top nav button.on  (selected tab — yellow) */
+.pub-top nav button.on {
+  color: var(--yellow);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Spacer pushes the auth buttons to the far right */
+.pub-top-spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Auth button group */
+.pub-top-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ----- Auth buttons: match prototype .pub-top .btn ----- */
+
+.pub-top .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 9px 16px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--blue-ink);
+  transition: filter 0.15s, transform 0.05s;
+}
+
+.pub-top .btn:hover {
+  filter: brightness(1.08);
+}
+
+.pub-top .btn:active {
+  transform: translateY(1px);
+}
+
+/* .btn.sm */
+.pub-top .btn.sm {
+  padding: 6px 11px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+/* .btn.ghost — Sign in (ghostly white border on navy) */
+.pub-top .btn.ghost {
+  background: transparent;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.pub-top .btn.ghost:not([disabled]):hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #fff;
+}
+
+/* .btn:not(.ghost) — Create account (yellow) */
+.pub-top .btn:not(.ghost) {
+  background: var(--yellow);
+  color: var(--yellow-ink);
+}
+
+.pub-top .btn:not(.ghost):hover {
+  background: #ffcb80;
+}
+
+/* Logo image */
+.pub-top .logo-img {
+  border-radius: 0;
+  height: 52px;
+  width: auto;
+  flex: none;
+}
+
+/* Logo button */
+.pub-top .logo {
+  background: none;
+  border: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  flex: none;
+}
+
+/* AWNING STRIPE — yellow / cream / red scallops under the pub-top bar */
+.pub-top::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -10px;
+  height: 10px;
+  background: var(--awning);
+  -webkit-mask: radial-gradient(11px 10px at 50% 0, #000 98%, transparent 100%) 0 0 / 22px 100%
+repeat-x;
+  mask: radial-gradient(11px 10px at 50% 0, #000 98%, transparent 100%) 0 0 / 22px 100% repeat-x;
+  pointer-events: none;
+}
+
+/* ----- MOBILE: max-width 1100px ----- */
+@media (max-width: 1100px) {
+  .pub-top nav {
+    gap: 2px;
+    margin-left: 10px;
+  }
+  .pub-top nav button {
+    padding: 8px 8px;
+  }
+  .pub-top .logo {
+    flex: none;
+  }
+  .pub-top .logo-img {
+    height: 46px;
+  }
+}
+
+/* ----- MOBILE: max-width 900px ----- */
+@media (max-width: 900px) {
+  .pub-top {
+    flex-wrap: wrap;
+    padding: 10px 16px;
+    gap: 8px 10px;
+  }
+  .pub-top nav {
+    display: flex;
+    order: 5;
+    flex: 0 0 100%;
+    margin: 0;
+    overflow-x: auto;
+    gap: 2px;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .pub-top nav::-webkit-scrollbar {
+    display: none;
+  }
+  .btn.sm,
+  .tab,
+  .nav {
+    min-height: 36px;
+  }
+}
+
+/* ----- MOBILE: max-width 640px ----- */
+@media (max-width: 640px) {
+  .pub-top .btn {
+    padding: 7px 10px;
+  }
+}
+
+/* ----- MOBILE: max-width 600px ----- */
+@media (max-width: 600px) {
+  .pub-top .logo-img {
+    height: 42px;
+  }
+  .pub-top::after,
+  .top::after {
+    height: 8px;
+    bottom: -8px;
+  }
+}

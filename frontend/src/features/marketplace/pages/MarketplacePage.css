@@ -1,0 +1,95 @@
+/* ==========================================================================
+   MARKETPLACE PAGE (prototype: .catwrap, .catrow, .catchip, .catarrow, .pgrid4)
+   ========================================================================== */
+
+.catwrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.catrow {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 4px 2px 8px;
+  flex: 1;
+  min-width: 0;
+  outline-offset: 2px;
+}
+.catrow::-webkit-scrollbar {
+  display: none;
+}
+.catchip {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 13px;
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s, color 0.15s, transform 0.05s;
+}
+.catchip:hover {
+  border-color: var(--navy);
+  color: var(--navy);
+  background: #fffaf0;
+}
+:root[data-theme='dark'] .catchip:hover {
+  background: var(--soft);
+  color: var(--yellow);
+  border-color: var(--yellow);
+}
+.catchip:active {
+  transform: translateY(1px);
+}
+.catico {
+  color: var(--blue);
+  display: inline-grid;
+}
+.catarrow {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow);
+  transition: opacity 0.15s;
+}
+.catarrow.l .ico {
+  transform: rotate(90deg);
+}
+.catarrow.r .ico {
+  transform: rotate(-90deg);
+}
+.catwrap.at-start .catarrow.l,
+.catwrap.at-end .catarrow.r {
+  opacity: 0.3;
+  pointer-events: none;
+}
+.catwrap.no-scroll .catarrow {
+  display: none;
+}
+@media (hover: none), (max-width: 640px) {
+  .catarrow {
+    display: none;
+  }
+}

@@ -1,0 +1,14 @@
+/* ==========================================================================
+   CONFIRM REQUEST SENT PAGE (prototype: .confirm-two)
+   ========================================================================== */
+
+.confirm-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+@media (max-width: 1000px) {
+  .confirm-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

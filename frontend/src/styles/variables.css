@@ -1,0 +1,271 @@
+/* ==========================================================================
+   RTU TINDAHAN STYLES
+   One stylesheet for the whole site. Search for a section name below to jump to it.
+   Sections, in order:
+     - RESET
+     - THEME COLORS
+     - BASE ELEMENTS
+     - TEXT AND LAYOUT HELPERS
+     - BUTTONS
+     - PILLS
+     - CARDS, NOTES, FORM FIELDS AND ICONS
+     - LOGO
+     - PHOTO TILES
+     - PRODUCT CARDS
+     - APP SHELL
+     - TABS, STEPPERS, TABLES, QUANTITY BOX, TOAST
+     - PUBLIC PAGES
+     - SMALL-SCREEN RULES FOR PUBLIC PAGES, FORMS AND THE SIDE DRAWER
+     - GUEST HOMEPAGE
+     - RESPONSIVE: PHONE, TABLET, LAPTOP, LARGE SCREENS
+     - SMALL ADDITIONS
+     - VERSION 1.2 ADDITIONS
+     - SELLER GROUPS AND SOURCE LABELS
+     - SERVICES CORNER
+     - MESSAGES
+     - FORUM
+     - TRANSACTIONS
+   ========================================================================== */
+
+/* ==========================================================================
+   RESET
+   ========================================================================== */
+/* RULE: * { margin: 0 }  (RESET, part 1)
+   TARGETS: every element on every page.
+   EFFECT: Removes the browser's default outer spacing (margin) from all elements, so spacing in this site comes only from the gap, padding and margin values written in the rules below and in inline style attributes in the JS templates. */
+* {
+  margin: 0;
+}
+/* RULE: [hidden] { display: none !important }
+   TARGETS: any element that has the HTML attribute hidden. In this project the hidden file input #imp-file ("Import backup" in Staff tools, js/10-staff-storage-boot.js) uses it.
+   EFFECT: Forces the element to stay invisible even if another rule sets its display. The !important is what makes it win. */
+[hidden] {
+  display: none !important;
+}
+
+/* ==========================================================================
+   THEME COLORS (CSS VARIABLES)
+   Change colors here. The dark theme overrides the same names further down.
+   ========================================================================== */
+/* NOTE ON THE FILE: the sentence below describes the layout idea. Public pages (home, login, verify) are full width. Signed-in pages use a navy sidebar, a top bar and a content area (built by shell() in js/6-accounts-login.js). */
+/* Layout: public pages (home, login, verify) full width; app pages use navy sidebar + topbar + content, like the Figma frames */
+/* RULE: :root { ... }  LIGHT THEME VARIABLES
+   TARGETS: the html element, so every variable below is available to every rule in this file as var(--name).
+   VARIABLES (what each color is used for):
+     --navy and --navy2: dark blue of the sidebar, the navy pills and the dark banners.
+     --blue and --blue-ink: main button and link color, and the text color placed on top of it.
+     --yellow and --yellow-ink: accent buttons (class btn yellow) and the logo mark, and the text on them.
+     --bg: page background behind the cards.  --card: background of cards, inputs and ghost buttons.
+     --ink: main text color.  --muted: grey secondary text.  --line: borders and dividers.  --soft: light blue tint (chips, soft panels, hover areas).
+     --green and --green-bg: success text and its background.  --red and --red-bg: error or danger text and its background.
+     --warn-bg and --warn-line: yellow notice background and border.
+     --side-ink and --side-mute: text colors inside the navy sidebar.
+     color-scheme: light tells the browser to draw built-in controls (scrollbars, checkboxes) in the light style.
+     --f-body: the font stack (Inter first, then system fonts) used by body.
+     --shadow: the card shadow.
+   TO CHANGE the site colors, edit these values. The dark theme block below must be changed too if you want the same change in dark mode. */
+:root {
+  --navy: #0e2f5a;
+  --navy2: #16407a;
+  --blue: #1f5fae;
+  --blue-ink: #ffffff;
+  --yellow: #f4b63a;
+  --yellow-ink: #3a2a00;
+  --bg: #f2f5f9;
+  --card: #ffffff;
+  --ink: #12233d;
+  --muted: #5f6f87;
+  --line: #dde4ee;
+  --soft: #eaf0f8;
+  --green: #1e8e5a;
+  --green-bg: #e6f5ec;
+  --red: #c0392b;
+  --red-bg: #fbeae8;
+  --warn-bg: #fff4d6;
+  --warn-line: #f0d58a;
+  --side-ink: #d6e2f3;
+  --side-mute: #8fa6c6;
+  color-scheme: light;
+  --f-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --shadow: 0 1px 2px rgba(14, 47, 90, 0.06), 0 4px 14px rgba(14, 47, 90, 0.06);
+  --awning: repeating-linear-gradient(90deg, #ffbd59 0 22px, #fffaf0 22px 44px, #c25a5a 44px 66px,
+ #fffaf0 66px 88px);
+}
+/* NOTE ON THE FILE: the sentence below explains when the dark values apply. The theme choice is saved by ACT.theme in js/5-actions-events.js and read at page load by the inline script in index.html. */
+/* Light is the default. Dark mode only turns on when the user picks it (saved in localStorage). Dark uses black, grey and white. */
+/* RULE: :root[data-theme="dark"] { ... }  DARK THEME VARIABLES
+   TARGETS: the html element only when it carries data-theme="dark" (set by ACT.theme and by the inline script in index.html).
+   EFFECT: Replaces the same variable names with dark values (near-black backgrounds, light text, grey lines), so every rule that uses var(--...) changes color without being rewritten. Note that in dark mode --blue becomes a light grey (#e8e8e8) and --blue-ink becomes dark, so blue buttons turn light with dark text. --yellow stays the same. color-scheme: dark makes built-in controls dark. */
+:root[data-theme="dark"] {
+  --navy: #050505;
+  --navy2: #262626;
+  --blue: #e8e8e8;
+  --blue-ink: #111111;
+  --yellow: #f4b63a;
+  --yellow-ink: #3a2a00;
+  --bg: #121212;
+  --card: #1c1c1c;
+  --ink: #f5f5f5;
+  --muted: #a3a3a3;
+  --line: #333333;
+  --soft: #2a2a2a;
+  --green: #6fcf97;
+  --green-bg: #1f2a24;
+  --red: #ef8a80;
+  --red-bg: #2e1f1f;
+  --warn-bg: #2b2b2b;
+  --warn-line: #4a4a4a;
+  --side-ink: #e5e5e5;
+  --side-mute: #8a8a8a;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+/* RULE: :root[data-theme="dark"] .photo { filter: grayscale(1) }
+   TARGETS: every .photo tile (the colored product picture boxes, see PHOTO TILES below) while the dark theme is on.
+   EFFECT: Turns the colored gradients into grey. */
+:root[data-theme="dark"] .photo {
+  filter: none;
+}
+
+/* ==========================================================================
+   BASE ELEMENTS
+   Default look of body text, links, form controls and headings.
+   ========================================================================== */
+/* RULE: * { box-sizing: border-box }  (BASE ELEMENTS, part 1)
+   TARGETS: every element.
+   EFFECT: Width and height include padding and border, so a box with width 100% and padding does not overflow its parent. */
+* {
+  box-sizing: border-box;
+}
+/* RULE: html, body { height: auto }
+   TARGETS: the html and body elements.
+   EFFECT: Lets the page height follow its content. */
+html,
+body {
+  height: auto;
+}
+/* RULE: body
+   TARGETS: the body element, which holds #root and #toast-host (index.html).
+   EFFECT: Page background (--bg), text color (--ink), font family (--f-body, Inter), base text size 14px, line height 1.45, no side padding, and smoother font drawing on Mac and iOS (-webkit-font-smoothing). */
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 14px;
+  line-height: 1.45;
+  padding-inline: 0;
+  -webkit-font-smoothing: antialiased;
+}
+/* RULE: button, input, select, textarea { font: inherit; color: inherit }
+   TARGETS: all buttons and form controls.
+   EFFECT: They use the same font and text color as the surrounding text instead of the browser's default control font. This is why buttons look like the rest of the page. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+/* RULE: button { cursor: pointer }
+   TARGETS: every button. EFFECT: Shows the hand cursor on hover. */
+button {
+  cursor: pointer;
+}
+/* RULE: a
+   TARGETS: <a> links (the project uses buttons for nearly all clicks, so this rarely applies).
+   EFFECT: Link color is --blue and the underline is removed. */
+a {
+  color: var(--blue);
+  text-decoration: none;
+}
+/* RULE: :focus-visible
+   TARGETS: any element that receives keyboard focus (Tab key). EFFECT: A 2px yellow outline with 2px offset and rounded corners, so keyboard users can see where they are. Mouse clicks do not show it. */
+:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* RULE: h1, h2, h3, h4, p { margin: 0 }
+   TARGETS: headings and paragraphs. EFFECT: Removes their default margins (the browser default would add space above and below). */
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+/* RULE: h1, h2, h3 { text-wrap: balance }
+   TARGETS: headings such as the page titles (for example "Campus forum"). EFFECT: When a heading wraps to two lines, the browser balances the line lengths. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+/* ==========================================================================
+   TEXT AND LAYOUT HELPERS
+   Small reusable classes: .row, .stack, .muted, .small and so on.
+   ========================================================================== */
+/* RULE: .tnum
+   TARGETS: elements with class tnum (prices, counts, dates and table numbers throughout the JS templates).
+   EFFECT: font-variant-numeric: tabular-nums gives every digit the same width so numbers line up in columns. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+/* RULE: .muted
+   TARGETS: any element with class muted (helper text, captions). EFFECT: grey text color (--muted). */
+.muted {
+  color: var(--muted);
+}
+/* RULE: .row  (flexbox layout helper)
+   TARGETS: any element with class row. It is used everywhere for a horizontal group, for example button groups, avatar and name pairs, card headers.
+   EFFECT: display flex (items side by side), items centered vertically (align-items center), 10px gap between items. Other classes (between, wrap, grow) and inline styles modify it. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* RULE: .between { justify-content: space-between }
+   TARGETS: elements with class between, always together with row. EFFECT: pushes the first item to the left edge and the last to the right edge. */
+.between {
+  justify-content: space-between;
+}
+/* RULE: .wrap { flex-wrap: wrap }
+   TARGETS: elements with class wrap (together with row). EFFECT: items drop to the next line when there is no room, which keeps rows usable on phones. */
+.wrap {
+  flex-wrap: wrap;
+}
+/* RULE: .grow { flex: 1; min-width: 0 }
+   TARGETS: a child inside a row that should take all remaining width (for example the text part next to an avatar or a button). min-width 0 lets long text shrink and wrap instead of pushing the row wider. */
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+/* RULE: .stack  (flexbox layout helper)
+   TARGETS: any element with class stack (cards and form columns in almost every page template).
+   EFFECT: display flex in a column, children stacked top to bottom with 12px gap (inline styles change the gap in some places). */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* RULE: .eyebrow
+   TARGETS: the small uppercase label above page headings, for example "COMMUNITY · FORUM", "STAFF · TRANSACTIONS", "STUDENT SELLERS".
+   EFFECT: 11px bold text, 0.09em letter spacing, uppercase, blue color (--blue). */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+/* RULE: .small { font-size: 12px }
+   TARGETS: secondary text everywhere (descriptions, table text, button labels in lists). */
+.small {
+  font-size: 12px;
+}
+/* RULE: .tiny { font-size: 11px }
+   TARGETS: the smallest text (dates, hints, counts under names). */
+.tiny {
+  font-size: 11px;
+}

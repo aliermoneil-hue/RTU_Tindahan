@@ -1,0 +1,78 @@
+/* ==========================================================================
+   MODALS, DIALOGS & TOAST OVERLAYS (prototype: .dlg, .dlg-wide, .dlg-cfm, .dlg-actions, .toast)
+   ========================================================================== */
+
+.modal-scrim.show {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 90;
+  animation: fadeInScrim 0.18s ease-out;
+}
+.modal-scrim.cfm-scrim {
+  z-index: 110;
+}
+.dlg {
+  position: fixed;
+  z-index: 95;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(540px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: dlgEntrance 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dlg.dlg-wide {
+  width: min(640px, calc(100vw - 32px));
+}
+.dlg.dlg-cfm {
+  z-index: 112;
+  width: min(440px, calc(100vw - 32px));
+}
+.dlg-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.dlg-ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@keyframes fadeInScrim {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dlgEntrance {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-scrim.show,
+  .dlg {
+    animation: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .dlg-actions .btn {
+    flex: 1 1 140px;
+  }
+}

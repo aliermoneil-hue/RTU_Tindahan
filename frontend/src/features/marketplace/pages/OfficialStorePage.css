@@ -1,0 +1,10 @@
+/* ==========================================================================
+   OFFICIAL RTU STORE PAGE (prototype: .srchead.school)
+   ========================================================================== */
+
+.srchead.school {
+  background: var(--navy);
+  color: #fff;
+  border-color: transparent;
+  border-left: 6px solid var(--yellow);
+}

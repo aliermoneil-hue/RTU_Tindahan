@@ -1,0 +1,617 @@
+import { useState } from 'react'
+import { Icon } from '@/common/components/Icon'
+import type { IconName } from '@/common/components/icons'
+import { playRemove, playSuccess } from '@/common/sounds'
+import { navigate } from '@/common/router/router'
+import { PLACES, findVar, getSellerTimeWindows, isSvc, peso, unitPrice, varLabel } from '../constants'
+import { getPickupDates } from '../dateHelper'
+import { useTindahan } from '../context/TindahanContext'
+import { imgSrc, imgsOf } from '../imageStore'
+import type { ChosenFulfillment, FulfillmentMethod } from '../types'
+import './CartPage.css'
+
+export function CartPage() {
+  const {
+    currentAccount,
+    cartCount,
+    cartTotal,
+    cartStep,
+    setCartStep,
+    cartMsg,
+    setCartMsg,
+    cartAgree,
+    setCartAgree,
+    cartErr,
+    setCartErr,
+    byId,
+    sellerKind,
+    updateCartQty,
+    removeCartLine,
+    toggleCartEdit,
+    updateCartMeetup,
+    sendMeetupRequest,
+    toast,
+  } = useTindahan()
+
+  const [othersCartIdx, setOthersCartIdx] = useState<Record<number, boolean>>({})
+  const presetPlaces = PLACES.filter((pl) => pl !== 'Others')
+
+  if (!currentAccount) return null
+  const cart = currentAccount.cart || []
+  const sellers = new Set(
+    cart.map((c) => byId(c.id)?.seller).filter(Boolean),
+  ).size
+
+  // Check if any line has an invalid or unconfigured fulfillment method
+  const hasInvalidFulfillment = cart.some((c) => {
+    const p = byId(c.id)
+    if (!p) return true
+    const avail: FulfillmentMethod | 'none' =
+      p.cat === 'Official' && !p.fulfillment
+        ? 'pickup'
+        : p.fulfillment === 'pickup' || p.fulfillment === 'delivery' || p.fulfillment === 'both'
+          ? p.fulfillment
+          : 'none'
+    if (avail === 'none') return true
+    const chosen: ChosenFulfillment =
+      c.fulfillment || (avail === 'delivery' ? 'delivery' : 'pickup')
+    if (avail === 'pickup' && chosen !== 'pickup') return true
+    if (avail === 'delivery' && chosen !== 'delivery') return true
+    return false
+  })
+
+  const handleSend = () => {
+    if (hasInvalidFulfillment) {
+      toast('Please select a valid fulfillment method enabled by the seller before proceeding.')
+      return
+    }
+    playSuccess()
+    sendMeetupRequest()
+  }
+
+  return (
+    <>
+      <div>
+        <span className="eyebrow">PICKUP & DELIVERY REQUEST</span>
+        <h1>Review and schedule your order</h1>
+        <p className="muted small">
+          No online checkout. You are sending a pickup or delivery request to the seller and paying
+          in person on campus.
+        </p>
+      </div>
+
+      <div className="steps" role="list">
+        {(
+          ['1. Review items & fulfillment', '2. Message & confirm', '3. Request sent'] as const
+        ).map((s, i) => (
+          <div
+            key={s}
+            role="listitem"
+            className={`step ${
+              cartStep === i + 1 ? 'on' : cartStep > i + 1 ? 'done' : ''
+            }`.trim()}
+          >
+            {s}
+          </div>
+        ))}
+      </div>
+
+      {!cart.length ? (
+        <div
+          className="card stack"
+          style={{ alignItems: 'center', textAlign: 'center', padding: 40 }}
+        >
+          <span style={{ color: 'var(--blue)' }}>
+            <Icon name="cart" />
+          </span>
+          <b>Your request cart is empty</b>
+          <p className="small muted">
+            Reserve an item from the marketplace to schedule a campus pickup or delivery.
+          </p>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              navigate('browse')
+            }}
+          >
+            Browse listings
+          </button>
+        </div>
+      ) : (
+        <div className="cart-two two">
+          <div className="stack">
+            {cart.map((c, idx) => {
+              const p = byId(c.id)
+              if (!p) return null
+              const vr = c.vid && findVar(p, c.vid)
+              const pr = unitPrice(p, c.vid)
+              const imgs = imgsOf(p)
+              const src = imgs.length ? imgSrc(imgs[0]) : ''
+              const svc = isSvc(p)
+
+              const availMethod: FulfillmentMethod | 'none' =
+                p.cat === 'Official' && !p.fulfillment
+                  ? 'pickup'
+                  : p.fulfillment === 'pickup' ||
+                      p.fulfillment === 'delivery' ||
+                      p.fulfillment === 'both'
+                    ? p.fulfillment
+                    : 'none'
+              const chosenMethod: ChosenFulfillment =
+                availMethod === 'delivery'
+                  ? 'delivery'
+                  : availMethod === 'pickup'
+                    ? 'pickup'
+                    : c.fulfillment || 'pickup'
+
+              const isOfficial = p.cat === 'Official' || sellerKind(p) === 'school'
+              const sellerTimeSlots = getSellerTimeWindows(p)
+              const activeTime = sellerTimeSlots.includes(c.time)
+                ? c.time
+                : sellerTimeSlots[0] || c.time
+              const officialPlace = (p.when.split(',')[0] || 'BAU Office').trim()
+
+              // Compute available dates based on seller schedule
+              const { options: dateOpts, todayStatus, windowEndText } = getPickupDates(p)
+              const activeDateLabel =
+                c.date || (dateOpts.length ? dateOpts[0].label : 'Today')
+
+              return (
+                <div key={`${c.id}-${c.vid || ''}-${idx}`} className="card stack">
+                  <div className="row between wrap">
+                    <div className="row" style={{ minWidth: 0 }}>
+                      <div
+                        className={`photo cart-photo ${p.tone || 't-study'} ${
+                          src ? 'has-img' : 'nophoto-tile'
+                        }`.trim()}
+                      >
+                        {src ? <img className="pimg" src={src} alt={p.name} /> : null}
+                        <Icon name={(p.icon || 'tag') as IconName} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <b style={{ overflowWrap: 'anywhere' }}>{p.name}</b>
+                        <div className="row wrap" style={{ gap: 6, marginTop: 2 }}>
+                          {vr && <span className="pill">{varLabel(p, vr)}</span>}
+                          <span
+                            className={`pill ${chosenMethod === 'delivery' ? 'blue' : 'green'}`}
+                          >
+                            {chosenMethod === 'delivery' ? 'Delivery' : 'Pickup'}
+                          </span>
+                        </div>
+                        <div className="small muted">Seller: {p.seller}</div>
+                        <span className="price tnum">{peso(pr)}</span>
+                      </div>
+                    </div>
+
+                    <div className="row">
+                      <div className="qty" role="group" aria-label={`Quantity for ${p.name}`}>
+                        <button
+                          type="button"
+                          aria-label="Decrease"
+                          onClick={() => {
+                            updateCartQty(idx, -1)
+                          }}
+                        >
+                          −
+                        </button>
+                        <span className="tnum">{c.qty}</span>
+                        <button
+                          type="button"
+                          aria-label="Increase"
+                          onClick={() => {
+                            updateCartQty(idx, 1)
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        className="iconbtn"
+                        aria-label={`Remove ${p.name}`}
+                        onClick={() => {
+                          playRemove()
+                          removeCartLine(idx)
+                        }}
+                      >
+                        <Icon name="trash" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Requirement #1: Fulfillment method selection per cart line */}
+                  <div
+                    className="card flat stack"
+                    style={{ background: 'var(--bg)', padding: 12, gap: 10 }}
+                  >
+                    <div className="row between wrap">
+                      <div className="row wrap" style={{ gap: 8 }}>
+                        <span className="small">
+                          <b>Fulfillment:</b>{' '}
+                          {availMethod === 'none'
+                            ? 'Not configured'
+                            : chosenMethod === 'delivery'
+                              ? 'Campus Delivery'
+                              : 'Campus Pickup'}
+                        </span>
+                        <span className="tiny muted">
+                          (
+                          {availMethod === 'both'
+                            ? 'Seller offers Pickup & Delivery'
+                            : availMethod === 'delivery'
+                              ? 'Seller offers Delivery only'
+                              : availMethod === 'pickup'
+                                ? 'Seller offers Pickup only'
+                                : 'No method configured'}
+                          )
+                        </span>
+                      </div>
+                      {availMethod === 'both' && (
+                        <div className="row" role="radiogroup" aria-label="Fulfillment method" style={{ gap: 6 }}>
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={chosenMethod === 'pickup'}
+                            className={`btn sm ${chosenMethod === 'pickup' ? '' : 'ghost'}`.trim()}
+                            onClick={() => updateCartMeetup(idx, 'fulfillment', 'pickup')}
+                          >
+                            Pickup
+                          </button>
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={chosenMethod === 'delivery'}
+                            className={`btn sm ${chosenMethod === 'delivery' ? '' : 'ghost'}`.trim()}
+                            onClick={() => updateCartMeetup(idx, 'fulfillment', 'delivery')}
+                          >
+                            Delivery
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {availMethod === 'none' && (
+                      <div className="note" style={{ background: 'var(--red-bg)', borderColor: 'transparent' }}>
+                        <Icon name="info" size="sm" />
+                        <span className="small">
+                          This listing does not have an enabled fulfillment method. Please remove it
+                          or ask the seller to configure Pickup or Delivery.
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="row between wrap">
+                      <span className="small">
+                        <b>{chosenMethod === 'delivery' ? 'Delivery:' : 'Meetup:'}</b>{' '}
+                        {isOfficial
+                          ? officialPlace
+                          : chosenMethod === 'delivery' && c.deliverySpot
+                            ? `${c.deliverySpot} (${c.place})`
+                            : c.place}{' '}
+                        · <b>{activeDateLabel}</b> · {activeTime}
+                      </span>
+                      {!isOfficial ? (
+                        <button
+                          type="button"
+                          className="link"
+                          onClick={() => {
+                            toggleCartEdit(idx)
+                          }}
+                        >
+                          {(c.edit || c.editing)
+                            ? 'Done'
+                            : `Change ${chosenMethod === 'delivery' ? 'delivery' : 'pickup'} date & time`}
+                        </button>
+                      ) : (
+                        <span className="tiny muted">
+                          <Icon name="shield" size="sm" /> Location & open hours set by RTU Admin
+                        </span>
+                      )}
+                    </div>
+
+                    {isOfficial ? (
+                      <div className="grid2" style={{ marginTop: 4 }}>
+                        <div className="field">
+                          <label htmlFor={`cd-${idx}`}>Pickup date (within store schedule)</label>
+                          <select
+                            className="input"
+                            id={`cd-${idx}`}
+                            value={activeDateLabel}
+                            onChange={(e) => {
+                              updateCartMeetup(idx, 'date', e.target.value)
+                            }}
+                          >
+                            {dateOpts.map((opt) => (
+                              <option key={opt.id} value={opt.label}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label>Official Store Location & Time Window (Fixed by Admin)</label>
+                          <div
+                            className="input"
+                            style={{
+                              background: 'var(--soft)',
+                              color: 'var(--muted)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {officialPlace} · {activeTime}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      (c.edit || c.editing || chosenMethod === 'delivery' || cartStep === 2) && (
+                        <div className="stack" style={{ gap: 10, marginTop: 4 }}>
+                          {chosenMethod === 'delivery' && (
+                            <div className="field">
+                              <label htmlFor={`cdspot-${idx}`}>
+                                Campus delivery drop-off spot (room / building / landmark)
+                              </label>
+                              <input
+                                className="input"
+                                id={`cdspot-${idx}`}
+                                placeholder={`e.g. Room 304 or ${c.place}`}
+                                value={c.deliverySpot || ''}
+                                onChange={(e) =>
+                                  updateCartMeetup(idx, 'deliverySpot', e.target.value)
+                                }
+                              />
+                            </div>
+                          )}
+
+                          {(c.edit || c.editing || cartStep === 2) && (
+                            <>
+                              <div className="grid2">
+                                {/* Date Selector */}
+                                <div className="field">
+                                  <label htmlFor={`cd-${idx}`}>
+                                    {chosenMethod === 'delivery' ? 'Delivery date' : 'Pickup date'}
+                                  </label>
+                                  <select
+                                    className="input"
+                                    id={`cd-${idx}`}
+                                    value={activeDateLabel}
+                                    onChange={(e) => {
+                                      updateCartMeetup(idx, 'date', e.target.value)
+                                    }}
+                                  >
+                                    {dateOpts.map((opt) => (
+                                      <option key={opt.id} value={opt.label}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                {/* Time window restricted strictly to seller's time window */}
+                                <div className="field">
+                                  <label htmlFor={`ct-${idx}`}>
+                                    Seller’s available time window
+                                  </label>
+                                  <select
+                                    className="input"
+                                    id={`ct-${idx}`}
+                                    value={activeTime}
+                                    onChange={(e) => {
+                                      updateCartMeetup(idx, 'time', e.target.value)
+                                    }}
+                                  >
+                                    {sellerTimeSlots.map((tm) => (
+                                      <option key={tm} value={tm}>
+                                        {tm}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div className="field">
+                                <label htmlFor={`cp-${idx}`}>
+                                  {chosenMethod === 'delivery'
+                                    ? 'Campus building / area'
+                                    : 'Campus meetup location'}
+                                </label>
+                                <select
+                                  className="input"
+                                  id={`cp-${idx}`}
+                                  value={
+                                    othersCartIdx[idx] || !presetPlaces.includes(c.place)
+                                      ? 'Others'
+                                      : c.place
+                                  }
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    if (val === 'Others') {
+                                      setOthersCartIdx((prev) => ({ ...prev, [idx]: true }))
+                                    } else {
+                                      setOthersCartIdx((prev) => ({ ...prev, [idx]: false }))
+                                      updateCartMeetup(idx, 'place', val)
+                                    }
+                                  }}
+                                >
+                                  {PLACES.map((pl) => (
+                                    <option key={pl} value={pl}>
+                                      {pl}
+                                    </option>
+                                  ))}
+                                </select>
+                                {(othersCartIdx[idx] || !presetPlaces.includes(c.place)) && (
+                                  <input
+                                    className="input"
+                                    style={{ marginTop: 8 }}
+                                    placeholder="Write specific campus place (e.g. Gate 2 bench, Room 402)..."
+                                    value={presetPlaces.includes(c.place) ? '' : c.place}
+                                    onChange={(e) => {
+                                      updateCartMeetup(idx, 'place', e.target.value)
+                                    }}
+                                  />
+                                )}
+                              </div>
+                            </>
+                          )}
+
+                        {/* Informative notice for same-day and advance service scheduling rules */}
+                        {svc && (
+                          <div className="tiny muted" style={{ color: 'var(--blue)' }}>
+                            <Icon name="info" size="sm" /> Services must be scheduled in advance
+                            (earliest available date is selected).
+                          </div>
+                        )}
+                        {!svc && todayStatus === 'window_closed' && (
+                          <div className="tiny muted" style={{ color: 'var(--amber, #c27b00)' }}>
+                            <Icon name="info" size="sm" /> Today’s window ({windowEndText})
+                            has closed. Earliest available date is selected.
+                          </div>
+                        )}
+                        {!svc && todayStatus === 'not_selling_day' && (
+                          <div className="tiny muted">
+                            <Icon name="info" size="sm" /> Seller is available on {p.avail || 'weekdays'}.
+                          </div>
+                        )}
+                      </div>
+                    )
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+
+            {cartStep === 2 && (
+              <div className="card stack">
+                <div className="field">
+                  <label htmlFor="cmsg">Note to seller (optional)</label>
+                  <textarea
+                    className="input"
+                    id="cmsg"
+                    value={cartMsg}
+                    onChange={(e) => setCartMsg(e.target.value)}
+                  />
+                </div>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    id="cagree"
+                    checked={cartAgree}
+                    onChange={(e) => {
+                      setCartAgree(e.target.checked)
+                      setCartErr('')
+                    }}
+                  />
+                  <span>
+                    I understand that RTU Tindahan only coordinates the campus pickup or delivery.
+                    Payment is settled directly with the seller in person after inspecting the item.
+                  </span>
+                </label>
+                {cartErr && (
+                  <span className="err" role="alert">
+                    {cartErr}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="card stack">
+            <b>Request summary</b>
+            <div className="row between small">
+              <span className="muted">Items ({cartCount})</span>
+              <span className="tnum">{peso(cartTotal)}</span>
+            </div>
+            <div className="row between small">
+              <span className="muted">Sellers</span>
+              <span className="tnum">
+                {sellers} ({sellers > 1 ? 'separate requests' : '1 request'})
+              </span>
+            </div>
+            <div className="stack" style={{ gap: 4 }}>
+              <span className="tiny muted">SELECTED FULFILLMENT</span>
+              {cart.map((c, idx) => {
+                const p = byId(c.id)
+                if (!p) return null
+                const avail: FulfillmentMethod =
+                  p.fulfillment === 'delivery' || p.fulfillment === 'both'
+                    ? p.fulfillment
+                    : 'pickup'
+                const chosen: ChosenFulfillment =
+                  avail === 'delivery'
+                    ? 'delivery'
+                    : avail === 'pickup'
+                      ? 'pickup'
+                      : c.fulfillment || 'pickup'
+                return (
+                  <div key={idx} className="row between tiny">
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 165 }}>
+                      {p.name}
+                    </span>
+                    <span className={`pill ${chosen === 'delivery' ? 'blue' : 'green'}`}>
+                      {chosen === 'delivery' ? 'Delivery' : 'Pickup'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="row between small">
+              <span className="muted">Platform fee</span>
+              <span>₱0 (student service)</span>
+            </div>
+            <hr style={{ border: 0, borderTop: '1px solid var(--line)' }} />
+            <div className="row between">
+              <b>Pay in person</b>
+              <span className="price tnum" style={{ fontSize: 22 }}>
+                {peso(cartTotal)}
+              </span>
+            </div>
+            <div className="note">
+              <Icon name="info" />
+              <span>
+                Bring exact cash or agree on e-wallet in person after inspecting the item.
+              </span>
+            </div>
+            {cartStep === 1 ? (
+              <button
+                type="button"
+                className="btn yellow block lg"
+                disabled={hasInvalidFulfillment}
+                onClick={() => {
+                  if (hasInvalidFulfillment) {
+                    toast('Please fix any invalid fulfillment method before continuing.')
+                    return
+                  }
+                  setCartStep(2)
+                }}
+              >
+                Continue to confirmation
+              </button>
+            ) : (
+              <div className="stack" style={{ gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn yellow block lg"
+                  disabled={hasInvalidFulfillment}
+                  onClick={handleSend}
+                >
+                  Send order request
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost block sm"
+                  onClick={() => {
+                    setCartStep(1)
+                  }}
+                >
+                  Back to items
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
