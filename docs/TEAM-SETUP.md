@@ -3,6 +3,10 @@
 Everything a member needs to run the project on Windows. Follow it top to
 bottom; do not skip the clone step.
 
+> Working on the integrated branch (catalogue API, official store, emailed
+> sign-up codes)? Read [`INTEGRATION-SETUP.md`](INTEGRATION-SETUP.md) first — it
+> needs one extra `python manage.py migrate` step that this guide predates.
+
 ---
 
 ## 1. Install these first
