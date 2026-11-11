@@ -2,7 +2,6 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .emails import send_verification_email
 from .models import User
 from .validators import normalize_email, validate_rtu_email
 
@@ -118,8 +117,21 @@ class RegisterSerializer(serializers.Serializer):
             contact_number=validated_data.get("contact_number", "").strip(),
             role=User.Role.VISITOR,
         )
-        send_verification_email(user)
+        # The view issues the 6-digit code and emails it, so that a failed
+        # send can be reported instead of leaving a silent half-signup.
         return user
+
+
+class VerifyCodeSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.RegexField(
+        r"^\d{6}$",
+        error_messages={"invalid": "Enter the 6 digits from the email."},
+    )
+
+
+class ResendCodeSerializer(serializers.Serializer):
+    email = serializers.EmailField()
 
 
 class VerifyEmailSerializer(serializers.Serializer):

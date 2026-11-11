@@ -5,7 +5,9 @@ from .views import (
     LogoutView,
     MeView,
     RegisterView,
+    ResendCodeView,
     ResendVerificationView,
+    VerifyCodeView,
     VerifyEmailView,
 )
 
@@ -13,6 +15,10 @@ app_name = "accounts"
 
 urlpatterns = [
     path("auth/register/", RegisterView.as_view(), name="register"),
+    # The code that the sign-up screens use.
+    path("auth/verify-code/", VerifyCodeView.as_view(), name="verify-code"),
+    path("auth/resend-code/", ResendCodeView.as_view(), name="resend-code"),
+    # Link-based verification is kept for accounts verified by hand.
     path("auth/verify-email/", VerifyEmailView.as_view(), name="verify-email"),
     path(
         "auth/resend-verification/",

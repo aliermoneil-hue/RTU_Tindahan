@@ -41,7 +41,9 @@ class RegistrationTests(APITestCase):
         self.assertEqual(user.role, User.Role.VISITOR)
         self.assertFalse(user.is_verified)
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn("verify-email", mail.outbox[0].body)
+        # The sign-up screens use a 6-digit code, not a link.
+        self.assertRegex(mail.outbox[0].body, r"code is:\s*\d{6}")
+        self.assertNotIn("verify-email", mail.outbox[0].body)
 
     def test_register_rejects_non_rtu_email(self):
         payload = STUDENT_PAYLOAD | {"email": "juan@gmail.com"}

@@ -186,3 +186,26 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def get_short_name(self) -> str:
         return self.display_name.split(" ")[0] if self.display_name else self.email
+
+
+class VerificationCode(models.Model):
+    """The 6-digit code emailed at sign-up (AV-03, code-based flow).
+
+    Only a hash is stored. One row per account: asking for a new code replaces
+    the old one, so an interrupted sign-up cannot leave two valid codes.
+    """
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="verification_code"
+    )
+    code_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    sent_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "verification code"
+        verbose_name_plural = "verification codes"
+
+    def __str__(self) -> str:
+        return f"Code for {self.user.email}"

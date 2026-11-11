@@ -9,15 +9,25 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from .emails import send_verification_email
+from .emails import send_verification_code_email, send_verification_email
 from .models import User
 from .serializers import (
     LoginSerializer,
     ProfileUpdateSerializer,
     RegisterSerializer,
+    ResendCodeSerializer,
     ResendVerificationSerializer,
     UserSerializer,
+    VerifyCodeSerializer,
     VerifyEmailSerializer,
+)
+from .verification import (
+    CODE_TTL_MINUTES,
+    RESEND_SECONDS,
+    CodeError,
+    check_code,
+    issue_code,
+    start_cooldown,
 )
 
 
@@ -35,12 +45,120 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+
+        # AV-03: the account stays a visitor until the emailed code is used.
+        code = issue_code(user)
+        send_verification_code_email(user, code)
+
         return Response(
             {
-                "detail": "Account created. Check your RTU email for the verification link.",
+                "detail": (
+                    "Account created. We emailed a 6-digit code to your RTU "
+                    "address."
+                ),
                 "email": user.email,
+                "code_expires_in_minutes": CODE_TTL_MINUTES,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class VerifyCodeView(APIView):
+    """AV-03: enter the 6-digit code to activate the account and sign in."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "verify"
+
+    def post(self, request):
+        serializer = VerifyCodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"].lower()
+        submitted = serializer.validated_data["code"]
+
+        user = User.objects.filter(email=email).first()
+        if user is None:
+            # AV-06: do not reveal whether the address is registered.
+            return Response(
+                {"detail": "That code is not right.", "code": "code_invalid"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not user.can_sign_in:
+            return Response(
+                {
+                    "detail": "This account is suspended or banned.",
+                    "code": "account_suspended",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if user.is_verified:
+            # Never hand out a token here: the code is gone, so anyone who
+            # knows the address could otherwise sign in without a password.
+            return Response(
+                {
+                    "detail": (
+                        "This account is already verified. Sign in with your "
+                        "password."
+                    ),
+                    "code": "already_verified",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            check_code(user, submitted)
+        except CodeError as exc:
+            return Response(
+                {"detail": exc.message, "code": "code_invalid"},
+                status=exc.status,
+            )
+
+        user.verify()
+        payload = auth_payload(user)
+        payload["detail"] = "Your RTU email is confirmed. You are now signed in."
+        return Response(payload)
+
+
+class ResendCodeView(APIView):
+    """AV-03: send a fresh code, with a short cooldown to stop abuse."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "verify"
+
+    def post(self, request):
+        serializer = ResendCodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"].lower()
+
+        if not start_cooldown(email):
+            return Response(
+                {
+                    "detail": (
+                        f"Please wait {RESEND_SECONDS} seconds before asking for "
+                        "another code."
+                    ),
+                    "code": "code_cooldown",
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        user = User.objects.filter(email=email).first()
+        if user and not user.is_verified and user.can_sign_in:
+            code = issue_code(user)
+            send_verification_code_email(user, code)
+
+        # Same answer either way, so the endpoint cannot be used to test emails.
+        return Response(
+            {
+                "detail": (
+                    "If that RTU email is waiting for verification, a new code "
+                    "has been sent."
+                )
+            }
         )
 
 
