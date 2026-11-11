@@ -9,9 +9,11 @@ urlpatterns = [
     path("", api_root, name="api-root"),
     path("health/", health, name="health"),
     path("admin/", admin.site.urls),
-    # Exact /api/v1/ shows the index; sub-paths go to the accounts app.
+    # Exact /api/v1/ shows the index; sub-paths go to the app routers.
     path("api/v1/", api_root, name="api-v1-root"),
     path("api/v1/", include("apps.accounts.urls")),
+    path("api/v1/", include("apps.catalog.urls")),
+    path("api/v1/", include("apps.store.urls")),
 ]
 
 if settings.DEBUG:

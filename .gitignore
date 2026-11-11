@@ -61,6 +61,9 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+# Uploaded files (listing photos, avatars) and collected static files.
+backend/media/
+backend/staticfiles/
 
 # Flask stuff:
 instance/
