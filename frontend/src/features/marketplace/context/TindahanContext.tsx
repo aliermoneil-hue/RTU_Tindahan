@@ -46,6 +46,7 @@ import {
   type ReactNode,
 } from 'react'
 import { apiFetch, getToken } from '@/common/api/client'
+import { fetchListings, mergeApiCatalogue } from '../api/listings'
 import { navigate } from '@/common/router/router'
 import { useAuth } from '@/features/authentication'
 import type { User } from '@/common/types'
@@ -794,6 +795,31 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   })
   const [imgVersion, setImgVersion] = useState(0)
   const bumpImgVersion = useCallback(() => setImgVersion((v) => v + 1), [])
+
+  // -----------------------------------------------------------------------
+  // Load the published catalogue from Django once per page load.
+  //
+  // The result is merged into the same snapshot the pages already read, so no
+  // page component changed. Entries are tagged with an `api:` id prefix, which
+  // lets the merge replace only backend data and leave anything created in the
+  // prototype alone. If the server is unreachable, the local snapshot stands.
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      try {
+        const listings = await fetchListings()
+        if (cancelled || listings.length === 0) return
+        setDb((prev) => mergeApiCatalogue(prev, listings))
+      } catch {
+        /* backend offline or CORS blocked: keep the local catalogue */
+      }
+    }
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // UI overlays
   const [toastMsg, setToastMsg] = useState<string | null>(null)

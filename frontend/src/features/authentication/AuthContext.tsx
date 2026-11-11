@@ -1,151 +1,59 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { sendMail } from '@/common/config'
-import { setToken } from '@/common/api/client'
+import { apiFetch, getToken, setToken } from '@/common/api/client'
 import type { User } from '@/common/types'
 
 /**
- * AUTH CONTEXT — prototype-exact offline authentication
+ * AUTH CONTEXT — the Django backend is the source of truth
  * ------------------------------------------------------------
- * Mirrors the prototype's js/6-accounts-login.js exactly:
+ * Replaced the prototype's offline authentication. Now:
  *
- *   - hash()        : djb2 scramble for passwords and OTP codes
- *   - STUDENT_EMAIL : 4 digits, dash, 6 digits, @rtu.edu.ph
- *   - newCode()     : random 6-digit code
- *   - OTP_MS = 5 min, OTP_WAIT = 30 sec
- *   - Accounts stored locally in localStorage (rtu_auth_accounts)
- *   - No Django backend required for sign up or sign in
+ *   Sign up   1. details  -> POST /auth/register/  (creates a visitor account
+ *                           and emails a 6-digit code)
+ *             2. code     -> POST /auth/verify-code/ (activates the account and
+ *                           returns a token, so the user is signed in)
+ *   Sign in                -> POST /auth/login/  (token, or an error code such
+ *                           as "email_not_verified")
+ *   Reload                 -> GET /auth/me/ with the stored token
+ *   Sign out               -> POST /auth/logout/ deletes the token server-side
  *
- * The sign-up flow is 3 steps (prototype exact):
- *   1. Student account  — name, program, RTU email, password (8+ chars)
- *   2. Email code       — 6-digit code sent via EmailJS (demo mode shows it on screen)
- *   3. All set          — code checked, account created, user signed in
- *
- * Sign in:
- *   RTU email format check → account must exist → password hash must match
- *   → account must not be suspended or banned → load account → welcome toast
+ * The token lives in localStorage under `rtu_token` (see common/api/client.ts)
+ * and is sent as `Authorization: Token <key>`.
  */
 
-// ---------------------------------------------------------------------------
-// Prototype hash (djb2) — used for passwords and OTP codes
-// ---------------------------------------------------------------------------
-const hash = (s: string): string => {
-  let h = 5381
-  const t = 'rtu-tindahan:' + s
-  for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0
-  return String(h >>> 0)
-}
-
-// ---------------------------------------------------------------------------
-// Student email pattern (prototype exact)
-// ---------------------------------------------------------------------------
 const STUDENT_EMAIL = /^\d{4}-\d{6}@rtu\.edu\.ph$/i
+const LOGIN_EMAIL = /^[^@\s]+@rtu\.edu\.ph$/i
 
-// ---------------------------------------------------------------------------
-// OTP constants (prototype exact)
-// ---------------------------------------------------------------------------
-const OTP_MS = 300000   // a code lives 5 minutes
-const OTP_WAIT = 30000  // 30 seconds before asking for another code
-
-// ---------------------------------------------------------------------------
-// Generate a random 6-digit code (with leading zeros)
-// ---------------------------------------------------------------------------
-function newCode(): string {
-  return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0')
-}
-
-// ---------------------------------------------------------------------------
-// localStorage keys
-// ---------------------------------------------------------------------------
-const ACCOUNTS_KEY = 'rtu_auth_accounts'
-const SESSION_KEY = 'rtu_auth_session'
-
-// ---------------------------------------------------------------------------
-// Account store helpers (localStorage)
-// ---------------------------------------------------------------------------
-type RawAccount = {
-  email: string
-  ph: string           // hashed password
+/** What the sign-up screen collects before the code is sent. */
+export interface RegisterInput {
   first: string
   last: string
-  name: string
-  sid: string          // student number (text before @)
-  role: 'student' | 'moderator'
-  aff: string
+  email: string
+  pass: string
   prog: string
-  status: 'active' | 'suspended' | 'banned'
-  verified: boolean
-  since: string
-  notifs: Array<{ t: string; read: boolean; ts: string; at?: string; link?: any | null }>
+  year: number | null
+  consent: boolean
 }
 
-function loadAccounts(): RawAccount[] {
-  try {
-    const raw = localStorage.getItem(ACCOUNTS_KEY)
-    return raw ? (JSON.parse(raw) as RawAccount[]) : []
-  } catch {
-    return []
-  }
-}
-
-function saveAccounts(accounts: RawAccount[]): void {
-  try {
-    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts))
-  } catch {
-    /* ignore storage problems */
-  }
-}
-
-function findAccount(email: string): RawAccount | undefined {
-  const e = String(email).trim().toLowerCase()
-  return loadAccounts().find((a) => a.email === e)
-}
-
-// ---------------------------------------------------------------------------
-// Convert a raw stored account into the shared User type
-// ---------------------------------------------------------------------------
-function toUser(a: RawAccount): User {
-  return {
-    id: a.email,
-    email: a.email,
-    display_name: a.name,
-    role: a.role === 'moderator' ? 'moderator' : 'user',
-    member_type: a.aff === 'Staff' ? 'personnel' : 'student',
-    college: a.prog,
-    year_level: null,
-    contact_number: '',
-    profile_photo: null,
-    status: a.status,
-    is_verified: a.verified,
-    date_joined: a.since,
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Auth context
-// ---------------------------------------------------------------------------
 interface OtpState {
+  /** Where the code was sent. Drives the "we emailed you" screen. */
   to: string
-  demo: boolean
-  code: string | null       // kept only in demo mode
-  h: string                 // hash('otp:' + code)
-  exp: number               // expiry timestamp
-  tries: number             // wrong attempts so far
-  sentAt: number            // when the code was sent
+  /** When it was requested, so the screen can show a resend countdown. */
+  sentAt: number
 }
 
 interface AuthValue {
   user: User | null
   /** true while restoring the session on first load */
   isLoading: boolean
-  /** The pending OTP (null when no code has been sent) */
+  /** The pending sign-up code request (null before one has been sent) */
   otp: OtpState | null
-  /** Sign in with RTU email and password (local, offline). */
   login: (email: string, password: string) => Promise<void>
-  /** Step 2 of sign up: create and send the 6-digit code. */
-  sendCode: (email: string, firstName: string) => Promise<void>
-  /** Step 3 of sign up: check the code, create the account, sign in. */
-  verifyCode: (code: string, regData: { first: string; last: string; email: string; pass: string; prog: string }) => Promise<void>
-  /** Sign out and clear the session. */
+  /** Step 2 of sign up: create the account and email a 6-digit code. */
+  register: (input: RegisterInput) => Promise<void>
+  /** Ask for another 6-digit code (30-second cooldown server-side). */
+  resendCode: (email: string) => Promise<void>
+  /** Step 3 of sign up: check the code and sign in. */
+  confirmCode: (email: string, code: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -157,198 +65,115 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [otp, setOtp] = useState<OtpState | null>(null)
 
   // -----------------------------------------------------------------------
-  // On first load: restore the signed-in user from the saved session
+  // On first load: if a token is stored, ask the server who it belongs to.
+  // A rejected token is dropped so the user simply appears signed out.
   // -----------------------------------------------------------------------
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+    const restore = async () => {
+      if (!getToken()) {
+        setIsLoading(false)
+        return
+      }
       try {
-        const raw = localStorage.getItem(SESSION_KEY)
-        if (!raw) {
-          setIsLoading(false)
-          return
-        }
-        const session = JSON.parse(raw) as { email: string }
-        const acct = findAccount(session.email)
-        if (!cancelled && acct) {
-          setUser(toUser(acct))
-        }
+        const me = await apiFetch<User>('/auth/me/')
+        if (!cancelled) setUser(me)
       } catch {
-        /* ignore */
+        setToken(null)
       } finally {
         if (!cancelled) setIsLoading(false)
       }
-    })()
+    }
+    void restore()
     return () => {
       cancelled = true
     }
   }, [])
 
   // -----------------------------------------------------------------------
-  // Sign in — prototype exact
+  // Sign in
   // -----------------------------------------------------------------------
-  const LOGIN_EMAIL = /^[^@\s]+@rtu\.edu\.ph$/i
-
   const login = useCallback(async (email: string, password: string) => {
-    const e = email.trim().toLowerCase()
-    if (!LOGIN_EMAIL.test(e)) {
+    const address = email.trim().toLowerCase()
+    if (!LOGIN_EMAIL.test(address)) {
       throw new Error('Use your RTU email, like 2024-123456@rtu.edu.ph.')
     }
-    const a = findAccount(e)
-    if (!a) {
-      throw new Error('No account found for that email. Create your account first.')
-    }
-    if (!password) {
-      throw new Error('Enter your password.')
-    }
-    if (a.ph !== hash(password)) {
-      throw new Error('That password is not right. Try again or use Forgot password.')
-    }
-    if (a.status === 'suspended' || a.status === 'banned') {
-      throw new Error(
-        a.status === 'banned'
-          ? 'This account has been banned. Please contact the RTU Office of Student Affairs.'
-          : 'This account is suspended for now. Please contact the RTU Office of Student Affairs.',
-      )
-    }
+    if (!password) throw new Error('Enter your password.')
 
-    // Save session and set user
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ email: e }))
-    setToken(e) // keep a token so apiFetch auth headers work if the backend is added later
-    setUser(toUser(a))
+    const data = await apiFetch<{ token: string; user: User }>('/auth/login/', {
+      method: 'POST',
+      body: { email: address, password },
+    })
+    setToken(data.token)
+    setUser(data.user)
   }, [])
 
   // -----------------------------------------------------------------------
-  // Step 2: send the 6-digit sign-up code — prototype exact
+  // Sign up, step 1 -> 2: create the account, then email the code
   // -----------------------------------------------------------------------
-  const sendCode = useCallback(async (email: string, firstName: string) => {
-    const g = email.trim().toLowerCase()
-    if (!STUDENT_EMAIL.test(g)) {
-      setOtp(null)
+  const register = useCallback(async (input: RegisterInput) => {
+    const address = input.email.trim().toLowerCase()
+    if (!STUDENT_EMAIL.test(address)) {
       throw new Error('Your RTU email must look like 2024-123456@rtu.edu.ph.')
     }
-    if (findAccount(g)) {
-      setOtp(null)
-      throw new Error('An account with that email already exists. Sign in instead.')
-    }
-    if (otp && otp.to === g && Date.now() - otp.sentAt < OTP_WAIT) {
-      const w = Math.ceil((OTP_WAIT - (Date.now() - otp.sentAt)) / 1000)
-      setOtp(null)
-      throw new Error(`Please wait ${w} seconds before asking for another code.`)
+    if (!input.consent) {
+      throw new Error('Accept the privacy notice to create your account.')
     }
 
-    const code = newCode()
-    const r = await sendMail(g, firstName || 'student', code)
+    const displayName = `${input.first.trim()} ${input.last.trim()}`.trim()
+    await apiFetch<{ detail: string; email: string }>('/auth/register/', {
+      method: 'POST',
+      body: {
+        email: address,
+        display_name: displayName,
+        password: input.pass,
+        password_confirm: input.pass,
+        member_type: 'student',
+        college: input.prog,
+        ...(input.year ? { year_level: input.year } : {}),
+        privacy_consent: input.consent,
+      },
+    })
 
-    const nextOtp: OtpState = {
-      to: g,
-      demo: r.demo,
-      code: r.demo ? code : null,
-      h: hash('otp:' + code),
-      exp: Date.now() + OTP_MS,
-      tries: 0,
-      sentAt: Date.now(),
+    setOtp({ to: address, sentAt: Date.now() })
+  }, [])
+
+  const resendCode = useCallback(async (email: string) => {
+    const address = email.trim().toLowerCase()
+    await apiFetch<{ detail: string }>('/auth/resend-code/', {
+      method: 'POST',
+      body: { email: address },
+    })
+    setOtp({ to: address, sentAt: Date.now() })
+  }, [])
+
+  // -----------------------------------------------------------------------
+  // Sign up, step 3: the code activates the account and signs the user in
+  // -----------------------------------------------------------------------
+  const confirmCode = useCallback(async (email: string, code: string) => {
+    const address = email.trim().toLowerCase()
+    const digits = String(code).replace(/\s/g, '')
+    if (!/^\d{6}$/.test(digits)) {
+      throw new Error('Enter the 6 digits from the email.')
     }
-    setOtp(nextOtp)
-  }, [otp])
+
+    const data = await apiFetch<{ token: string; user: User }>(
+      '/auth/verify-code/',
+      { method: 'POST', body: { email: address, code: digits } },
+    )
+    setToken(data.token)
+    setUser(data.user)
+    setOtp(null)
+  }, [])
 
   // -----------------------------------------------------------------------
-  // Step 3: check the code, create the account, sign in — prototype exact
-  // -----------------------------------------------------------------------
-  const verifyCode = useCallback(
-    async (code: string, regData: {
-      first: string
-      last: string
-      email: string
-      pass: string
-      prog: string
-    }) => {
-      const v = regData
-      const em = v.email.trim().toLowerCase()
-      const c = String(code).replace(/\s/g, '')
-
-      const o = otp
-      if (!o) {
-        throw new Error('Send a new code first.')
-      }
-      if (Date.now() > o.exp) {
-        setOtp(null)
-        throw new Error('That code expired. Send a new one.')
-      }
-      if (o.tries >= 5) {
-        setOtp(null)
-        throw new Error('Too many wrong tries. Send a new code.')
-      }
-      if (!/^\d{6}$/.test(c)) {
-        throw new Error('Enter the 6 digits from the email.')
-      }
-
-      o.tries++
-      if (hash('otp:' + c) !== o.h) {
-        setOtp({ ...o })
-        throw new Error(
-          `That code is not right. ${5 - o.tries} ${
-            5 - o.tries === 1 ? 'try' : 'tries'
-          } left.`,
-        )
-      }
-
-      if (findAccount(em)) {
-        setOtp(null)
-        throw new Error('An account with that email already exists. Sign in instead.')
-      }
-
-      // If no staff account exists yet, this first account becomes staff
-      const existing = loadAccounts()
-      const hasStaff = existing.some((a) => a.role === 'moderator')
-
-      // Create the account (prototype mkAcct equivalent)
-      const now = new Date()
-      const newAcct: RawAccount = {
-        email: em,
-        ph: hash(v.pass),
-        first: v.first.trim(),
-        last: v.last.trim(),
-        name: `${v.first.trim()} ${v.last.trim()}`,
-        sid: em.split('@')[0],
-        role: hasStaff ? 'student' : 'moderator',
-        aff: hasStaff ? 'Student' : 'Staff',
-        prog: hasStaff ? v.prog : 'Office of Student Affairs',
-        status: 'active',
-        verified: true,
-        since: now.toISOString(),
-        notifs: [
-          {
-            t: hasStaff
-              ? 'Welcome to RTU Tindahan. Your RTU email is confirmed.'
-              : 'Welcome — you are the first account, so you are set up as RTU staff.',
-            read: false,
-            ts: new Date().toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }),
-            at: now.toISOString(),
-            link: null,
-          },
-        ],
-      }
-
-      existing.push(newAcct)
-      saveAccounts(existing)
-
-      setOtp(null)
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ email: em }))
-      setToken(em)
-      setUser(toUser(newAcct))
-    },
-    [otp],
-  )
-
-  // -----------------------------------------------------------------------
-  // Sign out — clear session and user
+  // Sign out
   // -----------------------------------------------------------------------
   const logout = useCallback(async () => {
     try {
-      localStorage.removeItem(SESSION_KEY)
+      await apiFetch('/auth/logout/', { method: 'POST' })
     } catch {
-      /* ignore */
+      /* the token may already be gone; local state still has to clear */
     }
     setToken(null)
     setUser(null)
@@ -356,8 +181,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, isLoading, otp, login, sendCode, verifyCode, logout }),
-    [user, isLoading, otp, login, sendCode, verifyCode, logout],
+    () => ({ user, isLoading, otp, login, register, resendCode, confirmCode, logout }),
+    [user, isLoading, otp, login, register, resendCode, confirmCode, logout],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -14,14 +14,18 @@ const PROGRAMS = [
   'BS Business Administration',
 ]
 
+const YEARS = ['1st', '2nd', '3rd', '4th', '5th', '6th']
+
 interface Step1Data {
   first: string
   last: string
   prog: string
+  year: number
   email: string
   pass: string
   pass2: string
   code: string
+  agree: boolean
 }
 
 interface VerifyFormProps {
@@ -29,15 +33,20 @@ interface VerifyFormProps {
 }
 
 export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const { register, resendCode, confirmCode, otp } = useAuth()
+  // A code was already requested (this page reloaded, or the user came back),
+  // so resume on the code screen instead of asking for the details again.
+  const [step, setStep] = useState<1 | 2 | 3>(otp ? 2 : 1)
   const [step1, setStep1] = useState<Step1Data>({
     first: '',
     last: '',
     prog: PROGRAMS[0],
+    year: 1,
     email: '',
     pass: '',
     pass2: '',
     code: '',
+    agree: false,
   })
   // Per-field errors shown below each input
   const [firstErr, setFirstErr] = useState<string | null>(null)
@@ -46,7 +55,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
   const [passErr, setPassErr] = useState<string | null>(null)
   const [pass2Err, setPass2Err] = useState<string | null>(null)
   const [codeErr, setCodeErr] = useState<string | null>(null)
-  const { sendCode, verifyCode, otp } = useAuth()
+  const [agreeErr, setAgreeErr] = useState<string | null>(null)
 
   const clearAllErr = useCallback(() => {
     setFirstErr(null)
@@ -55,6 +64,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
     setPassErr(null)
     setPass2Err(null)
     setCodeErr(null)
+    setAgreeErr(null)
   }, [])
 
   const goBack = () => {
@@ -71,7 +81,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
   const handleStep1Submit = async (e: React.FormEvent) => {
     e.preventDefault()
     clearAllErr()
-    const { first, last, email, pass, pass2 } = step1
+    const { first, last, email, pass, pass2, prog, year, agree } = step1
 
     if (!first.trim() || !last.trim()) {
       if (!first.trim()) setFirstErr('Enter your first name.')
@@ -99,9 +109,22 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
       setPass2Err('The two passwords do not match.')
       return
     }
+    if (!agree) {
+      setAgreeErr('Accept the privacy notice to create your account.')
+      return
+    }
 
     try {
-      await sendCode(em, first.trim())
+      // Creates the visitor account and emails the 6-digit code.
+      await register({
+        first: first.trim(),
+        last: last.trim(),
+        email: em,
+        pass,
+        prog,
+        year,
+        consent: agree,
+      })
       setStep1((prev) => ({ ...prev, email: em }))
       setStep(2)
       window.scrollTo(0, 0)
@@ -117,7 +140,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
     e.preventDefault()
     clearAllErr()
     try {
-      await sendCode(step1.email.trim().toLowerCase(), step1.first.trim())
+      await resendCode(step1.email.trim().toLowerCase())
       window.scrollTo(0, 0)
     } catch (err) {
       setEmailErr(err instanceof Error ? err.message : 'Could not send code. Try again.')
@@ -130,7 +153,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
   const handleResendCode = async () => {
     clearAllErr()
     try {
-      await sendCode(step1.email.trim().toLowerCase(), step1.first.trim())
+      await resendCode(otp?.to || step1.email.trim().toLowerCase())
     } catch (err) {
       setEmailErr(err instanceof Error ? err.message : 'Could not resend code. Try again.')
     }
@@ -149,13 +172,8 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
       return
     }
     try {
-      await verifyCode(step1.code, {
-        first: step1.first,
-        last: step1.last,
-        email: step1.email,
-        pass: step1.pass,
-        prog: step1.prog,
-      })
+      // Correct code activates the account and signs the user in.
+      await confirmCode(otp?.to || step1.email, step1.code)
       setStep(3)
       onStep3Complete?.()
     } catch (err) {
@@ -171,8 +189,8 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
     return `${p[0].slice(0, 2)}***@${p[1] || ''}`
   }
 
-  // Keep step1 in sync with OTP email
-  const demoCode = otp?.code ?? null
+  // The address the code was sent to. Kept by AuthContext, so it survives a
+  // page reload and the code screen can still resume.
   const otpEmail = otp?.to ?? step1.email
 
   return (
@@ -251,6 +269,23 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
                 ))}
               </select>
             </div>
+            <div className="field">
+              <label htmlFor="v-year">Year level</label>
+              <select
+                className="input"
+                id="v-year"
+                value={step1.year}
+                onChange={(e) =>
+                  setStep1((prev) => ({ ...prev, year: Number(e.target.value) }))
+                }
+              >
+                {YEARS.map((label, index) => (
+                  <option key={label} value={index + 1}>
+                    {label} year
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="card stack" style={{ gap: 12 }}>
             <b>Sign-in details</b>
@@ -306,6 +341,26 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
               </div>
             </div>
           </div>
+          <label className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
+            <input
+              type="checkbox"
+              checked={step1.agree}
+              onChange={(e) => {
+                setStep1((prev) => ({ ...prev, agree: e.target.checked }))
+                setAgreeErr(null)
+              }}
+              style={{ marginTop: 3 }}
+            />
+            <span className="small">
+              I accept the privacy notice. My RTU email, program, and year level are used only to
+              run the marketplace (RA 10173).
+            </span>
+          </label>
+          {agreeErr && (
+            <p className="err" role="alert">
+              {agreeErr}
+            </p>
+          )}
           <div className="err" role="alert">{emailErr}</div>
           <div className="row between wrap">
             <button
@@ -369,18 +424,6 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
                 We sent a 6-digit code to your RTU email <b>{maskMail(otpEmail)}</b>. It expires in
                 5 minutes. Check your spam folder if you do not see it.
               </p>
-              {otp?.demo && (
-                <div className="note" role="status">
-                  <Icon name="info" size="sm" />
-                  <span>
-                    <b>Demo mode.</b> No email service is connected, so nothing was emailed. Your
-                    code is{' '}
-                    <b className="demo-code tnum" style={{ letterSpacing: '0.25em', fontSize: 15 }}>
-                      {demoCode}
-                    </b>
-                  </span>
-                </div>
-              )}
               <div className="card stack" style={{ gap: 12 }}>
                 <div className="field">
                   <label htmlFor="v-code">6-digit code</label>
