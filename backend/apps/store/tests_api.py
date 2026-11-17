@@ -140,6 +140,34 @@ class TicketApiTests(StoreApiTestCase):
         self.assertEqual(self.variant.available, 10)
         self.assertEqual(self.variant.reserved, 0)
 
+    def test_claiming_a_ticket_counts_the_sale(self):
+        reference = self.order(3).json()["reference"]
+        self.client.force_authenticate(self.staff)
+
+        for next_status in ("confirmed", "ready_for_pickup", "claimed"):
+            response = self.client.post(
+                f"/api/v1/store/tickets/{reference}/transition/",
+                {"status": next_status},
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.sold_count, 3)
+
+    def test_cancelling_a_ticket_does_not_count_a_sale(self):
+        reference = self.order(2).json()["reference"]
+        self.client.force_authenticate(self.student)
+
+        self.client.post(
+            f"/api/v1/store/tickets/{reference}/transition/",
+            {"status": "cancelled", "note": "Changed my mind"},
+            format="json",
+        )
+
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.sold_count, 0)
+
     def test_a_student_cannot_cancel_someone_elses_request(self):
         reference = self.order(1).json()["reference"]
         self.client.force_authenticate(self.other)

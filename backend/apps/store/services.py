@@ -1,9 +1,9 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import F, Sum
 from django.utils import timezone
 
-from apps.catalog.models import ListingVariant
+from apps.catalog.models import Listing, ListingVariant
 
 from .models import (
     DailyCount,
@@ -269,6 +269,16 @@ def change_ticket_status(ticket, new_status, *, by=None, note=""):
                         ticket=ticket,
                         by=by,
                         reason=reason,
+                    )
+
+            if new_status == OfficialTicket.Status.CLAIMED:
+                # A claimed ticket is a completed sale, so the catalogue's
+                # sales counter moves here. It feeds the "best-selling"
+                # ordering; a cancelled ticket must not touch it, and a
+                # claimed ticket has no way back out of that status.
+                for item in ticket.items.all():
+                    Listing.objects.filter(pk=item.listing_id).update(
+                        sold_count=F("sold_count") + item.quantity
                     )
 
         TicketStatusHistory.objects.create(
