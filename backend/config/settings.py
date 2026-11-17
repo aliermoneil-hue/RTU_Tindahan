@@ -165,7 +165,9 @@ PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
+        # AV-06 hardening: a token older than AUTH_TOKEN_TTL_DAYS is refused.
+        # The format is unchanged, so the React client needed no edit.
+        "apps.accounts.authentication.ExpiringTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -182,8 +184,12 @@ REST_FRAMEWORK = {
         "login": os.getenv("THROTTLE_LOGIN", "5/min"),
         "register": os.getenv("THROTTLE_REGISTER", "10/hour"),
         "verify": os.getenv("THROTTLE_VERIFY", "20/hour"),
+        "password-reset": os.getenv("THROTTLE_PASSWORD_RESET", "5/hour"),
     },
 }
+
+# AV-06: how long a sign-in lasts. Zero disables the check (the old behaviour).
+AUTH_TOKEN_TTL_DAYS = int(os.getenv("AUTH_TOKEN_TTL_DAYS", "14") or 0)
 
 # ---------------------------------------------------------------------------
 # CORS (the React app runs on a different port during development)

@@ -1,5 +1,8 @@
+import logging
+
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from rest_framework import status
@@ -9,10 +12,17 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from .emails import send_verification_code_email, send_verification_email
+from .authentication import token_lifetime
+from .emails import (
+    send_password_reset_code_email,
+    send_verification_code_email,
+    send_verification_email,
+)
 from .models import User
 from .serializers import (
     LoginSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     ProfileUpdateSerializer,
     RegisterSerializer,
     ResendCodeSerializer,
@@ -24,15 +34,32 @@ from .serializers import (
 from .verification import (
     CODE_TTL_MINUTES,
     RESEND_SECONDS,
+    RESET_TTL_MINUTES,
     CodeError,
     check_code,
+    check_reset_code,
+    clear_reset_code,
     issue_code,
+    issue_reset_code,
+    reset_cooldown_active,
     start_cooldown,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def auth_payload(user: User) -> dict:
     token, _ = Token.objects.get_or_create(user=user)
+
+    # If the stored token has aged past AUTH_TOKEN_TTL_DAYS, signing in must
+    # mint a new one. Without this, a returning user is handed the same dead
+    # token and every request fails with "your sign-in has expired" — the
+    # account looks broken and the only cure is a logout the client cannot do.
+    lifetime = token_lifetime()
+    if lifetime is not None and timezone.now() - token.created > lifetime:
+        token.delete()
+        token = Token.objects.create(user=user)
+
     return {"token": token.key, "user": UserSerializer(user).data}
 
 
@@ -291,3 +318,130 @@ class MeView(APIView):
                 {"detail": exc.messages}, status=status.HTTP_400_BAD_REQUEST
             )
         return Response(UserSerializer(request.user).data)
+
+
+class PasswordResetRequestView(APIView):
+    """AV-06: email a 6-digit reset code.
+
+    The answer is identical whether or not the address exists. Telling a
+    stranger which RTU addresses have accounts is a directory leak, and it is
+    the first thing an attacker would use this endpoint for.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password-reset"
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"].lower()
+
+        detail = (
+            "If that RTU address has an account, we emailed a 6-digit code to it."
+        )
+        payload = {"detail": detail, "code_expires_in_minutes": RESET_TTL_MINUTES}
+
+        user = User.objects.filter(email=email).first()
+        if user is None or not user.is_active or user.status == User.Status.BANNED:
+            return Response(payload)
+
+        if reset_cooldown_active(email):
+            # Same answer, no second mail: a cooldown is not a reason to
+            # confirm that the account exists.
+            return Response(payload)
+
+        code = issue_reset_code(user)
+        try:
+            send_password_reset_code_email(user, code)
+        except Exception:  # noqa: BLE001 - the caller must not learn anything
+            logger.exception("Password reset email failed for %s", email)
+
+        return Response(payload)
+
+
+class PasswordResetConfirmView(APIView):
+    """AV-06: spend the code, set the new password, end every other session."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password-reset"
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"].lower()
+
+        user = User.objects.filter(email=email).first()
+        try:
+            if user is None:
+                # Deliberately the same message as a wrong code, so this
+                # endpoint cannot be used to probe for accounts either.
+                raise CodeError("That code is not right. Ask for a new code.")
+            check_reset_code(user, serializer.validated_data["code"])
+        except CodeError as exc:
+            # One message for every failure. A response that tells a stranger
+            # "wrong code" versus "expired code" versus "no such account" is a
+            # directory probe with extra steps, so the reason is logged for us
+            # and the caller learns nothing.
+            logger.info("Password reset refused for %s: %s", email, exc.message)
+            return Response(
+                {
+                    "detail": (
+                        "That code is not right or has expired. Ask for a new code."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.set_password(serializer.validated_data["password"])
+        user.save(update_fields=["password"])
+        clear_reset_code(user)
+
+        # A reset is the moment to end other sessions: whoever had the old
+        # password, or a token taken from a shared laptop, is now locked out.
+        Token.objects.filter(user=user).delete()
+
+        return Response(
+            {"detail": "Password changed. Sign in with the new password."}
+        )
+
+
+class LogoutAllView(APIView):
+    """End every session for this account.
+
+    DRF's `authtoken` issues one token per account, so today this does exactly
+    what `auth/logout/` does. It exists as its own endpoint anyway: the moment
+    tokens become per-device, "sign out of every device" has to keep meaning
+    what it says, and the client should already be calling the right name.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        removed, _ = Token.objects.filter(user=request.user).delete()
+        return Response(
+            {"detail": "Signed out of every device.", "sessions_ended": removed}
+        )
+
+
+class TokenRefreshView(APIView):
+    """Replace the caller's token with a fresh one of the same kind.
+
+    Rotation, not extension: the old key stops working immediately. The client
+    must store the new token, which is the behaviour the app's API helper
+    already has when it reads a `token` field from the response.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        lifetime = token_lifetime()
+        Token.objects.filter(user=request.user).delete()
+        token = Token.objects.create(user=request.user)
+        return Response(
+            {
+                "token": token.key,
+                "expires_in_days": int(lifetime.days) if lifetime else None,
+            }
+        )

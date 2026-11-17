@@ -209,3 +209,28 @@ class VerificationCode(models.Model):
 
     def __str__(self) -> str:
         return f"Code for {self.user.email}"
+
+
+class PasswordResetCode(models.Model):
+    """The 6-digit code emailed when a password is forgotten (AV-06).
+
+    Kept apart from `VerificationCode` on purpose: a live sign-up code and a
+    live reset code must not overwrite each other, and the two flows expire on
+    different clocks. One row per account, replaced on every request, hash
+    only — same rules as the sign-up code.
+    """
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="password_reset_code"
+    )
+    code_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    sent_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "password reset code"
+        verbose_name_plural = "password reset codes"
+
+    def __str__(self) -> str:
+        return f"Password reset code for {self.user.email}"
