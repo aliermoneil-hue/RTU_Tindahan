@@ -148,6 +148,38 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, trim_whitespace=False)
 
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """AV-06: the address to send a reset code to."""
+
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """AV-06: the code plus the new password."""
+
+    email = serializers.EmailField()
+    code = serializers.RegexField(
+        r"^\d{6}$",
+        error_messages={"invalid": "Enter the 6 digits from the email."},
+    )
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    password_confirm = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError(
+                {"password_confirm": "The two passwords do not match."}
+            )
+        # Same validators the model uses, so a reset cannot install a password
+        # that sign-up would have refused.
+        candidate = User(email=attrs["email"])
+        try:
+            validate_password(attrs["password"], user=candidate)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"password": list(exc.messages)})
+        return attrs
+
+
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     """AV-07/AV-08: editable profile fields. Email and role are not editable."""
 

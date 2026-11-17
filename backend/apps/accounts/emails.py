@@ -5,7 +5,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
 from .models import User
-from .verification import CODE_TTL_MINUTES
+from .verification import CODE_TTL_MINUTES, RESET_TTL_MINUTES
 
 
 def build_verification_link(user: User) -> str:
@@ -47,6 +47,34 @@ def send_verification_code_email(user: User, code: str) -> None:
         f"Enter it on the sign-up screen. The code expires in "
         f"{CODE_TTL_MINUTES} minutes.\n\n"
         "If you did not create this account, you can ignore this message.\n\n"
+        "RTU Tindahan\n"
+        "Rizal Technological University, Pasig Campus"
+    )
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+
+def send_password_reset_code_email(user: User, code: str) -> None:
+    """Email the 6-digit password reset code (AV-06).
+
+    Deliberately says what to do if the request was not expected: a reset mail
+    arriving unrequested is the first sign of someone probing an account, and
+    the reader should be told to change their password rather than ignore it.
+    """
+    subject = "Reset your RTU Tindahan password"
+    message = (
+        f"Hello {user.display_name},\n\n"
+        f"Your password reset code is: {code}\n\n"
+        f"Enter it on the reset screen. The code expires in "
+        f"{RESET_TTL_MINUTES} minutes.\n\n"
+        "If you did not ask to reset your password, do not share this code. "
+        "Sign in and change your password, then tell your instructor or the "
+        "site administrator.\n\n"
         "RTU Tindahan\n"
         "Rizal Technological University, Pasig Campus"
     )
