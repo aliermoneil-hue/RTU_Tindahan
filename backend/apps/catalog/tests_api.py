@@ -96,6 +96,58 @@ class ListingApiTests(APITestCase):
         self.assertEqual([row["title"] for row in by_search.json()["results"]], ["Notebook"])
         self.assertEqual(len(by_category.json()["results"]), 2)
 
+    # -- browsing: price range and sales ordering (BD-03, BD-06) -----------
+
+    def test_price_filters_are_inclusive_and_combinable(self):
+        self.make_listing(title="Candy", price="10.00", status=Listing.Status.APPROVED)
+        self.make_listing(title="Lumpia", price="50.00", status=Listing.Status.APPROVED)
+        self.make_listing(title="Jacket", price="500.00", status=Listing.Status.APPROVED)
+
+        def titles(query):
+            response = self.client.get(f"/api/v1/listings/?{query}")
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            return sorted(row["title"] for row in response.json()["results"])
+
+        self.assertEqual(titles("max_price=50"), ["Candy", "Lumpia"])
+        self.assertEqual(titles("min_price=50"), ["Jacket", "Lumpia"])
+        self.assertEqual(titles("min_price=10&max_price=50"), ["Candy", "Lumpia"])
+        self.assertEqual(titles("min_price=500.01"), [])
+
+    def test_an_unreadable_price_is_reported_not_ignored(self):
+        response = self.client.get("/api/v1/listings/?max_price=cheap")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("max_price", response.json())
+
+    def test_an_inverted_price_range_is_reported(self):
+        response = self.client.get("/api/v1/listings/?min_price=100&max_price=10")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("max_price", response.json())
+
+    def test_a_negative_price_is_reported(self):
+        response = self.client.get("/api/v1/listings/?min_price=-5")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("min_price", response.json())
+
+    def test_best_selling_orders_by_units_sold(self):
+        self.make_listing(title="Quiet", status=Listing.Status.APPROVED, sold_count=0)
+        self.make_listing(title="Steady", status=Listing.Status.APPROVED, sold_count=5)
+        self.make_listing(title="Brisk", status=Listing.Status.APPROVED, sold_count=12)
+
+        best = self.client.get("/api/v1/listings/?ordering=best-selling")
+        least = self.client.get("/api/v1/listings/?ordering=least-sold")
+
+        self.assertEqual(
+            [row["title"] for row in best.json()["results"]],
+            ["Brisk", "Steady", "Quiet"],
+        )
+        self.assertEqual(
+            [row["title"] for row in least.json()["results"]],
+            ["Quiet", "Steady", "Brisk"],
+        )
+
     def test_detail_counts_a_view(self):
         listing = self.make_listing(status=Listing.Status.APPROVED)
 

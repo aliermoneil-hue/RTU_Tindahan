@@ -15,10 +15,12 @@ Listings are created as `pending_screening` and published only by an approve
 call, which keeps LS-05/AI-02 true even before the screening service exists.
 """
 
+from decimal import Decimal, InvalidOperation
+
 from django.db.models import F, Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -32,14 +34,39 @@ from .serializers import (
     ListingWriteSerializer,
 )
 
+# Every mode ends with a tie-breaker so that paging is stable: without one,
+# two listings posted in the same second can swap places between requests and
+# a visitor sees the same row twice.
 ORDERING = {
-    "newest": "-created_at",
-    "oldest": "created_at",
-    "price": "price",
-    "-price": "-price",
-    "popular": "-view_count",
+    "newest": ("-created_at",),
+    "oldest": ("created_at",),
+    "price": ("price", "-created_at"),
+    "-price": ("-price", "-created_at"),
+    "popular": ("-view_count", "-created_at"),
+    # BD-03/BD-07: done by the sales counter, which a claimed ticket raises.
+    "best-selling": ("-sold_count", "-created_at"),
+    "least-sold": ("sold_count", "-created_at"),
 }
 TRUE_VALUES = {"1", "true", "yes"}
+
+
+def price_bound(params, key):
+    """Read a price bound from the query string, or None when it is absent.
+
+    A bad value is reported instead of ignored: a visitor who filters
+    `max_price=abc` and silently receives the whole catalogue would think the
+    filter is broken.
+    """
+    raw = (params.get(key) or "").strip()
+    if not raw:
+        return None
+    try:
+        value = Decimal(raw)
+    except (InvalidOperation, ValueError, TypeError):
+        raise ValidationError({key: "Enter a number, for example 150 or 150.00."})
+    if value < 0:
+        raise ValidationError({key: "Price cannot be negative."})
+    return value
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -82,12 +109,23 @@ class ListingViewSet(viewsets.ModelViewSet):
             )
         if listing_type := params.get("type"):
             queryset = queryset.filter(listing_type=listing_type)
+        # BD-06: price range. Both bounds are optional and inclusive.
+        min_price = price_bound(params, "min_price")
+        max_price = price_bound(params, "max_price")
+        if min_price is not None and max_price is not None and min_price > max_price:
+            raise ValidationError(
+                {"max_price": "The maximum price is below the minimum price."}
+            )
+        if min_price is not None:
+            queryset = queryset.filter(price__gte=min_price)
+        if max_price is not None:
+            queryset = queryset.filter(price__lte=max_price)
         if (official := params.get("official")) is not None:
             queryset = queryset.filter(is_official=official.lower() in TRUE_VALUES)
         if params.get("seller") == "me" and user.is_authenticated:
             queryset = queryset.filter(seller=user)
         if (ordering := params.get("ordering")) in ORDERING:
-            queryset = queryset.order_by(ORDERING[ordering])
+            queryset = queryset.order_by(*ORDERING[ordering])
         return queryset
 
     def get_serializer_class(self):

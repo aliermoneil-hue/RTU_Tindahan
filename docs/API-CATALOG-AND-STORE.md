@@ -52,9 +52,11 @@ Query parameters on `GET /api/v1/listings/`:
 | `category` | `?category=uniforms` | Filter by category slug |
 | `search` | `?search=lumpia` | Match title or description (case-insensitive) |
 | `type` | `?type=service` | `product` or `service` |
+| `min_price` | `?min_price=50` | Inclusive lower bound on price |
+| `max_price` | `?max_price=300` | Inclusive upper bound on price; combining the two gives a range. A value that is not a number, a negative number, or a range where the maximum sits below the minimum returns `400` with the offending key |
 | `official` | `?official=true` | Official Store items only — this is what the Store page should call |
 | `seller` | `?seller=me` | Your own listings, any status (the "My shop" page) |
-| `ordering` | `?ordering=price` | `newest`, `oldest`, `price`, `-price`, `popular` |
+| `ordering` | `?ordering=price` | `newest`, `oldest`, `price`, `-price`, `popular`, `best-selling`, `least-sold`. Sales ordering uses `sold_count`, which a ticket raises when staff mark it `claimed` |
 | `page` | `?page=2` | Page size is 20 (global DRF setting) |
 
 ### Posting an item (multipart, up to 10 photos)
