@@ -104,6 +104,91 @@ class ListingApiTests(APITestCase):
         listing.refresh_from_db()
         self.assertEqual(listing.view_count, 1)
 
+    # -- price filter (BD-02) ----------------------------------------------
+
+    def prices(self, query):
+        response = self.client.get(f"/api/v1/listings/{query}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return sorted(row["price"] for row in response.json()["results"])
+
+    def test_price_filter_is_inclusive_on_both_ends(self):
+        for price in ("10.00", "50.00", "90.00"):
+            self.make_listing(
+                title=f"Item {price}",
+                price=price,
+                status=Listing.Status.APPROVED,
+            )
+
+        self.assertEqual(self.prices("?min_price=50&max_price=90"), ["50.00", "90.00"])
+        self.assertEqual(self.prices("?max_price=50"), ["10.00", "50.00"])
+        self.assertEqual(self.prices("?min_price=90"), ["90.00"])
+
+    def test_price_filter_accepts_decimals(self):
+        self.make_listing(title="Cheap", price="49.99", status=Listing.Status.APPROVED)
+        self.make_listing(title="Dear", price="50.01", status=Listing.Status.APPROVED)
+
+        self.assertEqual(self.prices("?min_price=50.00"), ["50.01"])
+
+    def test_blank_or_malformed_price_bounds_are_ignored(self):
+        self.make_listing(title="One", price="10.00", status=Listing.Status.APPROVED)
+        self.make_listing(title="Two", price="20.00", status=Listing.Status.APPROVED)
+
+        # A browse screen often submits an empty box; that must not 400 or filter.
+        self.assertEqual(self.prices("?min_price=&max_price="), ["10.00", "20.00"])
+        self.assertEqual(self.prices("?min_price=abc&max_price=xyz"), ["10.00", "20.00"])
+
+    def test_price_filter_still_hides_unapproved_listings(self):
+        self.make_listing(title="Hidden", price="10.00", status=Listing.Status.PENDING_SCREENING)
+
+        self.assertEqual(self.prices("?min_price=0"), [])
+
+    # -- ordering (BD-03) --------------------------------------------------
+
+    def titles(self, query):
+        response = self.client.get(f"/api/v1/listings/{query}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return [row["title"] for row in response.json()["results"]]
+
+    def test_best_selling_orders_by_completed_sales(self):
+        slow = self.make_listing(title="Slow", status=Listing.Status.APPROVED, sold_count=1)
+        hot = self.make_listing(title="Hot", status=Listing.Status.APPROVED, sold_count=9)
+        none = self.make_listing(title="None", status=Listing.Status.APPROVED)
+        self.assertIsNotNone(none)
+
+        self.assertEqual(self.titles("?ordering=best-selling"), ["Hot", "Slow", "None"])
+        self.assertEqual(
+            self.titles("?ordering=least-sold"),
+            ["None", "Slow", "Hot"],
+        )
+        self.assertIsNotNone(slow)
+
+    def test_best_selling_is_not_the_same_as_popular(self):
+        """BD-03: best-selling counts sales, popular counts views."""
+        seen = self.make_listing(
+            title="Seen", status=Listing.Status.APPROVED, view_count=100, sold_count=0
+        )
+        sold = self.make_listing(
+            title="Sold", status=Listing.Status.APPROVED, view_count=0, sold_count=5
+        )
+        self.assertIsNotNone(seen)
+
+        self.assertEqual(self.titles("?ordering=popular"), ["Seen", "Sold"])
+        self.assertEqual(self.titles("?ordering=best-selling"), ["Sold", "Seen"])
+
+    def test_ties_in_best_selling_keep_a_stable_order(self):
+        self.make_listing(title="First", status=Listing.Status.APPROVED, sold_count=4)
+        self.make_listing(title="Second", status=Listing.Status.APPROVED, sold_count=4)
+
+        # Both created in the same instant, so created_at cannot break the tie.
+        # The request must still succeed and return both rows exactly once.
+        ordered = self.titles("?ordering=best-selling")
+        self.assertEqual(sorted(ordered), ["First", "Second"])
+
+    def test_unknown_ordering_is_ignored(self):
+        self.make_listing(title="Anything", status=Listing.Status.APPROVED)
+
+        self.assertEqual(self.titles("?ordering=top-rated"), ["Anything"])
+
     # -- writing -----------------------------------------------------------
 
     def test_posting_requires_a_signed_in_member(self):
