@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     # Local apps
     "apps.accounts",
     "apps.catalog",
+    "apps.screening",
     "apps.store",
 ]
 
@@ -208,6 +209,24 @@ RTU_STUDENT_EMAIL_REGEX = os.getenv(
     "RTU_STUDENT_EMAIL_REGEX",
     r"^(?P<student_number>\d{4}-\d{6})@rtu\.edu\.ph$",
 )
+
+# ---------------------------------------------------------------------------
+# Content screening (AI-01 to AI-16)
+#
+# Which implementation answers is decided here, from backend/.env, and nowhere
+# else: no request data can choose a provider. The key stays on the server and
+# is never serialised to a client.
+#
+# `stub` is a deterministic rules provider, so the screening flow is testable
+# before a real model is chosen. Naming a provider that does not exist raises
+# at screening time, which sends the listing to a moderator rather than
+# publishing it unchecked.
+#
+# Walkthrough: docs/SCREENING.md
+# ---------------------------------------------------------------------------
+
+SCREENING_PROVIDER = os.getenv("LLM_PROVIDER", "stub").strip().lower()
+SCREENING_API_KEY = os.getenv("LLM_API_KEY", "")
 
 # ---------------------------------------------------------------------------
 # Email
