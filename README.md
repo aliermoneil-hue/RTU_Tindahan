@@ -263,6 +263,12 @@ as `feature/<your-name>-<task>`, push, and open a pull request.
 Real values live in `backend/.env`, which is gitignored. `backend/.env.example`
 lists every key the system needs and is safe to commit.
 
+Email has one setting worth understanding before you fill the file: `EMAIL_MODE`
+selects between `console` (code printed in the terminal), `mailtrap` (a sandbox
+inbox) and `gmail` (real delivery). Local machines use Mailtrap or console; the
+deployed backend uses Gmail. Full walkthrough, including how to obtain each
+credential: `docs/EMAIL-SETUP.md`.
+
 Never paste an API key into a file that is not gitignored. If you commit one by
 accident, tell the team and rotate the key — deleting the file in a later commit
 does not remove it from history.

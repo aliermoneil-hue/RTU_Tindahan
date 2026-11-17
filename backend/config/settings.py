@@ -212,22 +212,74 @@ RTU_STUDENT_EMAIL_REGEX = os.getenv(
 # ---------------------------------------------------------------------------
 # Email
 #
-# Development prints verification emails to the console. Set EMAIL_BACKEND to
-# the SMTP backend in .env when a real mailbox is available.
+# Three modes, chosen with EMAIL_MODE in .env:
+#
+#   console   Local development. The message is printed in the runserver
+#             terminal instead of being sent. No account needed.
+#   mailtrap  Local development against the Mailtrap sandbox. Nothing reaches
+#             a real inbox; the message appears in the Mailtrap web inbox.
+#             Use it for repeated sign-up tests without spending the sending
+#             account's daily quota.
+#   gmail     Deployed backend. Real delivery through Gmail SMTP with an App
+#             Password. This is the mode the deployed backend runs.
+#
+# Credentials are shared by both SMTP modes: EMAIL_HOST_USER and
+# EMAIL_HOST_PASSWORD. Leave EMAIL_MODE empty to keep the older behaviour,
+# where EMAIL_BACKEND and the EMAIL_HOST_* keys are read directly.
+#
+# Step-by-step walkthrough: docs/EMAIL-SETUP.md
 # ---------------------------------------------------------------------------
 
-EMAIL_BACKEND = os.getenv(
-    "EMAIL_BACKEND",
-    "django.core.mail.backends.console.EmailBackend"
-    if DEBUG
-    else "django.core.mail.backends.smtp.EmailBackend",
-)
-EMAIL_HOST = os.getenv("EMAIL_HOST", "")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_MODE = os.getenv("EMAIL_MODE", "").strip().lower()
+
+# Transport for each named mode. Anything not listed is read from .env.
+EMAIL_TRANSPORTS = {
+    "console": {
+        "backend": "django.core.mail.backends.console.EmailBackend",
+    },
+    "mailtrap": {
+        "backend": "django.core.mail.backends.smtp.EmailBackend",
+        "host": "sandbox.smtp.mailtrap.io",
+        "port": 2525,
+        "use_tls": True,
+    },
+    "gmail": {
+        "backend": "django.core.mail.backends.smtp.EmailBackend",
+        "host": "smtp.gmail.com",
+        "port": 587,
+        "use_tls": True,
+    },
+}
+
+_transport = EMAIL_TRANSPORTS.get(EMAIL_MODE)
+
+if _transport:
+    EMAIL_BACKEND = _transport["backend"]
+    EMAIL_HOST = _transport.get("host", "")
+    EMAIL_PORT = _transport.get("port", 587)
+    EMAIL_USE_TLS = _transport.get("use_tls", True)
+else:
+    EMAIL_BACKEND = os.getenv(
+        "EMAIL_BACKEND",
+        "django.core.mail.backends.console.EmailBackend"
+        if DEBUG
+        else "django.core.mail.backends.smtp.EmailBackend",
+    )
+    EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+    EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "RTU Tindahan <no-reply@rtu.edu.ph>")
+
+# Gmail rejects a From address that is not the authenticated account, so the
+# SMTP modes default the display address to that account. A team member who
+# has a verified alias can still override DEFAULT_FROM_EMAIL in .env.
+_DEFAULT_FROM = "RTU Tindahan <no-reply@rtu.edu.ph>"
+if EMAIL_MODE in {"mailtrap", "gmail"} and EMAIL_HOST_USER:
+    _DEFAULT_FROM = f"RTU Tindahan <{EMAIL_HOST_USER}>"
+
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "").strip() or _DEFAULT_FROM
 
 # ---------------------------------------------------------------------------
 # Internationalization
