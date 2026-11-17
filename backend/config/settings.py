@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     # Local apps
     "apps.accounts",
     "apps.catalog",
+    "apps.screening",
     "apps.store",
 ]
 
@@ -251,6 +252,22 @@ MEDIA_ROOT = BASE_DIR / "media"
 # SE-06: image uploads only, with a size ceiling (5 MB, matching the prototype).
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE
+
+# ---------------------------------------------------------------------------
+# Screening (AI-01 to AI-16)
+# ---------------------------------------------------------------------------
+# The key lives here and never leaves the server. Until LLM_API_KEY is set, the
+# deterministic rule stub in apps.screening.services is used (AI-07).
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "")
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+
+# AI-12: an approval below this confidence is treated as Needs Review.
+SCREENING_MIN_CONFIDENCE = float(os.getenv("SCREENING_MIN_CONFIDENCE", "0.7"))
+
+# Fallback rules, used only when no ScreeningRule rows exist (AI-10 lets an
+# Administrator replace these from the back office without a deploy).
+SCREENING_RULES = None
+SCREENING_RULES_VERSION = os.getenv("SCREENING_RULES_VERSION", "default")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

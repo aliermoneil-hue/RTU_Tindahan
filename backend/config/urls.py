@@ -13,6 +13,7 @@ urlpatterns = [
     path("api/v1/", api_root, name="api-v1-root"),
     path("api/v1/", include("apps.accounts.urls")),
     path("api/v1/", include("apps.catalog.urls")),
+    path("api/v1/", include("apps.screening.urls")),
     path("api/v1/", include("apps.store.urls")),
 ]
 

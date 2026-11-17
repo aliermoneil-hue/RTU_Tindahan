@@ -200,7 +200,13 @@ class ListingApiTests(APITestCase):
         )
         self.assertEqual(Listing.objects.count(), 0)
 
-    def test_verified_member_posting_waits_for_screening(self):
+    def test_verified_member_posting_is_screened(self):
+        """AI-01/AI-03: a clean post is screened and published, not parked.
+
+        Before the screening app existed, every post sat at pending_screening
+        and only a moderator could move it. Now the stub screens on create, so a
+        harmless listing goes live immediately.
+        """
         self.client.force_authenticate(self.seller)
 
         response = self.client.post("/api/v1/listings/", self.payload(), format="json")
@@ -208,8 +214,27 @@ class ListingApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         listing = Listing.objects.get(slug=response.json()["slug"])
         self.assertEqual(listing.seller, self.seller)
-        self.assertEqual(listing.status, Listing.Status.PENDING_SCREENING)
+        self.assertEqual(listing.status, Listing.Status.APPROVED)
+        self.assertTrue(listing.is_published)
+        self.assertIsNotNone(listing.published_at)
+
+    def test_a_flagged_post_is_not_published(self):
+        """The screening step still stops bad content reaching the catalogue."""
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            "/api/v1/listings/",
+            self.payload(title="Baril", description="Selling a baril."),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        listing = Listing.objects.get(slug=response.json()["slug"])
+        self.assertEqual(listing.status, Listing.Status.REJECTED)
         self.assertFalse(listing.is_published)
+
+        anonymous = Listing.objects.filter(status=Listing.Status.APPROVED).count()
+        self.assertEqual(anonymous, 0)
 
     def test_cannot_publish_is_official_over_http(self):
         self.client.force_authenticate(self.seller)

@@ -8,12 +8,15 @@ Two rules hold everywhere in this file:
    does not call, so the same rules are repeated in `ListingWriteSerializer`.
 """
 
+import logging
 from pathlib import Path
 
 from django.conf import settings
 from rest_framework import serializers
 
 from .models import Category, Listing, ListingPhoto, ListingVariant
+
+logger = logging.getLogger(__name__)
 
 PHOTO_TYPES = {"jpg", "jpeg", "png", "webp"}
 
@@ -171,6 +174,19 @@ class ListingWriteSerializer(serializers.ModelSerializer):
         )
         for index, image in enumerate(photos):
             ListingPhoto.objects.create(listing=listing, image=image, sort_order=index)
+
+        # AI-01/AI-02: screen right away. A failure here must not lose the
+        # listing, so the error is logged and the item stays pending for a
+        # moderator (AI-07).
+        try:
+            from apps.screening.integrations import screen_and_apply
+
+            screen_and_apply(listing, commit=True)
+        except Exception:
+            logger.exception(
+                "Screening failed for listing %s; leaving it pending.", listing.pk
+            )
+
         return listing
 
     def update(self, instance, validated_data):

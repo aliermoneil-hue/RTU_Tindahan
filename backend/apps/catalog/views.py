@@ -110,6 +110,12 @@ class ListingViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(is_official=official.lower() in TRUE_VALUES)
         if params.get("seller") == "me" and user.is_authenticated:
             queryset = queryset.filter(seller=user)
+        # A moderator asking for one bucket at a time - this is what the
+        # moderation queue screen needs. Non-moderators can only reach their own
+        # listings here anyway, so the filter cannot leak anything.
+        if (wanted := params.get("status")) and user.is_authenticated and user.is_moderator:
+            if wanted in dict(Listing.Status.choices):
+                queryset = queryset.filter(status=wanted)
         if (ordering := params.get("ordering")) in ORDERING:
             queryset = queryset.order_by(ORDERING[ordering])
         return queryset
