@@ -228,6 +228,16 @@ RTU_STUDENT_EMAIL_REGEX = os.getenv(
 SCREENING_PROVIDER = os.getenv("LLM_PROVIDER", "stub").strip().lower()
 SCREENING_API_KEY = os.getenv("LLM_API_KEY", "")
 
+# Which model, and how long to wait for it. Kept in .env because providers
+# retire model names without notice; a code change should not be needed.
+SCREENING_MODEL = os.getenv("LLM_MODEL", "gemini-3.1-flash-lite").strip()
+SCREENING_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "12"))
+
+# When the provider fails, fall back to the deterministic rules instead of
+# leaving the listing unscreened. Safe only because screening never publishes:
+# a moderator still approves everything. See docs/SCREENING.md.
+SCREENING_FALLBACK = env_bool("LLM_FALLBACK", True)
+
 # ---------------------------------------------------------------------------
 # Email
 #

@@ -20,7 +20,9 @@ real language model behind it later without touching the rest of the system.
               |
               +--> provider returns flagged -> status becomes needs_review
               |
-              +--> provider raises          -> status becomes needs_review
+              +--> provider raises          -> with LLM_FALLBACK on, the rules provider
+              |                                answers and the audit row says so;
+              |                                with it off, status becomes needs_review
               |
               v
       moderator queue: ?status=pending_screening,needs_review
@@ -82,7 +84,54 @@ list. Do not describe it to the panel as an AI checker.
 
 ---
 
-## 4. Putting a real model behind it
+## 4. Gemini (the configured provider)
+
+    LLM_PROVIDER=gemini
+    LLM_API_KEY=<the key>
+    LLM_MODEL=gemini-3.1-flash-lite
+    LLM_TIMEOUT=12
+    LLM_FALLBACK=True
+
+`GeminiProvider` sends the title, description, and price with a system
+instruction and a response schema, so the answer comes back as JSON with a
+verdict, a score, and at most three reasons written for a moderator. Measured
+on this project's machine: 1.0–2.1 seconds per listing, about 160 tokens each.
+
+**The model name lives in `.env`, never in code, and is taken from the
+provider's own model list.** That is not fussiness. The first name tried here
+was `gemini-2.5-flash`; the API answered *"no longer available to new users"*
+and pointed at a successor that then returned `503 UNAVAILABLE` for minutes at
+a time. `gemini-3.1-flash-lite` answered 6 of 6 test listings correctly. When a
+model is retired again, change one line in `.env` — and check the list first:
+
+    curl -s -H "x-goog-api-key: $KEY" \
+      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200" \
+      | grep -o '"name": "models/[^"]*"' | sort
+
+The key travels in the `x-goog-api-key` header, never in the query string — a
+URL ends up in logs and error messages far more often than a header does.
+
+### When the provider fails
+
+`LLM_FALLBACK=True` (the default) means a timeout, an exhausted free tier, or a
+retired model name does not leave a listing unscreened: `run_screening` catches
+the failure, runs the deterministic rules instead, and records it as
+`provider: "gemini+fallback"` with the sentence *"The gemini provider failed
+(HTTPError), so the rules check answered."*
+
+This is safe only because screening never publishes. The worst outcome is a
+flagged item reaching the moderator's pending queue instead of the review
+queue, and a human still decides. With `LLM_FALLBACK=False` the same failure
+sends the listing straight to `needs_review` with the error as the reason.
+
+Verified by pointing `LLM_MODEL` at the retired name on purpose:
+
+    provider : gemini+fallback
+    verdict  : clean | score: 0
+    status   : pending_screening
+    reasons  : ['The gemini provider failed (HTTPError), so the rules check answered.']
+
+### Adding a different provider
 
 Three steps, none of them outside `providers.py`:
 
@@ -90,14 +139,16 @@ Three steps, none of them outside `providers.py`:
    Read `settings.SCREENING_API_KEY` inside it. Never accept a key as an
    argument passed down from a view.
 2. Register it in the `PROVIDERS` dict at the bottom of that file.
-3. Set `LLM_PROVIDER` and `LLM_API_KEY` in `backend/.env`, then run
+3. Set `LLM_PROVIDER`, `LLM_MODEL`, and `LLM_API_KEY` in `backend/.env`, then run
    `python manage.py test apps.screening`. The existing tests still apply: a
-   provider that raises, returns nonsense, or times out must leave the listing
-   in `needs_review`.
+   provider that raises, returns nonsense, or times out must not publish.
 
-Keep provider calls inside a timeout. A hung request in `run_screening` hangs
-the seller's POST, because screening runs inline. If that becomes a problem,
-the fix is a background job — not a longer timeout.
+Pass the transport into the constructor when you write tests — both providers
+accept one — so the suite answers from a fixture instead of the network.
+
+Keep provider calls inside the `LLM_TIMEOUT`. A hung request in
+`run_screening` hangs the seller's POST, because screening runs inline. If that
+becomes a real problem the fix is a background job, not a longer timeout.
 
 ---
 
