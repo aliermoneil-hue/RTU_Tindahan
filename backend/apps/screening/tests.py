@@ -1,12 +1,15 @@
 """Screening: the provider boundary, the stub's rules, and the status it sets."""
 
+import json
+from unittest.mock import patch
+
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, override_settings
 
 from apps.accounts.models import User
 from apps.catalog.models import Category, Listing
 from apps.screening.models import ScreeningResult
-from apps.screening.providers import StubProvider, get_provider
+from apps.screening.providers import GeminiProvider, StubProvider, get_provider
 from apps.screening.services import run_screening
 
 
@@ -105,7 +108,20 @@ class RunScreeningTests(TestCase):
         self.assertTrue(result.reasons)
 
     @override_settings(SCREENING_PROVIDER="some-model-nobody-registered")
-    def test_a_broken_provider_fails_closed(self):
+    def test_a_misnamed_provider_falls_back_to_the_rules(self):
+        listing = make_listing()
+
+        result = run_screening(listing)
+
+        listing.refresh_from_db()
+        self.assertEqual(result.provider, "some-model-nobody-registered+fallback")
+        self.assertEqual(result.verdict, ScreeningResult.Verdict.CLEAN)
+        self.assertEqual(listing.status, Listing.Status.PENDING_SCREENING)
+
+    @override_settings(
+        SCREENING_PROVIDER="some-model-nobody-registered", SCREENING_FALLBACK=False
+    )
+    def test_a_misnamed_provider_fails_closed_when_the_fallback_is_off(self):
         listing = make_listing()
 
         result = run_screening(listing)
@@ -123,3 +139,119 @@ class RunScreeningTests(TestCase):
         listing.refresh_from_db()
         self.assertFalse(listing.is_published)
         self.assertIsNone(listing.published_at)
+
+
+def gemini_reply(verdict="clean", score=0, reasons=None, finish="STOP"):
+    """The shape Gemini returns, with a schema-constrained JSON answer inside."""
+    inner = json.dumps(
+        {"verdict": verdict, "score": score, "reasons": reasons or []}
+    )
+    return {
+        "candidates": [
+            {"content": {"parts": [{"text": inner}]}, "finishReason": finish}
+        ],
+        "usageMetadata": {"totalTokenCount": 120},
+    }
+
+
+class GeminiProviderTests(TestCase):
+    def test_a_clean_answer_is_read_back(self):
+        provider = GeminiProvider(
+            api_key="k",
+            transport=lambda *args: gemini_reply("clean", 0, []),
+        )
+
+        verdict = provider.screen(make_listing())
+
+        self.assertEqual(verdict.verdict, "clean")
+        self.assertEqual(verdict.provider, "gemini")
+        self.assertEqual(verdict.raw["tokens"], 120)
+
+    def test_a_flagged_answer_keeps_its_reasons(self):
+        provider = GeminiProvider(
+            api_key="k",
+            transport=lambda *args: gemini_reply(
+                "flagged", 95, ["Sale of exam answers is prohibited."]
+            ),
+        )
+
+        verdict = provider.screen(make_listing())
+
+        self.assertEqual(verdict.verdict, "flagged")
+        self.assertEqual(verdict.reasons, ["Sale of exam answers is prohibited."])
+
+    def test_an_unreadable_verdict_is_treated_as_flagged(self):
+        provider = GeminiProvider(
+            api_key="k",
+            transport=lambda *args: gemini_reply("probably fine", 10, []),
+        )
+
+        verdict = provider.screen(make_listing())
+
+        self.assertEqual(verdict.verdict, "flagged")
+
+    def test_the_key_travels_in_a_header_not_the_url(self):
+        seen = {}
+
+        def transport(url, payload, headers, timeout):
+            seen.update(url=url, headers=headers, timeout=timeout)
+            return gemini_reply()
+
+        provider = GeminiProvider(api_key="secret-key", model="gemini-test", transport=transport)
+        provider.screen(make_listing())
+
+        self.assertNotIn("secret-key", seen["url"])
+        self.assertEqual(seen["headers"]["x-goog-api-key"], "secret-key")
+        self.assertIn("gemini-test", seen["url"])
+
+    def test_a_missing_key_refuses_to_construct(self):
+        with self.assertRaises(ImproperlyConfigured):
+            GeminiProvider(api_key="")
+
+
+@override_settings(
+    SCREENING_PROVIDER="gemini",
+    SCREENING_API_KEY="test-key",
+    SCREENING_FALLBACK=True,
+)
+class GeminiFallbackTests(TestCase):
+    def test_a_failing_provider_falls_back_to_the_rules(self):
+        listing = make_listing()
+
+        with patch(
+            "apps.screening.providers.post_json", side_effect=TimeoutError("slow")
+        ):
+            result = run_screening(listing)
+
+        listing.refresh_from_db()
+        self.assertEqual(result.provider, "gemini+fallback")
+        self.assertEqual(result.verdict, ScreeningResult.Verdict.CLEAN)
+        self.assertTrue(any("rules check" in reason for reason in result.reasons))
+        self.assertEqual(listing.status, Listing.Status.PENDING_SCREENING)
+
+    @override_settings(SCREENING_FALLBACK=False)
+    def test_with_the_fallback_off_a_failure_goes_to_a_moderator(self):
+        listing = make_listing()
+
+        with patch(
+            "apps.screening.providers.post_json", side_effect=TimeoutError("slow")
+        ):
+            result = run_screening(listing)
+
+        listing.refresh_from_db()
+        self.assertEqual(result.provider, "error")
+        self.assertEqual(listing.status, Listing.Status.NEEDS_REVIEW)
+
+    def test_a_live_provider_answers_are_used_when_it_works(self):
+        listing = make_listing()
+
+        with patch(
+            "apps.screening.providers.post_json",
+            return_value=gemini_reply("flagged", 88, ["Prohibited item."]),
+        ):
+            result = run_screening(listing)
+
+        listing.refresh_from_db()
+        self.assertEqual(result.provider, "gemini")
+        self.assertEqual(result.score, 88)
+        self.assertEqual(listing.status, Listing.Status.NEEDS_REVIEW)
