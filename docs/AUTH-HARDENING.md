@@ -54,11 +54,16 @@ Rules, all of them enforced in code and covered by tests:
 The new password goes through Django's own validators, the same ones sign-up
 uses, so a reset cannot install something sign-up would have refused.
 
-### Frontend note
+### Screens
 
-The screens are not built yet. The API is ready; the reset page needs two
-states (ask for the code, then enter code + new password) and should call
-`auth/password-reset/` then `auth/password-reset/confirm/`.
+Built: `frontend/src/features/authentication/pages/ResetPasswordPage.tsx`, routed at
+`#/reset-password` and reachable from the sign-in page's "Forgot password?" link.
+Two states (ask, then code + new password) plus a done state; "Send a new code"
+re-asks after the 60-second cooldown; "Use a different address" returns to step 1.
+
+The page deliberately repeats the backend's hedge — *"If that address has an
+account, a 6-digit code is on its way"* — because the API cannot tell it
+anything more specific without becoming an account-lookup service.
 
 ---
 
@@ -163,6 +168,10 @@ curl -s -X POST $BASE/auth/logout-all/  -H "Authorization: Token $TOKEN"
 | `backend/apps/accounts/urls.py` | four routes |
 | `backend/apps/accounts/tests/test_hardening.py` | 18 tests |
 | `backend/config/settings.py` | auth class, `AUTH_TOKEN_TTL_DAYS`, throttle scope |
+| `frontend/src/features/authentication/api/passwordReset.ts` | the two calls |
+| `frontend/src/features/authentication/pages/ResetPasswordPage.tsx` | the screen |
+| `frontend/src/features/core/AppRoutes.tsx` | `#/reset-password` route |
+| `frontend/src/features/authentication/pages/LoginPage.tsx` | "Forgot password?" now navigates |
 
 Run `python manage.py migrate` after pulling this, or the reset table is
 missing.

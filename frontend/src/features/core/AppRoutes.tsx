@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { navigate, useRoute } from '@/common/router/router'
-import { LoginPage, VerifyPage, useAuth } from '@/features/authentication'
+import { LoginPage, ResetPasswordPage, VerifyPage, useAuth } from '@/features/authentication'
 import { BrowsePage } from '@/features/marketplace/pages/BrowsePage'
 import { CartPage } from '@/features/marketplace/pages/CartPage'
 import { ConfirmPage } from '@/features/marketplace/pages/ConfirmPage'
@@ -46,6 +46,7 @@ export function AppRoutes() {
     path === 'login' ||
     path === 'register' ||
     path === 'verify' ||
+    path === 'reset-password' ||
     path === 'books' ||
     path === 'merch' ||
     path === 'help' ||
@@ -156,6 +157,9 @@ export function AppRoutes() {
   }
   if (path === 'register' || path === 'verify') {
     return <VerifyPage />
+  }
+  if (path === 'reset-password') {
+    return <ResetPasswordPage />
   }
   if (path === 'books') {
     return <GuestSectionPage kind="books" />

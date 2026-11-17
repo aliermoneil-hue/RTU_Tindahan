@@ -1,5 +1,6 @@
 export { LoginPage } from './pages/LoginPage'
 export { VerifyPage } from './pages/VerifyPage'
+export { ResetPasswordPage } from './pages/ResetPasswordPage'
 export { LoginForm } from './components/LoginForm'
 export { AuthProvider, useAuth } from './AuthContext'
 export type { LoginCredentials, AuthState, AuthAction } from './types'

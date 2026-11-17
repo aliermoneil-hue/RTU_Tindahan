@@ -139,9 +139,7 @@ export function LoginPage() {
   }
 
   const handleForgotPassword = () => {
-    alert(
-      'Password reset is not available yet.\n\nContact the RTU Office of Student Affairs for help with your account.'
-    )
+    navigate('reset-password')
   }
 
   const handleGuidelines = () => {
