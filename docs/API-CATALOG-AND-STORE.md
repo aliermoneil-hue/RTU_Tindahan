@@ -49,6 +49,7 @@ Query parameters on `GET /api/v1/listings/`:
 
 | Parameter | Example | Effect |
 | --- | --- | --- |
+| `status` | `?status=pending_screening` | Comma-separated listing statuses, for the moderator queue (`pending_screening,needs_review`). Visibility is applied first, so a visitor cannot use it to see hidden listings; an unknown value returns `400` |
 | `category` | `?category=uniforms` | Filter by category slug |
 | `search` | `?search=lumpia` | Match title or description (case-insensitive) |
 | `type` | `?type=service` | `product` or `service` |

@@ -87,6 +87,9 @@ class ListingReadSerializer(serializers.ModelSerializer):
     photos = ListingPhotoSerializer(many=True, read_only=True)
     variants = ListingVariantSerializer(many=True, read_only=True)
     is_published = serializers.BooleanField(read_only=True)
+    # AI-03: the moderator queue needs to know why a listing was flagged.
+    # Everyone else gets null, so a seller never sees the scoring rules.
+    screening = serializers.SerializerMethodField()
 
     class Meta:
         model = Listing
@@ -115,8 +118,28 @@ class ListingReadSerializer(serializers.ModelSerializer):
             "photos",
             "variants",
             "is_published",
+            "screening",
         )
         read_only_fields = fields
+
+    def get_screening(self, obj: Listing):
+        """Latest screening verdict, for staff only (AI-03)."""
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not (user and user.is_authenticated and user.is_moderator):
+            return None
+
+        latest = next(iter(obj.screening_results.all()), None)
+        if latest is None:
+            return None
+        return {
+            "verdict": latest.verdict,
+            "score": latest.score,
+            "reasons": latest.reasons,
+            "provider": latest.provider,
+            "model": latest.model_name,
+            "at": latest.created_at,
+        }
 
 
 class ListingWriteSerializer(serializers.ModelSerializer):

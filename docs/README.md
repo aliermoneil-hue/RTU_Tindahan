@@ -14,6 +14,8 @@ Suggested contents, copied from the CapStone folder:
 
 - `EMAIL-SETUP.md` — sending verification mail: Mailtrap for local testing,
   Gmail for the deployed backend, plus troubleshooting and rotation rules.
+- `SCREENING.md` — the content-screening boundary: provider rules, the
+  deterministic stub, and the moderator queue.
 - `INTEGRATION-SETUP.md` — connecting the React app to the Django API.
 
 Rules:

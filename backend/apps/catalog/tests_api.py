@@ -1,6 +1,7 @@
 """API tests for the catalogue: visibility, ownership, and moderation."""
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -23,6 +24,7 @@ def make_user(email, role=User.Role.USER, **extra):
     return user
 
 
+@override_settings(SCREENING_PROVIDER="stub")
 class ListingApiTests(APITestCase):
     def setUp(self):
         self.category = Category.objects.create(name="Snacks")
@@ -147,6 +149,80 @@ class ListingApiTests(APITestCase):
             [row["title"] for row in least.json()["results"]],
             ["Quiet", "Steady", "Brisk"],
         )
+
+    # -- screening and the moderator queue (AI-01, AI-03) ------------------
+
+    def test_posting_a_prohibited_item_lands_in_review(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            "/api/v1/listings/",
+            self.payload(
+                title="Counterfeit RTU ID",
+                description="Fake student identification, looks exactly like the real one.",
+            ),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["status"], "needs_review")
+
+    def test_a_clean_listing_still_waits_for_a_moderator(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post("/api/v1/listings/", self.payload(), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["status"], "pending_screening")
+
+    def test_screening_reasons_reach_a_moderator_only(self):
+        self.client.force_authenticate(self.seller)
+        posted = self.client.post(
+            "/api/v1/listings/",
+            self.payload(
+                title="Answer key",
+                description="Complete exam answers for the midterm, message me.",
+            ),
+            format="json",
+        )
+        slug = posted.json()["slug"]
+
+        self.assertIsNone(posted.json()["screening"])
+
+        self.client.force_authenticate(self.moderator)
+        seen = self.client.get(f"/api/v1/listings/{slug}/")
+
+        self.assertEqual(seen.json()["screening"]["verdict"], "flagged")
+        self.assertTrue(seen.json()["screening"]["reasons"])
+
+    def test_the_moderator_queue_asks_for_a_status(self):
+        self.make_listing(title="Live one", status=Listing.Status.APPROVED)
+        self.make_listing(title="Waiting one", status=Listing.Status.PENDING_SCREENING)
+        self.make_listing(title="Flagged one", status=Listing.Status.NEEDS_REVIEW)
+
+        self.client.force_authenticate(self.moderator)
+        waiting = self.client.get("/api/v1/listings/?status=pending_screening")
+        queue = self.client.get(
+            "/api/v1/listings/?status=pending_screening,needs_review"
+        )
+
+        self.assertEqual(
+            [row["title"] for row in waiting.json()["results"]], ["Waiting one"]
+        )
+        self.assertEqual(len(queue.json()["results"]), 2)
+
+    def test_a_visitor_cannot_use_status_to_see_hidden_listings(self):
+        self.make_listing(status=Listing.Status.PENDING_SCREENING)
+
+        response = self.client.get("/api/v1/listings/?status=pending_screening")
+
+        self.assertEqual(response.json()["count"], 0)
+
+    def test_an_unknown_status_is_reported(self):
+        response = self.client.get("/api/v1/listings/?status=banana")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("status", response.json())
 
     def test_detail_counts_a_view(self):
         listing = self.make_listing(status=Listing.Status.APPROVED)

@@ -26,6 +26,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.accounts.permissions import IsModerator, IsVerifiedUser
+from apps.screening.services import run_screening
 
 from .models import Category, Listing
 from .serializers import (
@@ -48,6 +49,7 @@ ORDERING = {
     "least-sold": ("sold_count", "-created_at"),
 }
 TRUE_VALUES = {"1", "true", "yes"}
+STATUS_VALUES = {choice for choice, _ in Listing.Status.choices}
 
 
 def price_bound(params, key):
@@ -86,7 +88,7 @@ class ListingViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         queryset = Listing.objects.select_related("seller", "category").prefetch_related(
-            "photos", "variants"
+            "photos", "variants", "screening_results"
         )
 
         # Visibility: staff see every status, a seller sees their own, and
@@ -101,6 +103,25 @@ class ListingViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(status=Listing.Status.APPROVED)
 
         params = self.request.query_params
+        # AI-03: the moderator queue asks for one status at a time, e.g.
+        # ?status=pending_screening or ?status=pending_screening,needs_review.
+        # The visibility filter above already limits a visitor to approved
+        # listings, so narrowing by status here cannot reveal anything new.
+        if raw_status := params.get("status"):
+            asked = [
+                value.strip().lower()
+                for value in raw_status.split(",")
+                if value.strip()
+            ]
+            unknown = [value for value in asked if value not in STATUS_VALUES]
+            if unknown:
+                raise ValidationError(
+                    {
+                        "status": f"Unknown status: {', '.join(unknown)}. "
+                        f"Valid values: {', '.join(sorted(STATUS_VALUES))}."
+                    }
+                )
+            queryset = queryset.filter(status__in=asked)
         if category := params.get("category"):
             queryset = queryset.filter(category__slug=category)
         if search := params.get("search"):
@@ -149,6 +170,10 @@ class ListingViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         listing = serializer.save()
+        # AI-01: every new listing is screened before anyone can see it. A
+        # flagged verdict moves it to needs_review; a clean one keeps waiting
+        # for a moderator, because screening never publishes on its own.
+        run_screening(listing)
         # Answer with the read shape so the client gets the id and slug back.
         return Response(
             ListingReadSerializer(
@@ -170,6 +195,10 @@ class ListingViewSet(viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        # An edit changes the words a moderator would have judged, so the
+        # listing is screened again. A clean verdict leaves the status alone;
+        # a flagged one pulls it back to needs_review.
+        run_screening(listing)
         return Response(
             ListingReadSerializer(
                 listing, context=self.get_serializer_context()
