@@ -10,6 +10,12 @@ Suggested contents, copied from the CapStone folder:
     ├── SRS_Gap_Analysis.md                 Gap analysis between SRS versions
     └── diagrams/                           Figma exports, ERD, architecture
 
+## Guides written by the team
+
+- `EMAIL-SETUP.md` — sending verification mail: Mailtrap for local testing,
+  Gmail for the deployed backend, plus troubleshooting and rotation rules.
+- `INTEGRATION-SETUP.md` — connecting the React app to the Django API.
+
 Rules:
 
 - Markdown is preferred over `.docx` so changes show up in pull request diffs.
