@@ -36,9 +36,65 @@ import { NotFoundPage } from './pages/NotFoundPage'
  *  - Signed-in users: all student, seller, community, and admin pages inside AppLayout.
  *  - Wrong combination: redirect (visitor opens a member page -> login).
  */
+
+/** Import page icons from src/assets/icons/ so they are version-controlled and processed by Vite. */
+import buyMarketplaceIco from '@/assets/icons/buy-marketplace.ico'
+import buyBrowseIco from '@/assets/icons/buy-browse.ico'
+import buyProductIco from '@/assets/icons/buy-product.ico'
+import buyOrdersIco from '@/assets/icons/buy-orders.ico'
+import buyStudentSellersIco from '@/assets/icons/buy-student-sellers.ico'
+import buyStoreIco from '@/assets/icons/buy-store.ico'
+import sellCreateIco from '@/assets/icons/sell-create.ico'
+import sellShopIco from '@/assets/icons/sell-shop.ico'
+import communityForumIco from '@/assets/icons/community-forum.ico'
+import communityHelpIco from '@/assets/icons/community-help.ico'
+import adminModerationIco from '@/assets/icons/admin-moderation.ico'
+import adminUsersIco from '@/assets/icons/admin-users.ico'
+import adminBaoOrdersIco from '@/assets/icons/admin-baoorders.ico'
+import adminBaoStockIco from '@/assets/icons/admin-baostock.ico'
+import adminTransactionsIco from '@/assets/icons/admin-transactions.ico'
+import adminForumReportsIco from '@/assets/icons/admin-forum-reports.ico'
+import adminStaffIco from '@/assets/icons/admin-staff.ico'
+import topbarMessagesIco from '@/assets/icons/topbar-messages.ico'
+import topbarCartIco from '@/assets/icons/topbar-cart.ico'
+import topbarFavoritesIco from '@/assets/icons/topbar-favorites.ico'
+import topbarProfileIco from '@/assets/icons/topbar-profile.ico'
+import signInIco from '@/assets/icons/sign-in.ico'
+import signUpIco from '@/assets/icons/sign-up.ico'
+
+/** Maps each signed-in route path to its .ico favicon. */
+const PAGE_FAVICONS: Record<string, string> = {
+  marketplace: buyMarketplaceIco,
+  browse: buyBrowseIco,
+  product: buyProductIco,
+  orders: buyOrdersIco,
+  'student-sellers': buyStudentSellersIco,
+  store: buyStoreIco,
+  create: sellCreateIco,
+  shop: sellShopIco,
+  forum: communityForumIco,
+  help: communityHelpIco,
+  moderation: adminModerationIco,
+  users: adminUsersIco,
+  baoorders: adminBaoOrdersIco,
+  baostock: adminBaoStockIco,
+  transactions: adminTransactionsIco,
+  'forum-reports': adminForumReportsIco,
+  staff: adminStaffIco,
+  messages: topbarMessagesIco,
+  cart: topbarCartIco,
+  favorites: topbarFavoritesIco,
+  profile: topbarProfileIco,
+  login: signInIco,
+  register: signUpIco,
+}
+
 export function AppRoutes() {
   const { path } = useRoute()
   const { user, isLoading } = useAuth()
+
+  /** Canonical page key used for both rendering and favicon selection. */
+  const activePage = path === '' || path === 'landing' ? 'marketplace' : path
 
   const isPublicPath =
     path === '' ||
@@ -65,6 +121,13 @@ export function AppRoutes() {
     if (redirectTo) navigate(redirectTo, { replace: true })
   }, [redirectTo])
 
+  /** Swap the page favicon to match the current route. */
+  useEffect(() => {
+    const href = PAGE_FAVICONS[activePage] || '/favicon.svg'
+    const link = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null
+    if (link) link.href = href
+  }, [activePage])
+
   if (isLoading || redirectTo) {
     return (
       <p style={{ padding: 40, textAlign: 'center' }} className="muted">
@@ -75,7 +138,7 @@ export function AppRoutes() {
 
   // ----- signed-in -----
   if (user) {
-    const active = path === '' || path === 'landing' ? 'marketplace' : path
+    const active = activePage
 
     const renderAuthenticatedPage = () => {
       switch (active) {
