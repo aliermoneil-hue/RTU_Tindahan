@@ -13,7 +13,7 @@ import {
   varLabel,
 } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
-import type { ChosenFulfillment, FulfillmentMethod } from '../types'
+import type { ChosenFulfillment, FulfillmentMethod, ProductVariationAttr, ProductVariationRow } from '../types'
 import { AvatarBadge } from '../components/AvatarBadge'
 import { ProductGallery } from '../components/PhotoUploader'
 import { RatingText, StarsDisplay } from '../components/StarRating'
@@ -44,7 +44,7 @@ export function ProductPage() {
     toast,
   } = useTindahan()
   const pid = params.get('id') || selectedProductId
-  const p = byId[pid]
+  const p = byId[pid ?? '']
   const [selectedOpts, setSelectedOpts] = useState<Record<string, string>>({})
   const [qty, setQty] = useState(1)
   const [chosenFulfillment, setChosenFulfillment] = useState<ChosenFulfillment>('pickup')
@@ -139,7 +139,7 @@ export function ProductPage() {
   const sfav = Boolean(currentAccount?.sfavs?.includes(skey))
   const isOwnListing = Boolean(p.owner && currentAccount && p.owner === currentAccount.email)
 
-  const [place, win] = (p.when || '').split(',').map((s) => s.trim())
+  const [place, win] = (p.when || '').split(',').map((s: string) => s.trim())
   const hasVariations = hasVars(p) && p.vars
 
   // Resolve matching variation row when all attributes are selected (selVar in js/9d-listings.js)
@@ -149,8 +149,8 @@ export function ProductPage() {
       if (!selectedOpts[a.name]) return null
     }
     return (
-      p.vars.rows.find((r) =>
-        p.vars!.attrs.every((a) => r.opts[a.name] === selectedOpts[a.name]),
+      p.vars.rows.find((r: ProductVariationRow) =>
+        p.vars!.attrs.every((a: ProductVariationAttr) => r.opts[a.name] === selectedOpts[a.name]),
       ) || null
     )
   }, [hasVariations, p.vars, selectedOpts])
@@ -167,7 +167,7 @@ export function ProductPage() {
     if (chosenVar) return chosenVar.id
     toast(
       'Please choose your ' +
-        p.vars.attrs.map((a) => a.name.toLowerCase()).join(' and ') +
+        p.vars.attrs.map((a: ProductVariationAttr) => a.name.toLowerCase()).join(' and ') +
         ' first.',
     )
     return null
@@ -176,16 +176,16 @@ export function ProductPage() {
   // Option availability helper (matching varPickerHtml in js/9d-listings.js)
   const isOptSoldOut = (attrName: string, optVal: string): boolean => {
     if (!hasVariations || !p.vars) return false
-    const matchingRows = p.vars.rows.filter((r) => {
+    const matchingRows = p.vars.rows.filter((r: ProductVariationRow) => {
       if (r.opts[attrName] !== optVal) return false
       return p.vars!.attrs.every(
-        (other) =>
+        (other: ProductVariationAttr) =>
           other.name === attrName ||
           !selectedOpts[other.name] ||
           r.opts[other.name] === selectedOpts[other.name],
       )
     })
-    return matchingRows.reduce((sum, r) => sum + r.qty, 0) < 1
+    return matchingRows.reduce((sum: number, r: ProductVariationRow) => sum + r.qty, 0) < 1
   }
 
   const itemRating = ratingOf('item', p.id)
@@ -481,7 +481,7 @@ export function ProductPage() {
             {/* Per-attribute variation picker (varPickerHtml in js/9d-listings.js) */}
             {hasVariations && p.vars && (
               <div className="stack" style={{ gap: 10 }}>
-                {p.vars.attrs.map((a) => (
+                {p.vars.attrs.map((a: ProductVariationAttr) => (
                   <div key={a.name} className="stack" style={{ gap: 6 }}>
                     <div className="row between">
                       <b className="small">{a.name}</b>
@@ -495,7 +495,7 @@ export function ProductPage() {
                       aria-label={a.name}
                       style={{ gap: 6 }}
                     >
-                      {a.opts.map((v) => {
+                      {a.opts.map((v: string) => {
                         const on = selectedOpts[a.name] === v
                         const out = isOptSoldOut(a.name, v)
                         return (
