@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { navigate } from '@/common/router/router'
 import { LoginForm } from '../components/LoginForm'
@@ -124,6 +124,15 @@ export function LoginPage() {
   const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [popup, setPopup] = useState<'guidelines' | 'policy' | null>(null)
+
+  // Always scroll down when entering the sign-in page
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleLogin = async ({ email, password }: LoginCredentials) => {
     setIsLoading(true)
@@ -139,20 +148,11 @@ export function LoginPage() {
   }
 
   const handleForgotPassword = () => {
-    alert(
-      'Password reset is not available yet.\n\nContact the RTU Office of Student Affairs for help with your account.'
-    )
+    navigate('forgot-password')
   }
 
   const handleGuidelines = () => {
-    alert(
-      'Community Guidelines:\n' +
-        '1. Be honest about what you sell, including its condition.\n' +
-        '2. Meet only at visible spots inside Pasig Campus.\n' +
-        '3. Pay in person. RTU Tindahan never handles money or delivery.\n' +
-        '4. No exam answers, vaping products, medicines, resale tickets or weapons.\n' +
-        '5. Treat every student and staff member with respect.'
-    )
+    setPopup('guidelines')
   }
 
   return (
@@ -208,6 +208,30 @@ export function LoginPage() {
           />
         </div>
       </div>
+
+      {/* Popup: Community Guidelines — same as LandingPage */}
+      {popup === 'guidelines' && (
+        <div className="popup-overlay" onClick={() => setPopup(null)}>
+          <div className="popup-box" onClick={(e) => e.stopPropagation()}>
+            <div className="row" style={{ gap: 8, marginBottom: 16 }}>
+              <Icon name="note" size="sm" />
+              <span style={{ fontWeight: 600, color: 'var(--ink)' }}>Community Guidelines</span>
+            </div>
+            <ul className="small muted" style={{ lineHeight: 1.55, marginBottom: 20, paddingLeft: 20 }}>
+              <li>Be honest about what you sell, including its condition.</li>
+              <li>Meet only at visible spots inside Pasig Campus.</li>
+              <li>Pay in person. RTU Tindahan never handles money or delivery.</li>
+              <li>No exam answers, vaping products, medicines, resale tickets or weapons.</li>
+              <li>Treat every student and staff member with respect.</li>
+            </ul>
+            <div style={{ display: 'flex', flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" className="btn" onClick={() => setPopup(null)}>
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { navigate, useRoute } from '@/common/router/router'
-import { LoginPage, VerifyPage, useAuth } from '@/features/authentication'
+import { LoginPage, VerifyPage, ForgotPasswordPage, useAuth } from '@/features/authentication'
 import { useTindahan } from '../marketplace/context/TindahanContext'
 import { BrowsePage } from '@/features/marketplace/pages/BrowsePage'
 import { CartPage } from '@/features/marketplace/pages/CartPage'
@@ -92,6 +92,7 @@ const PAGE_FAVICONS: Record<string, string> = {
   profile: topbarProfileIco,
   login: signInIco,
   register: signUpIco,
+  'forgot-password': signInIco,
 }
 
 function renderActiveRoute(path: string, user: { email: string; role: string } | null) {
@@ -171,6 +172,9 @@ function renderActiveRoute(path: string, user: { email: string; role: string } |
   if (path === 'register' || path === 'verify') {
     return <VerifyPage />
   }
+  if (path === 'forgot-password') {
+    return <ForgotPasswordPage />
+  }
   if (path === 'books') {
     return <GuestSectionPage kind="books" />
   }
@@ -207,6 +211,7 @@ export function AppRoutes() {
     path === 'login' ||
     path === 'register' ||
     path === 'verify' ||
+    path === 'forgot-password' ||
     path === 'books' ||
     path === 'merch' ||
     path === 'student-sellers' ||
@@ -217,7 +222,7 @@ export function AppRoutes() {
   const redirectTo =
     !authLoading &&
     (user
-      ? path === 'login' || path === 'register' || path === 'verify'
+      ? path === 'login' || path === 'register' || path === 'verify' || path === 'forgot-password'
         ? 'marketplace'
         : null
       : !isPublicPath
@@ -250,7 +255,7 @@ export function AppRoutes() {
   useEffect(() => {
     const isMobile = window.innerWidth <= 900
     const shouldScroll = sessionStorage.getItem('rtu:scroll-after-login') === 'true'
-    const isAuthPage = path === 'login' || path === 'register'
+    const isAuthPage = path === 'login' || path === 'register' || path === 'forgot-password'
 
     if (!isMobile || !shouldScroll || !isAuthPage) return
 
@@ -277,7 +282,7 @@ export function AppRoutes() {
             <AppLayout user={user} activePath={activePage}>
               {renderActiveRoute(path, user)}
             </AppLayout>
-          ) : path === 'login' || path === 'register' || path === 'verify' ? (
+          ) : path === 'login' || path === 'register' || path === 'verify' || path === 'forgot-password' ? (
             renderActiveRoute(path, user)
           ) : (
             <PublicLayout>{renderActiveRoute(path, user)}</PublicLayout>

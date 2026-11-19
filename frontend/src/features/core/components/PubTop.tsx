@@ -225,7 +225,10 @@ return (
         type="button"
         className={`nav-tab${path === 'student-sellers' ? ' on' : ''}`}
         aria-current={path === 'student-sellers' ? 'location' : undefined}
-        onClick={() => navigate('student-sellers')}
+        onClick={() => {
+        setDropdownOpen(false)
+        navigate('student-sellers')
+        }}
         >
         Student Sellers
         </button>
@@ -233,7 +236,10 @@ return (
         type="button"
         className={`nav-tab${path === 'store' ? ' on' : ''}`}
         aria-current={path === 'store' ? 'location' : undefined}
-        onClick={() => navigate('store')}
+        onClick={() => {
+        setDropdownOpen(false)
+        navigate('store')
+        }}
         >
         Official RTU Store
         </button>
