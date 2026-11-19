@@ -72,6 +72,7 @@
   justify-content: center;
   align-items: center;
   min-width: 0;
+  min-height: 100vh;            /* white panel covers the full screen */
   overflow: hidden;
 }
 
@@ -97,7 +98,7 @@
     gap: 16px;
   }
   .split .r {
-    padding: clamp(16px, 3vh, 24px) clamp(16px, 4vw, 48px);
+    padding: clamp(60px, 15vh, 120px) clamp(16px, 4vw, 48px) clamp(16px, 3vh, 24px) clamp(16px, 4vw, 48px);   /* top whitespace on phones */
   }
   .info-panel {
     margin: 0 clamp(16px, 4vw, 48px) clamp(8px, 2vw, 16px) clamp(16px, 4vw, 48px);
@@ -198,4 +199,42 @@
   .login-carousel-card {
     height: clamp(110px, 28vh, 200px);
   }
+}
+
+/* Password toggle inside input field */
+.password-input {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.password-input .input {
+  padding-right: 34px;
+  box-sizing: border-box;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.password-toggle:hover {
+  color: var(--ink);
+}
+
+.password-toggle:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 4px;
 }

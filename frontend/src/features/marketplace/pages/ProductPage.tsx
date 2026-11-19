@@ -2,6 +2,7 @@ import { baoLimitFor, baoWindowState, baoWindowText } from '../baoHelpers'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { Icon } from '@/common/components/Icon'
 import { navigate, useRoute } from '@/common/router/router'
+import { MiniLoader } from '@/common/components/BrandLoader'
 import {
   catOf,
   hasVars,
@@ -22,6 +23,7 @@ export function ProductPage() {
   const { params } = useRoute()
   const {
     db,
+    listingsLoading,
     currentAccount,
     isStaffUser,
     selectedProductId,
@@ -41,12 +43,10 @@ export function ProductPage() {
     openModal,
     toast,
   } = useTindahan()
-
   const pid = params.get('id') || selectedProductId
-  const p = pid ? byId(pid) : undefined
-
-  const [qty, setQty] = useState(1)
+  const p = byId[pid]
   const [selectedOpts, setSelectedOpts] = useState<Record<string, string>>({})
+  const [qty, setQty] = useState(1)
   const [chosenFulfillment, setChosenFulfillment] = useState<ChosenFulfillment>('pickup')
   const [showMsgForm, setShowMsgForm] = useState(false)
   const [msgText, setMsgText] = useState('')
@@ -204,6 +204,12 @@ export function ProductPage() {
 
   return (
     <>
+      {listingsLoading ? (
+        <div style={{ padding: 40, textAlign: 'center', minHeight: 400 }}>
+          <MiniLoader variant="section" size="lg" label="Loading campus listings…" />
+        </div>
+      ) : (
+        <>
       <div className="crumbs">
         <button type="button" onClick={() => navigate('marketplace')}>
           Marketplace
@@ -848,6 +854,8 @@ export function ProductPage() {
           </p>
         )}
       </section>
+        </>
+      )}
     </>
   )
 }

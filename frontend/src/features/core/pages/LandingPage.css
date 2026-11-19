@@ -417,6 +417,25 @@
   width: auto;
 }
 
+/* ----- Popups on mobile: never stick to left/right edges ----- */
+@media (max-width: 768px) {
+  .popup-box {
+    min-width: auto;
+    max-width: 92vw;
+    width: auto;
+    margin-inline: 16px;
+    margin-top: 32px;
+    padding: 18px;
+  }
+  .popup-box h3 {
+    font-size: 16px;
+  }
+  .popup-box p,
+  .popup-box li {
+    font-size: 13px;
+  }
+}
+
 /* Popup bullet list */
 .popup-list {
   margin: 0 0 16px 0;

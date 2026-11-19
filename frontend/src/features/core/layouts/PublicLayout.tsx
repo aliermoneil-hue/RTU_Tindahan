@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { navigate } from '@/common/router/router'
 import { PubTop } from '../components/PubTop'
 import { SiteFooter } from '../components/SiteFooter'
 
@@ -6,7 +7,7 @@ import { SiteFooter } from '../components/SiteFooter'
 export function PublicLayout({ children }: { children: ReactNode }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <PubTop />
+      <PubTop onNavigate={(route) => navigate(route)} />
       <main style={{ flex: 1 }}>{children}</main>
       <SiteFooter variant="guest" />
     </div>

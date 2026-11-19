@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Icon } from '@/common/components/Icon'
 import { navigate, useRoute } from '@/common/router/router'
+import { MiniLoader } from '@/common/components/BrandLoader'
 import {
   BROWSE_CATS,
   SERVICES_CAT,
@@ -23,6 +24,7 @@ export function BrowsePage() {
     sellerKind,
     sortProducts,
     toast,
+    listingsLoading,
   } = useTindahan()
 
   // Optional URL query sync
@@ -114,9 +116,16 @@ export function BrowsePage() {
 
   return (
     <>
-      <div className="row between wrap">
-        <div>
-          <h1>Browse campus listings</h1>
+      {listingsLoading && (
+        <div style={{ padding: 40, textAlign: 'center', minHeight: 400 }}>
+          <MiniLoader variant="section" size="lg" label="Loading campus listings…" />
+        </div>
+      )}
+      {!listingsLoading && (
+        <>
+          <div className="row between wrap">
+            <div>
+              <h1>Browse campus listings</h1>
           <p className="muted small">
             Every item here is picked up in person inside Pasig Campus.
           </p>
@@ -530,6 +539,7 @@ export function BrowsePage() {
           )}
         </div>
       </div>
+      </>)}
     </>
   )
 }

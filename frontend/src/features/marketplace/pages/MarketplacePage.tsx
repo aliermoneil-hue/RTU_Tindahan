@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '@/common/components/Icon'
 import type { IconName } from '@/common/components/icons'
 import { navigate } from '@/common/router/router'
+import { MiniLoader } from '@/common/components/BrandLoader'
 import { CATEGORIES, CAT_META, SERVICES_CAT } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
 import { ProductCard } from '../components/ProductCard'
@@ -17,6 +18,7 @@ export function MarketplacePage() {
     browseFor,
     setDraft,
     setListStep,
+    listingsLoading,
   } = useTindahan()
 
   const catRowRef = useRef<HTMLDivElement | null>(null)
@@ -93,17 +95,24 @@ export function MarketplacePage() {
 
   return (
     <>
-      <div className="row between wrap">
-        <div>
-          <span className="eyebrow">
-            {greeting.toUpperCase()}, {firstName.toUpperCase()}
-          </span>
-          <h1>What do you need around campus?</h1>
-          <p className="muted small">
-            Discover verified Pasig campus sellers, official products, and services ready for
-            meetup.
-          </p>
+      {listingsLoading && (
+        <div style={{ padding: 40, textAlign: 'center', minHeight: 400 }}>
+          <MiniLoader variant="section" size="lg" label="Loading campus listings…" />
         </div>
+      )}
+      {!listingsLoading && (
+        <>
+          <div className="row between wrap">
+            <div>
+              <span className="eyebrow">
+                {greeting.toUpperCase()}, {firstName.toUpperCase()}
+              </span>
+              <h1>What do you need around campus?</h1>
+              <p className="muted small">
+                Discover verified Pasig campus sellers, official products, and services ready for
+                meetup.
+              </p>
+            </div>
       </div>
 
       <div
@@ -314,6 +323,7 @@ export function MarketplacePage() {
           </div>
         )}
       </div>
+      </>)}
     </>
   )
 }

@@ -1,0 +1,213 @@
+/* Full-screen fixed overlay that always uses the RTU Tindahan navy background */
+.brand-loader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #1a2f57;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  overflow: hidden;
+  will-change: transform, opacity;
+  /* Starts fully opaque so it covers the screen immediately when BrandLoader
+     mounts — no white flash between pre-splash and loader. */
+  opacity: 1;
+}
+
+/* Allows clicks to pass through to the mounted app underneath during exit */
+.brand-loader-overlay--exiting {
+  pointer-events: none;
+}
+
+/* Responsive wrapper for the layered SVG logo (320px phones to 4K) */
+.brand-loader-stage {
+  width: clamp(240px, 68vw, 520px);
+  max-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform, opacity;
+}
+
+.brand-loader-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  display: block;
+}
+
+/* GPU-composited hints for animated SVG groups */
+.bl-tindahan,
+.bl-tagline-line,
+.bl-tagline-text,
+.bl-tile,
+.bl-awning-group,
+.bl-letter,
+.bl-cursor,
+.bl-tag-group,
+.bl-shine {
+  will-change: transform, opacity;
+}
+
+/* Prevent flash of unstyled content before GSAP initializes.
+   GSAP sets these to opacity:0 / scaleX:0 in its initial gsap.set() calls,
+   but until that runs the SVG elements render at their default opacity:1.
+   These CSS fallbacks keep them invisible from the very first frame. */
+.bl-tindahan,
+.bl-tagline-text,
+.bl-tile,
+.bl-letter,
+.bl-cursor,
+.bl-tag-group,
+.bl-shine {
+  opacity: 0;
+}
+/* Tagline lines are hidden by GSAP (scaleX:0 with right/left center origin).
+   CSS opacity:0 covers the initial frame; GSAP sets the correct transform-origin
+   and animates scaleX:0→1 to draw the lines outward from center. */
+.bl-tagline-line-left,
+.bl-tagline-line-right {
+  opacity: 0;
+}
+
+/* Slow-load fallback message and retry button shown after ~8s */
+.brand-loader-slow {
+  margin-top: clamp(1rem, 3vh, 2rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: clamp(0.8125rem, 1.5vw, 0.9375rem);
+  text-align: center;
+  animation: bl-fade-in 0.3s ease forwards;
+}
+
+.brand-loader-retry {
+  background-color: #ffbd59;
+  color: #1a2f57;
+  border: none;
+  border-radius: 9999px;
+  padding: 0.45rem 1.15rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.brand-loader-retry:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.brand-loader-retry:active {
+  transform: scale(0.97);
+}
+
+/* Visually hidden text for screen readers */
+.bl-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes bl-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- MiniLoader (Inline & Section-Level Awning Pulse) --- */
+.mini-loader {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  vertical-align: middle;
+}
+
+.mini-loader--section {
+  width: 100%;
+  padding: 2.5rem 1rem;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mini-loader-tiles {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.mini-loader-tile {
+  width: 7px;
+  height: 11px;
+  border-radius: 2px 2px 4px 4px;
+  transform-origin: center bottom;
+  animation: mini-awning-pulse 0.9s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.mini-loader--sm .mini-loader-tile {
+  width: 5px;
+  height: 8px;
+}
+
+.mini-loader--lg .mini-loader-tile {
+  width: 10px;
+  height: 15px;
+}
+
+.mini-loader-tile--gold {
+  background-color: #ffbd59;
+}
+
+.mini-loader-tile--red {
+  background-color: #c25959;
+}
+
+.mini-loader-tile--white {
+  background-color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(26, 47, 87, 0.18);
+}
+
+.mini-loader-label {
+  font-size: 0.875rem;
+  color: inherit;
+  opacity: 0.75;
+}
+
+@keyframes mini-awning-pulse {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+    opacity: 0.55;
+  }
+  45% {
+    transform: translateY(-4px) scaleY(1.12);
+    opacity: 1;
+  }
+}
+
+/* Reduced motion: disable movement, keep gentle opacity fade */
+@media (prefers-reduced-motion: reduce) {
+  .mini-loader-tile {
+    animation: none;
+    opacity: 0.9;
+  }
+}

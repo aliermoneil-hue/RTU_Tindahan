@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { navigate, useRoute } from '@/common/router/router'
 import { LoginPage, VerifyPage, useAuth } from '@/features/authentication'
+import { useTindahan } from '../marketplace/context/TindahanContext'
 import { BrowsePage } from '@/features/marketplace/pages/BrowsePage'
 import { CartPage } from '@/features/marketplace/pages/CartPage'
 import { ConfirmPage } from '@/features/marketplace/pages/ConfirmPage'
@@ -9,6 +10,8 @@ import { FavoritesPage } from '@/features/marketplace/pages/FavoritesPage'
 import { ForumPage } from '@/features/marketplace/pages/ForumPage'
 import { ForumPostPage } from '@/features/marketplace/pages/ForumPostPage'
 import { GuestSectionPage } from '@/features/marketplace/pages/GuestSectionPage'
+import { GuestStudentSellersPage } from '@/features/marketplace/pages/GuestStudentSellersPage'
+import { GuestOfficialStorePage } from '@/features/marketplace/pages/GuestOfficialStorePage'
 import { HelpCenterPage } from '@/features/marketplace/pages/HelpCenterPage'
 import { MarketplacePage } from '@/features/marketplace/pages/MarketplacePage'
 import { MessagesPage } from '@/features/marketplace/pages/MessagesPage'
@@ -29,6 +32,8 @@ import { AppLayout } from './layouts/AppLayout'
 import { PublicLayout } from './layouts/PublicLayout'
 import { LandingPage } from './pages/LandingPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { BrandLoader } from '@/common/components/BrandLoader/BrandLoader'
+import { useAppReady } from '@/common/components/BrandLoader/useAppReady'
 
 /**
  * ROUTES: decides which page to show.
@@ -89,128 +94,74 @@ const PAGE_FAVICONS: Record<string, string> = {
   register: signUpIco,
 }
 
-export function AppRoutes() {
-  const { path } = useRoute()
-  const { user, isLoading } = useAuth()
-
-  /** Canonical page key used for both rendering and favicon selection. */
-  const activePage = path === '' || path === 'landing' ? 'marketplace' : path
-
-  const isPublicPath =
-    path === '' ||
-    path === 'landing' ||
-    path === 'login' ||
-    path === 'register' ||
-    path === 'verify' ||
-    path === 'books' ||
-    path === 'merch' ||
-    path === 'help' ||
-    path === 'help-center'
-
-  const redirectTo =
-    !isLoading &&
-    (user
-      ? path === 'login' || path === 'register' || path === 'verify'
-        ? 'marketplace'
-        : null
-      : !isPublicPath
-        ? 'login'
-        : null)
-
-  useEffect(() => {
-    if (redirectTo) navigate(redirectTo, { replace: true })
-  }, [redirectTo])
-
-  /** Swap the page favicon to match the current route. */
-  useEffect(() => {
-    const href = PAGE_FAVICONS[activePage] || '/favicon.svg'
-    const link = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null
-    if (link) link.href = href
-  }, [activePage])
-
-  if (isLoading || redirectTo) {
-    return (
-      <p style={{ padding: 40, textAlign: 'center' }} className="muted">
-        Loading...
-      </p>
-    )
-  }
+function renderActiveRoute(path: string, user: { email: string; role: string } | null) {
+  const active = path === '' || path === 'landing' ? 'marketplace' : path
 
   // ----- signed-in -----
   if (user) {
-    const active = activePage
-
-    const renderAuthenticatedPage = () => {
-      switch (active) {
-        case 'marketplace':
-        case 'market':
-          return <MarketplacePage />
-        case 'browse':
-          return <BrowsePage />
-        case 'product':
-          return <ProductPage />
-        case 'store':
-        case 'official':
-          return <OfficialStorePage />
-        case 'student-sellers':
-        case 'sellers':
-          return <StudentSellersPage />
-        case 'cart':
-          return <CartPage />
-        case 'confirm':
-          return <ConfirmPage />
-        case 'orders':
-          return <OrdersPage />
-        case 'create':
-        case 'list':
-          return <CreateListingPage />
-        case 'shop':
-        case 'seller':
-          return <MyShopPage />
-        case 'forum':
-          return <ForumPage />
-        case 'help':
-        case 'help-center':
-          return <HelpCenterPage />
-        case 'post':
-          return <ForumPostPage />
-        case 'messages':
-          return <MessagesPage />
-        case 'favorites':
-          return <FavoritesPage />
-        case 'profile':
-          return <ProfilePage />
-        case 'books':
-          return <GuestSectionPage kind="books" />
-        case 'merch':
-          return <GuestSectionPage kind="merch" />
-        case 'moderation':
-          return <ModerationPage />
-        case 'users':
-          return <UsersAuditPage />
-        case 'baoorders':
-        case 'store-orders':
-          return <StoreOrdersPage />
-        case 'baostock':
-        case 'store-inventory':
-          return <StoreInventoryPage />
-        case 'transactions':
-          return <TransactionsPage />
-        case 'forum-reports':
-        case 'forumreports':
-          return <ForumReportsPage />
-        case 'staff':
-          return <StaffToolsPage />
-        default:
-          return <NotFoundPage />
-      }
+    switch (active) {
+      case 'marketplace':
+      case 'market':
+        return <MarketplacePage />
+      case 'browse':
+        return <BrowsePage />
+      case 'product':
+        return <ProductPage />
+      case 'store':
+      case 'official':
+        return <OfficialStorePage />
+      case 'student-sellers':
+      case 'sellers':
+        return <StudentSellersPage />
+      case 'cart':
+        return <CartPage />
+      case 'confirm':
+        return <ConfirmPage />
+      case 'orders':
+        return <OrdersPage />
+      case 'create':
+      case 'list':
+        return <CreateListingPage />
+      case 'shop':
+      case 'seller':
+        return <MyShopPage />
+      case 'forum':
+        return <ForumPage />
+      case 'help':
+      case 'help-center':
+        return <HelpCenterPage />
+      case 'post':
+        return <ForumPostPage />
+      case 'messages':
+        return <MessagesPage />
+      case 'favorites':
+        return <FavoritesPage />
+      case 'profile':
+        return <ProfilePage />
+      case 'books':
+        return <GuestSectionPage kind="books" />
+      case 'merch':
+        return <GuestSectionPage kind="merch" />
+      case 'moderation':
+        return <ModerationPage />
+      case 'users':
+        return <UsersAuditPage />
+      case 'baoorders':
+      case 'store-orders':
+        return <StoreOrdersPage />
+      case 'baostock':
+      case 'store-inventory':
+        return <StoreInventoryPage />
+      case 'transactions':
+        return <TransactionsPage />
+      case 'forum-reports':
+      case 'forumreports':
+        return <ForumReportsPage />
+      case 'staff':
+        return <StaffToolsPage />
+      default:
+        return <NotFoundPage />
     }
-
-    return (
-      <AppLayout user={user} activePath={active}>
-        {renderAuthenticatedPage()}
-      </AppLayout>
-    )
   }
 
   // ----- visitor -----
@@ -226,18 +177,113 @@ export function AppRoutes() {
   if (path === 'merch') {
     return <GuestSectionPage kind="merch" />
   }
+  if (path === 'student-sellers') {
+    return <GuestStudentSellersPage />
+  }
+  if (path === 'store') {
+    return <GuestOfficialStorePage />
+  }
   if (path === 'help' || path === 'help-center') {
     return (
-      <PublicLayout>
-        <div className="g-wrap" style={{ padding: '24px 16px' }}>
-          <HelpCenterPage />
-        </div>
-      </PublicLayout>
+      <div className="g-wrap" style={{ padding: '24px 16px' }}>
+        <HelpCenterPage />
+      </div>
     )
   }
+  return <LandingPage />
+}
+
+export function AppRoutes() {
+  const { path } = useRoute()
+  const { user, isLoading: authLoading } = useAuth()
+  const { hasSettledInitialFetch } = useTindahan()
+
+  /** Canonical page key used for both rendering and favicon selection. */
+  const activePage = path === '' || path === 'landing' ? 'marketplace' : path
+
+  const isPublicPath =
+    path === '' ||
+    path === 'landing' ||
+    path === 'login' ||
+    path === 'register' ||
+    path === 'verify' ||
+    path === 'books' ||
+    path === 'merch' ||
+    path === 'student-sellers' ||
+    path === 'store' ||
+    path === 'help' ||
+    path === 'help-center'
+
+  const redirectTo =
+    !authLoading &&
+    (user
+      ? path === 'login' || path === 'register' || path === 'verify'
+        ? 'marketplace'
+        : null
+      : !isPublicPath
+        ? 'login'
+        : null)
+
+  const appReady = useAppReady({
+    authLoading,
+    isAuthenticated: !!user,
+    listingsSettled: hasSettledInitialFetch,
+  })
+
+  const showOverlay = !appReady || Boolean(redirectTo)
+
+  /** Swap the page favicon to match the current route. */
+  useEffect(() => {
+    const href = PAGE_FAVICONS[activePage] || '/favicon.svg'
+    const link = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null
+    if (link) link.href = href
+  }, [activePage])
+
+  useEffect(() => {
+    if (redirectTo) navigate(redirectTo, { replace: true })
+  }, [redirectTo])
+
+  /** Mobile only: after signing in / creating an account from the landing page,
+   * stay at the top for 3 seconds, then scroll down with animation. The flag is
+   * set in sessionStorage by PubTop before navigation, so it survives the page
+   * change (PubTop unmounts on login/register). */
+  useEffect(() => {
+    const isMobile = window.innerWidth <= 900
+    const shouldScroll = sessionStorage.getItem('rtu:scroll-after-login') === 'true'
+    const isAuthPage = path === 'login' || path === 'register'
+
+    if (!isMobile || !shouldScroll || !isAuthPage) return
+
+    sessionStorage.removeItem('rtu:scroll-after-login')
+
+    const timer = setTimeout(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [path])
+
   return (
-    <PublicLayout>
-      <LandingPage />
-    </PublicLayout>
+    <>
+      <BrandLoader
+        isLoading={showOverlay}
+        variant="auto"
+        onExited={() => {}}
+      />
+      {!authLoading && !redirectTo && (
+        <>
+          {/* Signed-in pages use AppLayout; login/verify pages have their own layout */}
+          {user ? (
+            <AppLayout user={user} activePath={activePage}>
+              {renderActiveRoute(path, user)}
+            </AppLayout>
+          ) : path === 'login' || path === 'register' || path === 'verify' ? (
+            renderActiveRoute(path, user)
+          ) : (
+            <PublicLayout>{renderActiveRoute(path, user)}</PublicLayout>
+          )}
+        </>
+      )}
+    </>
   )
 }
