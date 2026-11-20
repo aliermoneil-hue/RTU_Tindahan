@@ -1,0 +1,15 @@
+# Same-origin API proxy.
+#
+# The browser must never talk to the backend host directly: a public page
+# (rtutindahan.netlify.app) that fetches a tailnet address is blocked by
+# Chrome's Private Network Access rules, and the backend hostname changes
+# whenever the tunnel is re-minted. Proxying through Netlify's edge keeps the
+# API on this site's own origin, so CORS and private-address checks drop out
+# of the picture entirely.
+#
+# The upstream is the Tailscale Funnel URL, which is stable across reboots.
+/api/*  https://hdtv-commission-accepted-cos.trycloudflare.com/api/:splat  200
+
+# Everything else is the SPA. The app uses hash routing, so no deep-link
+# rewrite is required, but this keeps stray paths on index.html.
+/*  /index.html  200
