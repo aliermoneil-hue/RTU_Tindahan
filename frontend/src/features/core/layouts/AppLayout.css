@@ -114,6 +114,21 @@ body:hover::-webkit-scrollbar-thumb:active {
   margin-inline: auto;
 }
 
+/* Restore vertical flex gap inside .page > .page-content-shell so sections
+   keep their spacing. Scoped strictly to .page so SiteFooter's wrapper is
+   unaffected. */
+.page > .page-content-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.page > .page-content-shell > * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 /* Desktop (>= 768px): give <main> horizontal padding so outside buttons never clip */
 @media (min-width: 768px) {
   .page {

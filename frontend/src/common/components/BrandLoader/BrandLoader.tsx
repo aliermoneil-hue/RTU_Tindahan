@@ -32,8 +32,13 @@ export const LOADER_TIMING = {
     exitDuration: 0.3,
   },
 
-  // Fast-forward multiplier when app becomes ready mid-build
-  fastForwardTimeScale: 2.5,
+  // Fast-forward multiplier when app becomes ready mid-build (legacy fallback)
+  fastForwardTimeScale: 3.5,
+
+  // Adaptive exit durations based on actual load speed (seconds)
+  adaptiveExitFast: 0.24,   // < 400ms load
+  adaptiveExitNormal: 0.32, // 400–1200ms load
+  adaptiveExitSlow: 0.42,   // > 1200ms load
 
   // Calm idle shine sweep interval (seconds)
   idleShineDuration: 0.75,
@@ -68,6 +73,8 @@ export interface BrandLoaderProps {
   onExited?: () => void;
   /** GSAP timeScale multiplier for build & exit (1 = normal, 2 = 2x faster, etc.) */
   timeScale?: number;
+  /** Bypass the 150ms anti-flicker delay and show immediately (e.g. login flow) */
+  immediate?: boolean;
 }
 
 function getInitialVariant(variant: BrandLoaderVariant): "full" | "compact" {
@@ -93,10 +100,8 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
   onRetry,
   onExited,
   timeScale = 1,
+  immediate = false,
 }) => {
-  const [resolvedVariant] = useState<"full" | "compact">(() =>
-    getInitialVariant(variant)
-  );
   const [shouldRender, setShouldRender] = useState<boolean>(false);
   const [isExiting, setIsExiting] = useState<boolean>(false);
   const [isSlowLoad, setIsSlowLoad] = useState<boolean>(false);
@@ -108,23 +113,47 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
   const buildCompletedRef = useRef<boolean>(false);
   const exitStartedRef = useRef<boolean>(false);
   const isLoadingRef = useRef<boolean>(isLoading);
+  /** Recorded the moment shouldRender becomes true — used to compute elapsed load time. */
+  const loadStartMsRef = useRef<number>(0);
   /** True on the very first render. On initial mount with isLoading=true we skip
    * the anti-flicker delay so the brand loader always shows on a fresh page load. */
   const initialMountRef = useRef(true);
+  /** Prop refs — updated via effects so the build effect (which depends only on
+   * shouldRender) always reads the latest props without re-running. */
+  const variantRef = useRef<BrandLoaderVariant>(variant);
+  const onExitedRef = useRef<(() => void) | undefined>(onExited);
+  const timeScaleRef = useRef<number>(timeScale);
+  /** Adaptive exit duration in seconds, set by accelerateToFinish(). */
+  const adaptiveExitSecRef = useRef<number>(0.32);
 
   useEffect(() => {
     isLoadingRef.current = isLoading;
   }, [isLoading]);
 
+  // Keep prop refs in sync so the build effect (which depends only on shouldRender)
+  // always reads the latest props without re-running.
+  useEffect(() => {
+    variantRef.current = variant;
+  }, [variant]);
+  useEffect(() => {
+    onExitedRef.current = onExited;
+  }, [onExited]);
+  useEffect(() => {
+    timeScaleRef.current = timeScale;
+  }, [timeScale]);
+
   // 1. Anti-flicker gate: don't mount overlay if loading finishes in < 150ms.
   // On initial mount with isLoading=true we show immediately — a full page reload
-  // should always play the brand intro. Subsequent loading states (route changes,
-  // data refetches) still get the 150ms debounce to avoid flicker.
+  // should always play the brand intro. When `immediate` is true (login flow) we
+  // also bypass the delay so fast logins don't delay or skip the animation.
+  // Subsequent loading states (route changes, data refetches) still get the
+  // 150ms debounce to avoid flicker.
   useEffect(() => {
     if (!isLoading) return;
     if (shouldRender) return;
 
-    if (initialMountRef.current) {
+    if (initialMountRef.current || immediate) {
+      loadStartMsRef.current = Date.now();
       setShouldRender(true);
       initialMountRef.current = false;
       return;
@@ -137,7 +166,7 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
     }, LOADER_TIMING.antiFlickerDelayMs);
 
     return () => window.clearTimeout(timer);
-  }, [isLoading, shouldRender]);
+  }, [isLoading, shouldRender, immediate]);
 
   // 2. Slow-load timer (8s)
   useEffect(() => {
@@ -171,7 +200,7 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
   }, [shouldRender]);
 
   // 4. Trigger exit animation helper
-  const runExit = () => {
+  const runExit = (adaptiveExitDuration?: number) => {
     if (exitStartedRef.current || !overlayRef.current || !stageRef.current) return;
     exitStartedRef.current = true;
     setIsExiting(true);
@@ -192,14 +221,14 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
       "(prefers-reduced-motion: reduce)"
     ).matches;
 
-    const baseExitDuration = prefersReduced
-      ? LOADER_TIMING.reducedMotionFade
-      : resolvedVariant === "compact"
-      ? LOADER_TIMING.compact.exitDuration
-      : LOADER_TIMING.full.exitDuration;
-
-    // Faster loads (higher timeScale) exit sooner; slower loads take the normal exit time.
-    const exitDuration = baseExitDuration / Math.max(timeScale, 1);
+    let exitDuration: number;
+    if (prefersReduced) {
+      exitDuration = LOADER_TIMING.reducedMotionFade;
+    } else if (adaptiveExitDuration !== undefined) {
+      exitDuration = adaptiveExitDuration;
+    } else {
+      exitDuration = adaptiveExitSecRef.current || 0.32;
+    }
 
     const tl = gsap.timeline({
       onComplete: () => {
@@ -233,8 +262,26 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
   };
 
   // 5. GSAP Build & Idle Timeline (StrictMode-safe via gsap.context)
+  //    Depends ONLY on [shouldRender] so prop changes (variant/timeScale/onExited)
+  //    when isSigningIn flips never trigger ctx.revert() or kill the running timeline.
   useLayoutEffect(() => {
     if (!shouldRender || !overlayRef.current) return;
+
+    // Resolve variant once for this run — never re-resolve on prop changes.
+    const currentVariant =
+      variantRef.current !== "auto"
+        ? variantRef.current
+        : (() => {
+            try {
+              return window.sessionStorage.getItem(SESSION_KEY)
+                ? "compact"
+                : "full";
+            } catch {
+              return "full";
+            }
+          })();
+    const currentOnExited = onExitedRef.current;
+    const currentTimeScale = timeScaleRef.current;
 
     const prefersReduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
@@ -262,7 +309,9 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
             duration: LOADER_TIMING.reducedMotionFade,
             onComplete: () => {
               buildCompletedRef.current = true;
-              if (!isLoadingRef.current) runExit();
+              if (!isLoadingRef.current) {
+                runExit(adaptiveExitSecRef.current);
+              }
             },
           }
         );
@@ -287,7 +336,7 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
         onComplete: () => {
           buildCompletedRef.current = true;
           if (!isLoadingRef.current) {
-            runExit();
+            runExit(adaptiveExitSecRef.current);
           } else {
             // Calm idle state: soft shine sweep across the awning every ~1.6s
             idleTlRef.current = gsap
@@ -363,13 +412,13 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
           repeat: 1,
           ease: "power1.inOut",
         }, "-=0.15")
-        // T drops after R settles
+        // T drops right after R lands
         .to(".bl-letter-t", {
           y: 0,
           opacity: 1,
           duration: cfg.letterDropDuration,
           ease: "bounce.out",
-        }, "+=" + cfg.letterDropDuration)
+        }, "-=0.22")
         .to(".bl-awning-group", {
           scaleY: 0.94,
           duration: 0.07,
@@ -377,13 +426,13 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
           repeat: 1,
           ease: "power1.inOut",
         }, "-=0.15")
-        // U drops after T settles
+        // U drops right after T lands
         .to(".bl-letter-u", {
           y: 0,
           opacity: 1,
           duration: cfg.letterDropDuration,
           ease: "bounce.out",
-        }, "+=" + cfg.letterDropDuration)
+        }, "-=0.22")
         .to(".bl-awning-group", {
           scaleY: 0.94,
           duration: 0.07,
@@ -410,11 +459,21 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
         ease: "power2.inOut",
       });
 
-      if (resolvedVariant === "compact") {
-        tl.timeScale(LOADER_TIMING.compact.timeScale);
-      } else if (timeScale && timeScale !== 1) {
-        tl.timeScale(timeScale);
+      // Network-aware starting speed: slow networks play slower, fast networks play at normal/compact speed
+      const effType = (navigator as any).connection?.effectiveType;
+      const isSlowNetwork =
+        effType === "slow-2g" || effType === "2g" || effType === "3g";
+      let startTimeScale: number;
+      if (isSlowNetwork) {
+        startTimeScale = 0.75;
+      } else if (currentVariant === "compact") {
+        startTimeScale = LOADER_TIMING.compact.timeScale;
+      } else if (currentTimeScale && currentTimeScale !== 1) {
+        startTimeScale = currentTimeScale;
+      } else {
+        startTimeScale = 1.0;
       }
+      tl.timeScale(startTimeScale);
 
       buildTlRef.current = tl;
     }, overlayRef);
@@ -424,19 +483,86 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
       idleTlRef.current = null;
       ctx.revert();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldRender, resolvedVariant]);
+  }, [shouldRender]);
 
-  // 6. Adaptive speed: fast-forward if loading finishes mid-build, or exit immediately if idle
+  // Accelerate the build timeline to finish in targetSec seconds,
+  // computed from remaining time and actual load elapsed time.
+  const accelerateToFinish = (tl: gsap.core.Timeline) => {
+    const remaining = Math.max(0.05, tl.duration() - tl.time());
+    const elapsed = Date.now() - loadStartMsRef.current;
+    // Fast load finishes remaining steps briskly (~0.42s); slower load eases out (~0.58s)
+    const targetSec = elapsed < 400 ? 0.42 : elapsed < 1200 ? 0.50 : 0.58;
+    const neededScale = Math.max(1.5, Math.min(6.0, remaining / targetSec));
+    adaptiveExitSecRef.current = elapsed < 400 ? 0.24 : elapsed < 1200 ? 0.32 : 0.40;
+    gsap.killTweensOf(tl);
+    gsap.to(tl, {
+      timeScale: neededScale,
+      duration: 0.12,
+      ease: "power2.out",
+      overwrite: true,
+    });
+  };
+
+  // 6. Bidirectional adaptive speed:
+  //    - While loading drags on, smoothly decelerate the build (calm, never frozen)
+  //    - When loading finishes, fast-forward proportionally to how fast it actually was
   useEffect(() => {
-    if (!shouldRender || isLoading) return;
+    if (!shouldRender) return;
 
-    if (buildCompletedRef.current) {
-      runExit();
-    } else if (buildTlRef.current) {
-      buildTlRef.current.timeScale(LOADER_TIMING.fastForwardTimeScale);
+    // ----- Still loading: schedule real-time slowdown -----
+    if (isLoading) {
+      if (loadStartMsRef.current === 0) {
+        loadStartMsRef.current = Date.now();
+      }
+
+      const timer1 = window.setTimeout(() => {
+        if (
+          isLoadingRef.current &&
+          buildTlRef.current &&
+          !buildCompletedRef.current
+        ) {
+          gsap.to(buildTlRef.current, {
+            timeScale: 0.55,
+            duration: 0.5,
+            ease: "power2.out",
+            overwrite: true,
+          });
+        }
+      }, 500);
+
+      const timer2 = window.setTimeout(() => {
+        if (
+          isLoadingRef.current &&
+          buildTlRef.current &&
+          !buildCompletedRef.current
+        ) {
+          gsap.to(buildTlRef.current, {
+            timeScale: 0.35,
+            duration: 0.6,
+            ease: "power2.out",
+            overwrite: true,
+          });
+        }
+      }, 1400);
+
+      return () => {
+        window.clearTimeout(timer1);
+        window.clearTimeout(timer2);
+      };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    // ----- Loading finished: fast-forward adaptively -----
+    if (!isLoading && buildTlRef.current) {
+      const elapsedMs = Date.now() - loadStartMsRef.current;
+
+      if (buildCompletedRef.current) {
+        adaptiveExitSecRef.current =
+          elapsedMs < 400 ? 0.24 : elapsedMs < 1200 ? 0.32 : 0.40;
+        runExit(adaptiveExitSecRef.current);
+      } else {
+        accelerateToFinish(buildTlRef.current);
+      }
+    }
   }, [isLoading, shouldRender]);
 
   if (!shouldRender) return null;

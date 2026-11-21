@@ -45,6 +45,8 @@ interface AuthValue {
   user: User | null
   /** true while restoring the session on first load */
   isLoading: boolean
+  /** true while the login() API call is in flight (drives the persistent BrandLoader) */
+  isSigningIn: boolean
   /** The pending sign-up code request (null before one has been sent) */
   otp: OtpState | null
   login: (email: string, password: string) => Promise<void>
@@ -62,6 +64,7 @@ const AuthContext = createContext<AuthValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isSigningIn, setIsSigningIn] = useState<boolean>(false)
   const [otp, setOtp] = useState<OtpState | null>(null)
 
   // -----------------------------------------------------------------------
@@ -100,12 +103,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (!password) throw new Error('Enter your password.')
 
-    const data = await apiFetch<{ token: string; user: User }>('/auth/login/', {
-      method: 'POST',
-      body: { email: address, password },
-    })
-    setToken(data.token)
-    setUser(data.user)
+    setIsSigningIn(true)
+    try {
+      const data = await apiFetch<{ token: string; user: User }>('/auth/login/', {
+        method: 'POST',
+        body: { email: address, password },
+      })
+      setToken(data.token)
+      setUser(data.user)
+    } finally {
+      setIsSigningIn(false)
+    }
   }, [])
 
   // -----------------------------------------------------------------------
@@ -181,8 +189,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, isLoading, otp, login, register, resendCode, confirmCode, logout }),
-    [user, isLoading, otp, login, register, resendCode, confirmCode, logout],
+    () => ({ user, isLoading, isSigningIn, otp, login, register, resendCode, confirmCode, logout }),
+    [user, isLoading, isSigningIn, otp, login, register, resendCode, confirmCode, logout],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

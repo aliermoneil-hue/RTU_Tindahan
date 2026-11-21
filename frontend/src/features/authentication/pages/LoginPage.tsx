@@ -3,7 +3,6 @@ import gsap from 'gsap'
 import { navigate } from '@/common/router/router'
 import { LoginForm } from '../components/LoginForm'
 import { useAuth } from '../AuthContext'
-import { BrandLoader } from '@/common/components/BrandLoader/BrandLoader'
 import { Icon } from '@/common/components/Icon'
 import logoImg from '@/assets/logo-removebg-preview.png'
 import img0 from '@/assets/SampleImages/0.jpg'
@@ -128,24 +127,6 @@ export function LoginPage() {
   const [popup, setPopup] = useState<'guidelines' | 'policy' | null>(null)
   const loginStartRef = useRef<number>(0)
 
-  // Read previous login duration from sessionStorage to set animation speed.
-  // Fast login (<1s)  → timeScale 3 (super fast exit)
-  // Medium (1-3s)     → timeScale 2
-  // Slow (>3s)        → timeScale 1 (normal full animation)
-  const [loaderTimeScale, setLoaderTimeScale] = useState<number>(1)
-
-  useEffect(() => {
-    try {
-      const prev = sessionStorage.getItem('rtu_login_duration_ms')
-      const prevMs = prev ? Number(prev) : 0
-      if (prevMs > 0 && prevMs < 1000) setLoaderTimeScale(3)
-      else if (prevMs > 0 && prevMs < 3000) setLoaderTimeScale(2)
-      else setLoaderTimeScale(1)
-    } catch {
-      setLoaderTimeScale(1)
-    }
-  }, [])
-
   // Always scroll down when entering the sign-in page
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -164,13 +145,6 @@ export function LoginPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.')
     } finally {
-      // Record how long this login took so the next boot can speed up the animation.
-      const elapsed = Date.now() - loginStartRef.current
-      try {
-        sessionStorage.setItem('rtu_login_duration_ms', String(elapsed))
-      } catch {
-        /* ignore storage errors */
-      }
       setIsLoading(false)
     }
   }
@@ -234,16 +208,6 @@ export function LoginPage() {
             error={error}
             onForgotPassword={handleForgotPassword}
           />
-
-          {/* Full-screen brand loader animation while signing in */}
-          {isLoading && (
-            <BrandLoader
-              isLoading={isLoading}
-              variant="full"
-              timeScale={loaderTimeScale}
-              onExited={() => {}}
-            />
-          )}
         </div>
       </div>
 

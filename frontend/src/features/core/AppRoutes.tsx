@@ -199,7 +199,7 @@ function renderActiveRoute(path: string, user: { email: string; role: string } |
 
 export function AppRoutes() {
   const { path } = useRoute()
-  const { user, isLoading: authLoading } = useAuth()
+  const { user, isLoading: authLoading, isSigningIn } = useAuth()
   const { hasSettledInitialFetch } = useTindahan()
 
   /** Canonical page key used for both rendering and favicon selection. */
@@ -235,7 +235,7 @@ export function AppRoutes() {
     listingsSettled: hasSettledInitialFetch,
   })
 
-  const showOverlay = !appReady || Boolean(redirectTo)
+  const showOverlay = !appReady || Boolean(redirectTo) || Boolean(isSigningIn)
 
   /** Swap the page favicon to match the current route. */
   useEffect(() => {
@@ -272,7 +272,8 @@ export function AppRoutes() {
     <>
       <BrandLoader
         isLoading={showOverlay}
-        variant="auto"
+        variant={isSigningIn ? 'full' : 'auto'}
+        immediate={isSigningIn}
         onExited={() => {}}
       />
       {!authLoading && !redirectTo && (
