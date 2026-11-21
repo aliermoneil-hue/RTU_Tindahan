@@ -4,6 +4,7 @@
   flex-direction: column;
   min-height: 100vh;
   background: var(--bg, #f4f6fa);
+  --sidebar-expanded-width: 256px;
 }
 /* Global viewport scrollbar: hidden by default, appears on hover */
 html,
@@ -28,6 +29,24 @@ body::-webkit-scrollbar-thumb {
   border: 2px solid #f1f5f9;
   box-shadow: inset 0 0 0 2px #f1f5f9;
   transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+html[data-theme='dark'],
+html[data-theme='dark'] body {
+  scrollbar-color: transparent var(--bg);
+}
+html[data-theme='dark']::-webkit-scrollbar-track,
+html[data-theme='dark'] body::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+html[data-theme='dark']::-webkit-scrollbar-thumb,
+html[data-theme='dark'] body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border: 2px solid var(--bg);
+  box-shadow: inset 0 0 0 2px var(--bg);
+}
+html[data-theme='dark']:hover::-webkit-scrollbar-thumb:hover,
+html[data-theme='dark'] body:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--yellow);
 }
 html:hover::-webkit-scrollbar,
 body:hover::-webkit-scrollbar {
@@ -74,7 +93,7 @@ body:hover::-webkit-scrollbar-thumb:active {
   width: 100%;
   flex: 1 0 auto;
   box-sizing: border-box;
-  min-width: 0; /* allows shrinking when sidebar expands */
+  min-width: 0;
   min-height: 100dvh;
   min-height: 100vh;
   padding-bottom: 64px;
@@ -88,52 +107,36 @@ body:hover::-webkit-scrollbar-thumb:active {
   box-sizing: border-box;
 }
 
-/* When sidebar is collapsed, page content should expand into the reclaimed space.
-   When sidebar is expanded, content should shrink gracefully. */
-.app.sidebar-open .page {
+/* Centered content shell: locks page width so it never stretches when sidebar toggles */
+.page-content-shell {
   width: 100%;
+  max-width: min(1240px, calc(100vw - var(--sidebar-expanded-width, 256px) - 120px));
+  margin-inline: auto;
 }
-.page h1 {
-  font-size: 28px;
-  line-height: 1.12;
-  letter-spacing: -0.02em;
-}
-.crumbs {
-  font-size: 12px;
-  color: var(--muted);
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-@media (min-width: 1700px) {
+
+/* Desktop (>= 768px): give <main> horizontal padding so outside buttons never clip */
+@media (min-width: 768px) {
   .page {
-    padding-right: 48px;
-  }
-}
-@media (max-width: 900px) {
-  .main {
-    flex-direction: column;
-    margin-left: 0;
-  }
-  .page {
-    padding: max(calc(var(--header-offset, 76px) + 16px), 92px) 16px 28px;
-  }
-  .page h1 {
-    font-size: 22px;
-  }
-}
-@media (max-width: 640px) {
-  .page {
-    padding: max(calc(var(--header-offset, 76px) + 14px), 90px) 14px 28px;
-    gap: 14px;
+    padding-inline: 56px;
   }
 }
 
-/* ==========================================================================
-   MOBILE LAYOUT — only affects screens <= 900px, PC view untouched
-   ========================================================================== */
+/* Mobile (< 768px): full width shell, no horizontal constraint */
+@media (max-width: 767px) {
+  .page-content-shell {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .page {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
 
-/* On mobile, stack sidebar drawer over page content instead of beside it */
+/* Mobile drawer (<= 900px): stack sidebar drawer over page content */
 @media (max-width: 900px) {
   .app {
     overflow-x: hidden;
@@ -157,6 +160,8 @@ body:hover::-webkit-scrollbar-thumb:active {
     min-height: 100vh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   /* Mobile drawer backdrop: prevent body scroll when open */
@@ -164,7 +169,7 @@ body:hover::-webkit-scrollbar-thumb:active {
     position: fixed;
     left: 0;
     right: 0;
-    top: var(--navbar-height, 76px); /* start exactly below the topbar, no gap */
+    top: var(--navbar-height, 76px);
     bottom: 0;
     background: rgba(0, 0, 0, 0.3);
     z-index: 55;
@@ -183,23 +188,14 @@ body:hover::-webkit-scrollbar-thumb:active {
   }
 }
 
-/* Very small phones */
-@media (max-width: 480px) {
+/* Small mobile (<= 640px): tighter spacing */
+@media (max-width: 640px) {
+  .page {
+    padding-top: max(calc(var(--header-offset, 76px) + 14px), 90px);
+    gap: 14px;
+    padding-bottom: 60px;
+  }
   .page h1 {
     font-size: 20px;
-  }
-
-  .top .search input {
-    font-size: 16px;
-  }
-
-  .nav {
-    font-size: 13px;
-    padding: 10px 12px;
-  }
-
-  .sect {
-    font-size: 10px;
-    padding: 10px 32px 10px 14px;
   }
 }

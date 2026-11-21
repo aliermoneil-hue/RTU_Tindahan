@@ -16,8 +16,9 @@ export function SiteFooter({ variant }: SiteFooterProps) {
 
   return (
     <footer className={`sitefoot ${guest ? 'sf-guest' : ''}`} aria-label="Site footer">
-      <div className="sf-grid">
-        <div className="sf-brand">
+      <div className="page-content-shell">
+        <div className="sf-grid">
+          <div className="sf-brand">
           <div className="row" style={{ gap: 10 }}>
             <Logo />
           </div>
@@ -188,6 +189,7 @@ export function SiteFooter({ variant }: SiteFooterProps) {
       <div className="sf-base tiny muted">
         © {new Date().getFullYear()} RTU Tindahan. A student capstone project for the Pasig Campus
         community.
+      </div>
       </div>
     </footer>
   )

@@ -1,0 +1,167 @@
+/* ==========================================================================
+   MARKETPLACE PRODUCT SHELF — 5-on-2 horizontally scrollable showcase grid
+   Used by Latest Items, Best-Selling Items, Student Services.
+   ========================================================================== */
+
+.shelf-section {
+  container-type: inline-size;
+}
+
+.shelf-viewport {
+  overflow-x: auto;
+  overflow-y: visible;
+  width: 100%;
+  /* Subtle vertical padding so card borders/shadows are never clipped */
+  padding: 12px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.shelf-viewport::-webkit-scrollbar {
+  height: 8px;
+}
+.shelf-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+.shelf-viewport::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+.shelf-viewport::-webkit-scrollbar-thumb:hover {
+  background: #9aa3b2;
+}
+
+.shelf-track {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.shelf-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 16px;
+  min-width: max-content;
+}
+
+/* Card slot sizing: exactly 5 cards across on desktop using container query units */
+.shelf-row .pcard {
+  width: calc((100cqi - (4 * 16px)) / 5);
+  flex-shrink: 0;
+}
+
+/* Compact typography so seller names/prices don't wrap at 5-across width */
+.shelf-row .pcard h4 {
+  font-size: 13px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+.shelf-row .pcard .srcpill,
+.shelf-row .pcard .pill {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+.shelf-row .pcard .row {
+  flex-wrap: nowrap;
+}
+.shelf-row .pcard .price {
+  white-space: nowrap;
+}
+
+/* Chevron scroll buttons — appear only when section overflows */
+.shelf-chev {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: #1a2f57;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  z-index: 20;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+  min-width: 44px;
+  min-height: 44px;
+}
+.shelf-chev:hover {
+  background: #1a2f57;
+  color: #fff;
+  border-color: #1a2f57;
+}
+
+/* Dark theme shelf chevrons */
+:root[data-theme='dark'] .shelf-chev {
+  background: var(--card);
+  color: var(--ink);
+  border-color: var(--line);
+}
+:root[data-theme='dark'] .shelf-chev:hover {
+  background: var(--yellow);
+  color: var(--yellow-ink);
+  border-color: var(--yellow);
+}
+.shelf-chev:focus-visible {
+  outline: 2px solid #f4b63a;
+  outline-offset: 2px;
+}
+.shelf-chev:active {
+  transform: translateY(-50%) scale(0.95);
+}
+.shelf-chev-left {
+  left: -56px;
+}
+.shelf-chev-left .ico {
+  transform: rotate(90deg);
+}
+.shelf-chev-right {
+  right: -56px;
+}
+.shelf-chev-right .ico {
+  transform: rotate(-90deg);
+}
+.shelf-chev .ico {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+/* Mobile: hide scroll buttons */
+@media (max-width: 767px) {
+  .shelf-track {
+    gap: 10px;
+  }
+  .shelf-row {
+    gap: 10px;
+  }
+  .shelf-row .pcard {
+    width: calc((100cqi - 10px) / 2);
+    flex-shrink: 0;
+  }
+  .shelf-chev {
+    display: none;
+  }
+}
+
+/* Desktop responsive breakpoints - maintain 5-on-5 layout */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .shelf-row .pcard {
+    width: calc((100cqi - (2 * 16px)) / 3);
+  }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .shelf-row .pcard {
+    width: calc((100cqi - (3 * 16px)) / 4);
+  }
+}
+@media (min-width: 1280px) {
+  .shelf-row .pcard {
+    width: calc((100cqi - (4 * 16px)) / 5);
+  }
+}

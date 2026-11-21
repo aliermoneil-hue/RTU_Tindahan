@@ -86,6 +86,19 @@
   cursor: pointer;
 }
 
+/* Dark theme search bar */
+:root[data-theme='dark'] .hc-search-wrap {
+  background: var(--card);
+  color: var(--ink);
+}
+:root[data-theme='dark'] .hc-search-wrap input {
+  color: var(--ink);
+}
+:root[data-theme='dark'] .hc-search-clear {
+  background: var(--soft);
+  color: var(--muted);
+}
+
 .hc-quick-chips {
   display: flex;
   flex-wrap: wrap;

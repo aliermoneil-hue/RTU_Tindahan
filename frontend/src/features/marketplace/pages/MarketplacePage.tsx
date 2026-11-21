@@ -5,7 +5,7 @@ import { navigate } from '@/common/router/router'
 import { MiniLoader } from '@/common/components/BrandLoader'
 import { CATEGORIES, CAT_META, SERVICES_CAT } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
-import { ProductCard } from '../components/ProductCard'
+import { MarketplaceProductShelf } from '../components/MarketplaceProductShelf'
 import './MarketplacePage.css'
 
 export function MarketplacePage() {
@@ -302,136 +302,49 @@ export function MarketplacePage() {
       </div>
 
       {/* Latest Items */}
-      <div className="stack" style={{ gap: 10 }}>
-        <div className="row between wrap">
-          <div>
-            <h2 style={{ fontSize: 18 }}>Latest Items</h2>
-            <span className="small muted">Newly published listings, newest first.</span>
-          </div>
-          {latest.length > 4 && (
-            <button
-              type="button"
-              className="link"
-              onClick={() => browseFor({ sortBy: 'Newest' })}
-            >
-              View more
-            </button>
-          )}
-        </div>
-        {latest.length ? (
-          <div className="pgrid pgrid4">
-            {latest.slice(0, 4).map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        ) : (
-          <div
-            className="card stack"
-            style={{ alignItems: 'center', textAlign: 'center', padding: 30 }}
-          >
-            <b>No listings yet</b>
-            <p className="small muted">Be the first to post something for the Pasig campus.</p>
-            <button
-              type="button"
-              className="btn yellow"
-              onClick={() => {
-                setDraft((prev) => (prev.editLid ? prev : { ...prev, type: 'product' }))
-                setListStep(1)
-                navigate('create')
-              }}
-            >
-              Sell an item
-            </button>
-          </div>
-        )}
-      </div>
+      <MarketplaceProductShelf
+        title="Latest Items"
+        subtitle="Newly published listings, newest first."
+        items={latest}
+        viewMoreLabel="View more"
+        onViewMore={() => browseFor({ sortBy: 'Newest' })}
+        onEmptyAction={() => {
+          setDraft((prev) => (prev.editLid ? prev : { ...prev, type: 'product' }))
+          setListStep(1)
+          navigate('create')
+        }}
+        emptyActionLabel="Sell an item"
+        emptyTitle="No listings yet"
+        emptySubtitle="Be the first to post something for the Pasig campus."
+      />
 
       {/* Best-Selling Items */}
-      <div className="stack" style={{ gap: 10 }}>
-        <div className="row between wrap">
-          <div>
-            <h2 style={{ fontSize: 18 }}>Best-Selling Items</h2>
-            <span className="small muted">Ranked by completed pickups only.</span>
-          </div>
-          {best.length > 4 && (
-            <button
-              type="button"
-              className="link"
-              onClick={() => browseFor({ sortBy: 'Best-Selling' })}
-            >
-              View more
-            </button>
-          )}
-        </div>
-        {best.length ? (
-          <div className="pgrid pgrid4">
-            {best.slice(0, 4).map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        ) : (
-          <div
-            className="card stack"
-            style={{ alignItems: 'center', textAlign: 'center', padding: 30 }}
-          >
-            <b>No best sellers yet</b>
-            <p className="small muted">
-              This list fills in after students complete their first pickups. Requests and messages
-              do not count.
-            </p>
-          </div>
-        )}
-      </div>
+      <MarketplaceProductShelf
+        title="Best-Selling Items"
+        subtitle="Ranked by completed pickups only."
+        items={best}
+        viewMoreLabel="View more"
+        onViewMore={() => browseFor({ sortBy: 'Best-Selling' })}
+        emptyTitle="No best sellers yet"
+        emptySubtitle="This list fills in after students complete their first pickups. Requests and messages do not count."
+      />
 
       {/* Student Services */}
-      <div className="stack" style={{ gap: 10 }}>
-        <div className="row between wrap">
-          <div>
-            <h2 style={{ fontSize: 18 }}>Student Services</h2>
-            <span className="small muted">
-              Printing, tutoring, rentals and other services offered by students. Open one to see
-              details or request a booking.
-            </span>
-          </div>
-          {svcs.length > 4 && (
-            <button
-              type="button"
-              className="link"
-              onClick={() => browseFor({ cats: [SERVICES_CAT] })}
-            >
-              View more
-            </button>
-          )}
-        </div>
-        {svcs.length ? (
-          <div className="pgrid pgrid4">
-            {svcs.slice(0, 4).map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        ) : (
-          <div
-            className="card stack"
-            style={{ alignItems: 'center', textAlign: 'center', padding: 30 }}
-          >
-            <b>No services offered yet</b>
-            <p className="small muted">
-              Students can offer printing, tutoring, rentals and more from Sell an item.
-            </p>
-            <button
-              type="button"
-              className="btn yellow"
-              onClick={() => {
-                setDraft((prev) => (prev.editLid ? prev : { ...prev, type: 'service' }))
-                setListStep(1)
-                navigate('create')
-              }}
-            >
-              Offer a service
-            </button>
-          </div>
-        )}
-      </div>
+      <MarketplaceProductShelf
+        title="Student Services"
+        subtitle="Printing, tutoring, rentals and other services offered by students. Open one to see details or request a booking."
+        items={svcs}
+        viewMoreLabel="View more"
+        onViewMore={() => browseFor({ cats: [SERVICES_CAT] })}
+        onEmptyAction={() => {
+          setDraft((prev) => (prev.editLid ? prev : { ...prev, type: 'service' }))
+          setListStep(1)
+          navigate('create')
+        }}
+        emptyActionLabel="Offer a service"
+        emptyTitle="No services offered yet"
+        emptySubtitle="Students can offer printing, tutoring, rentals and more from Sell an item."
+      />
       </>)}
     </>
   )

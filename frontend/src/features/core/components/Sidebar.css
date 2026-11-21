@@ -514,6 +514,15 @@
     border: 2px solid #142444;
   }
 
+  /* Dark theme: mobile sidebar scrollbar */
+  :root[data-theme='dark'] .sidebar-scroll::-webkit-scrollbar-track {
+    background: var(--bg);
+  }
+  :root[data-theme='dark'] .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: var(--yellow);
+    border: 2px solid var(--navy);
+  }
+
   .scrim.show {
     display: block;
     position: fixed;
@@ -586,6 +595,34 @@
   .sidebar-inner {
     transition: none;
   }
+}
+
+/* ==========================================================================
+   DARK THEME OVERRIDES for Sidebar
+   ========================================================================== */
+:root[data-theme='dark'] .side,
+:root[data-theme='dark'] .sidebar-inner,
+:root[data-theme='dark'] .sidebar-scroll,
+:root[data-theme='dark'] .side.collapsed:not(.user-closed) {
+  background: var(--navy) !important;
+  background-color: var(--navy) !important;
+}
+
+:root[data-theme='dark'] .side.collapsed {
+  border-right-color: var(--line);
+}
+
+:root[data-theme='dark'] .sidebar-toggle {
+  background: var(--card);
+  border-color: var(--line);
+  color: var(--ink);
+}
+:root[data-theme='dark'] .sidebar-toggle:hover {
+  background: var(--soft);
+  border-color: var(--yellow);
+}
+:root[data-theme='dark'] .toggle-arrow {
+  border-right-color: var(--yellow);
 }
 
 /* ==========================================================================

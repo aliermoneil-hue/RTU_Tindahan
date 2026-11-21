@@ -135,7 +135,9 @@ export function AppLayout({ user, activePath, children }: AppLayoutProps) {
           onToggle={() => setIsSidebarOpen((prev) => !prev)}
         />
         <div className="page-wrap">
-          <main className="page">{children}</main>
+          <main className="page">
+            <div className="page-content-shell">{children}</div>
+          </main>
           <SiteFooter variant="member" />
         </div>
       </div>

@@ -409,6 +409,11 @@
   color: var(--navy);
 }
 
+/* Dark theme: keep modal heading legible on dark card */
+:root[data-theme='dark'] .popup-box h3 {
+  color: var(--ink);
+}
+
 .popup-box p {
   margin: 0 0 16px 0;
 }
