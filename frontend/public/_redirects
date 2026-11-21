@@ -1,0 +1,16 @@
+# Same-origin proxies back to the Django backend.
+#
+# The browser must never talk to the backend host directly: a public page
+# (rtutindahan.netlify.app) that fetches a tailnet address is blocked by
+# Chrome's Private Network Access rules, and the backend hostname changes
+# whenever the tunnel is re-minted. Proxying through Netlify's edge keeps the
+# API, the Django admin and its static files on this site's own origin.
+#
+# Upstream = the Cloudflare quick tunnel for kallisto-1:8000. Regenerate these
+# three lines with `tindahan-netlify-sync` when the tunnel host changes.
+/api/*     https://hdtv-commission-accepted-cos.trycloudflare.com/api/:splat  200
+/admin/*   https://hdtv-commission-accepted-cos.trycloudflare.com/admin/:splat  200
+/static/*  https://hdtv-commission-accepted-cos.trycloudflare.com/static/:splat  200
+
+# Everything else is the SPA (hash routing, so no deep-link rewrite needed).
+/*  /index.html  200

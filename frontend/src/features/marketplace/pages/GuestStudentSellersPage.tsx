@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { Icon } from '@/common/components/Icon'
 import { navigate } from '@/common/router/router'
 import { useTindahan } from '../context/TindahanContext'

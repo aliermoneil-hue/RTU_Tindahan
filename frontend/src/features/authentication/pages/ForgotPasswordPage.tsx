@@ -51,7 +51,7 @@ export function ForgotPasswordPage() {
 
     setIsLoading(true)
     try {
-      await apiFetch<{ detail: string }>('/auth/forgot-password/', {
+      await apiFetch<{ detail: string }>('/auth/password-reset/', {
         method: 'POST',
         body: { email: trimmed },
       })
@@ -94,9 +94,14 @@ export function ForgotPasswordPage() {
 
     setIsLoading(true)
     try {
-      await apiFetch<{ detail: string }>('/auth/reset-password/', {
+      await apiFetch<{ detail: string }>('/auth/password-reset/confirm/', {
         method: 'POST',
-        body: { email: email.trim().toLowerCase(), code: digits, password: newPass },
+        body: {
+          email: email.trim().toLowerCase(),
+          code: digits,
+          password: newPass,
+          password_confirm: confirmPass,
+        },
       })
       setStep('done')
     } catch (err: any) {
