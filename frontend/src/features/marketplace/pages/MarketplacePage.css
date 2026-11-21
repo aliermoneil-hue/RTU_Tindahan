@@ -10,22 +10,23 @@
   min-width: 0;
 }
 .catrow {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  padding: 4px 2px 8px;
+  outline-offset: 2px;
+}
+.catrow .marquee-track {
   display: flex;
   flex-wrap: nowrap;
   gap: 10px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x proximity;
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  padding: 4px 2px 8px;
-  flex: 1;
-  min-width: 0;
-  outline-offset: 2px;
+  width: max-content;
+  will-change: transform;
 }
-.catrow::-webkit-scrollbar {
-  display: none;
+.catrow .marquee-group {
+  display: flex;
+  flex-wrap: nowrap;
 }
 .catchip {
   flex: 0 0 auto;
@@ -34,6 +35,7 @@
   align-items: center;
   gap: 8px;
   white-space: nowrap;
+  margin-right: 8px;
   padding: 10px 16px;
   border-radius: 999px;
   border: 1px solid var(--line);
