@@ -255,3 +255,6 @@ pnpm-debug.log*
 !.vscode/extensions.json
 Thumbs.db
 *.swp
+
+# Local snapshot archives must never be committed
+*.tar.gz
