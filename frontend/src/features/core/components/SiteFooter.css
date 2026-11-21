@@ -7,7 +7,9 @@
   background: var(--navy);
   border-top: 0;
   color: #d8e0ef;
-  padding: 28px clamp(16px, 3vw, 28px) 18px;
+  padding: 28px 22px 18px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .sitefoot .logo-img {
@@ -19,7 +21,9 @@
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 28px;
-  max-width: 1180px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .sitefoot h3 {
@@ -46,11 +50,13 @@
 }
 
 .sitefoot .sf-base {
-  max-width: 1180px;
+  width: 100%;
+  max-width: none;
   margin-top: 20px;
   padding-top: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
   color: #aebbd6;
+  box-sizing: border-box;
 }
 
 .flink {

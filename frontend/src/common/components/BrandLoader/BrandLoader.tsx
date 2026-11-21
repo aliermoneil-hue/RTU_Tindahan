@@ -66,6 +66,8 @@ export interface BrandLoaderProps {
   onRetry?: () => void;
   /** Called after the exit animation finishes and the loader unmounts */
   onExited?: () => void;
+  /** GSAP timeScale multiplier for build & exit (1 = normal, 2 = 2x faster, etc.) */
+  timeScale?: number;
 }
 
 function getInitialVariant(variant: BrandLoaderVariant): "full" | "compact" {
@@ -90,6 +92,7 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
   variant = "auto",
   onRetry,
   onExited,
+  timeScale = 1,
 }) => {
   const [resolvedVariant] = useState<"full" | "compact">(() =>
     getInitialVariant(variant)
@@ -189,11 +192,14 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
       "(prefers-reduced-motion: reduce)"
     ).matches;
 
-    const exitDuration = prefersReduced
+    const baseExitDuration = prefersReduced
       ? LOADER_TIMING.reducedMotionFade
       : resolvedVariant === "compact"
       ? LOADER_TIMING.compact.exitDuration
       : LOADER_TIMING.full.exitDuration;
+
+    // Faster loads (higher timeScale) exit sooner; slower loads take the normal exit time.
+    const exitDuration = baseExitDuration / Math.max(timeScale, 1);
 
     const tl = gsap.timeline({
       onComplete: () => {
@@ -406,6 +412,8 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
 
       if (resolvedVariant === "compact") {
         tl.timeScale(LOADER_TIMING.compact.timeScale);
+      } else if (timeScale && timeScale !== 1) {
+        tl.timeScale(timeScale);
       }
 
       buildTlRef.current = tl;

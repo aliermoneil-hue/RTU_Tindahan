@@ -34,7 +34,7 @@ export function StudentSellersPage() {
   return (
     <>
       <div className="srchead">
-        <div style={{ maxWidth: '62ch' }}>
+        <div style={{ maxWidth: 'none' }}>
           <span className="eyebrow">STUDENT SELLERS</span>
           <h1>Items sold by students</h1>
           <p className="muted small">

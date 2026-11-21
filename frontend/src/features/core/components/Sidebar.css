@@ -1,114 +1,664 @@
-/* SIDEBAR (prototype: .side, .nav, .sect, .campus) */
+/* ==========================================================================
+   REDDIT-STYLE COLLAPSIBLE SIDEBAR
+   ========================================================================== */
+
+/* Outer aside: fixed to the left edge, starts BELOW the topbar+awning,
+   stretches to the bottom of the viewport. overflow: visible so the
+   border-straddling toggle button is never clipped.
+   NO overflow-y here — scrolling lives on .sidebar-inner only. */
 .side {
-  background: var(--navy);
-  color: var(--side-ink);
-  padding: 14px 12px;
+  background: #142444;
+  color: #d6e2f3;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  position: sticky;
+  position: fixed;
+  left: 0;
   top: 0;
   height: 100vh;
-  overflow: auto;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: var(--header-offset, 76px);   /* push content below topbar+awning; background covers full height */
+  overflow: visible;
+  z-index: 30;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  width: 240px;
+  /* Slow, smooth open/close on toggle button; hover gets its own delayed transition below */
+  transition: width 500ms cubic-bezier(0.4, 0, 0.2, 1), background 500ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-.side .logo {
-  justify-content: center;
-  padding: 0 0 8px;
-  color: #fff;
+
+/* Collapsed state: slim 32px rail with clean surface and subtle right hairline */
+.side.collapsed {
+  width: 32px;
+  border-right: 1px solid #e2e8f0;
 }
-.side .logo-img {
-  height: 76px;
-}
-.side-group {
+
+/* Inner flex-column wrapper: fills the sidebar height.
+   overflow-y: auto lives HERE (not on <aside>) so the toggle button
+   and the sidebar shell are never clipped. Starts cleanly below the
+   scalloped awning and ends at the bottom of the viewport. */
+.sidebar-inner {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  height: 100%;
+  overflow-x: hidden;
+  background-color: #142444;
+  /* Compact vertical padding keeps content close but not cramped.
+     Right padding increased so content sits clear of the scrollbar. */
+  padding: 12px 12px 12px;
+  box-sizing: border-box;
+  /* Default: fully visible, no slide offset */
+  transform: translateX(0);
+  /* Smooth fade + slide on toggle open/close and hover */
+  transition: opacity 400ms ease, transform 400ms ease;
 }
-.side .sect {
+
+/* When collapsed, hide the inner content (links + bottom card) */
+.side.collapsed .sidebar-inner {
+  opacity: 0;
+  pointer-events: auto;
+  /* Slide content out to the left as it fades out */
+  transform: translateX(-60px);
+  transition: opacity 400ms ease, transform 400ms ease;
+}
+
+/* Toggle button buffer zone — wraps the white circular toggle button.
+   Positioned at the right edge of the collapsed sidebar rail, overlapping
+   the border area. The transparent padding around the button creates a
+   dead-zone so moving the mouse toward the button does not trigger
+   hover-to-open on the sidebar rail behind it. */
+.toggle-wrapper {
+  position: absolute;
+  right: -30px; /* aligns the outer edge of the buffer with the sidebar's right edge */
+  top: calc(var(--header-offset, 76px) + 22px);
+  padding: 14px; /* transparent dead-zone around the button */
+  z-index: 60; /* above .sidebar-inner so button hover wins over rail hover */
+  box-sizing: border-box;
+  /* Slow, smooth move with the sidebar open/close toggle */
+  transition: right 500ms cubic-bezier(0.4, 0, 0.2, 1), top 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Border-straddling circular toggle button — sits inside .toggle-wrapper.
+   When collapsed (32px rail) or expanded (256px), the wrapper keeps it
+   straddling the right border edge. */
+.sidebar-toggle {
+  position: static;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1a2f57;
+  z-index: 50;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+.sidebar-toggle:focus-visible {
+  outline: 2px solid #f4b63a;
+  outline-offset: 2px;
+}
+.sidebar-toggle:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+/* CSS triangle indicator — same style as the About Us dropdown arrow,
+   rotates 180° smoothly between expanded (←) and collapsed (→) states */
+.toggle-arrow {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-right: 9px solid #1a2f57;
+  transform-origin: center;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+.toggle-arrow.rotate {
+  transform: rotate(180deg);
+}
+
+/* Simple, slick scrollbar — space always reserved, visuals appear on hover.
+   Because the scrollbar slot is never added/removed, the sidebar contents
+   never change size or position. */
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  color-scheme: dark;
+  background-color: #142444;
+  /* Firefox: thin scrollbar always present, invisible until hover */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px; /* always reserve 6px so content width never changes */
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent; /* invisible track by default */
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: transparent; /* invisible thumb by default */
+  border-radius: 9999px;
+  border: 2px solid #142444;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+/* Hover: reveal gold scrollbar without taking any extra space */
+.sidebar-scroll:hover {
+  scrollbar-color: #f4b63a transparent; /* track: fully transparent, no tint */
+}
+
+.sidebar-scroll:hover::-webkit-scrollbar-track {
+  background: transparent; /* no background — track stays invisible */
+}
+
+.sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  background: #f4b63a;
+}
+
+.sidebar-scroll:hover::-webkit-scrollbar-thumb:hover {
+  background: #f5c24a;
+  transform: scale(1.1);
+}
+
+.sidebar-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Section chevron — rotates 180° when its section collapses */
+.sect-chev {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.sect.collapsed .sect-chev {
+  transform: rotate(180deg) translateY(-50%);
+}
+
+/* Accordion section header (visible only when expanded) — real <button> for proper accessibility */
+.sect {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: var(--yellow);
+  color: #f4b63a;
   opacity: 0.85;
-  padding: 14px 10px 4px;
+  padding: 10px 34px 10px 12px;   /* right padding makes room for the chevron; 44px+ touch target height */
+  background: none;
+  border: 0;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 6px;
+  min-height: 44px;               /* minimum touch target */
+  box-sizing: border-box;
 }
+.sect:hover {
+  opacity: 1;
+}
+.sect:focus-visible {
+  outline: 2px solid #f4b63a;
+  outline-offset: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+.sect[aria-expanded="true"] {
+  opacity: 1;
+}
+
+
+/* When sidebar is collapsed, hide section text but keep the toggle button accessible */
+.side.collapsed .sect {
+  padding: 10px 0;
+  justify-content: center;
+  /* Fade section headers out smoothly when sidebar collapses */
+  transition: opacity 400ms ease, padding 400ms ease;
+}
+
+.side.collapsed .sect > *:not(.sect-chev) {
+  visibility: hidden;
+  opacity: 0;
+  /* Fade content out smoothly; keep visibility hidden until fade completes */
+  transition: opacity 400ms ease, visibility 0s linear 400ms;
+}
+
+/* Navigation link — compact padding, indented from both left
+   and right edges so the yellow active indicator isn't pinned to both sides.
+   44px+ minimum touch target height via min-height. */
 .nav {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
+  gap: 8px;
+  padding: 8px 10px;
   border-radius: 10px;
-  color: var(--side-ink);
+  color: #d6e2f3;
   font-weight: 500;
   font-size: 13px;
-  width: 100%;
+  margin: 0 8px 6px 8px;
+  min-height: 44px;               /* minimum touch target */
+  box-sizing: border-box;
   transition: background-color 0.15s, color 0.15s;
+  text-decoration: none;
 }
 .nav:hover {
   background: rgba(255, 255, 255, 0.09);
   color: #fff;
 }
+.nav:focus-visible {
+  outline: 2px solid #f4b63a;
+  outline-offset: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
 .nav.on {
-  background: rgba(255, 189, 89, 0.16);
+  background: rgba(244, 182, 58, 0.16);
   color: #fff;
   font-weight: 700;
-  box-shadow: inset 3px 0 0 var(--yellow);
+  box-shadow: inset 3px 0 0 #f4b63a;
 }
 .nav.on .ico {
-  color: var(--yellow);
+  color: #f4b63a;
 }
+
+/* Section group wrapper: spacing between nav sections */
+.side-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 8px;
+}
+
+/* Collapsible section content: smooth max-height/opacity animation */
+.section-content {
+  overflow: hidden;
+  max-height: 2000px;
+  opacity: 1;
+  transition: max-height 220ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 6px;
+}
+.section-content.collapsed-section {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+}
+
+/* Desktop hover-to-expand: wait 0.2s after hovering the collapsed sidebar
+   before sliding it open. Does NOT trigger when the toggle button closed it
+   (.user-closed). Non-hover states have no transition so the toggle button
+   is the primary open/close control. */
+@media (min-width: 768px) {
+  .side.collapsed:not(.user-closed) {
+    width: 32px;
+    background: #142444;
+  }
+
+  .side.collapsed:not(.user-closed).hover-open {
+    width: 240px;
+    background: #142444;
+    transition: width 500ms ease, background 500ms ease;
+    transition-delay: 100ms;
+  }
+
+  .side.collapsed:not(.user-closed) .sidebar-inner {
+    opacity: 0;
+    pointer-events: auto;
+    padding: 12px 12px 16px;
+    /* No delay on fade-out — collapses immediately when you move the mouse away */
+    transition: opacity 400ms ease, transform 400ms ease;
+  }
+
+  .side.collapsed:not(.user-closed).hover-open .sidebar-inner {
+    opacity: 1;
+    pointer-events: auto;
+    /* Match the toggled-open padding exactly so content width is identical */
+    padding: 12px 12px 16px;
+    /* Slide content back in from the left as it fades in */
+    transform: translateX(0);
+    transition: opacity 400ms ease, transform 400ms ease;
+    transition-delay: 100ms;
+  }
+
+  /* Restore left-aligned section headers + visible text when expanded on hover */
+  .side.collapsed:not(.user-closed) .sect {
+    justify-content: center;
+    padding: 10px 0;
+    opacity: 0.85;
+    transition: none;
+  }
+
+  .side.collapsed:not(.user-closed) .sect > *:not(.sect-chev) {
+    visibility: hidden;
+    opacity: 0;
+    /* No delay on fade-out */
+    transition: opacity 400ms ease, visibility 0s linear 400ms;
+  }
+
+  .side.collapsed:not(.user-closed).hover-open .sect {
+    justify-content: flex-start;
+    padding: 10px 34px 10px 12px;
+    opacity: 1;
+    transition: padding 400ms ease, opacity 400ms ease;
+    transition-delay: 100ms;
+  }
+  .side.collapsed:not(.user-closed).hover-open .sect > *:not(.sect-chev) {
+    visibility: visible;
+    opacity: 1;
+    transition: visibility 0s ease, opacity 400ms ease;
+    transition-delay: 100ms;
+  }
+
+  /* Move the topbar awning/shingles to the right of the hovered-expanded sidebar — no delay so it moves with the sidebar */
+  .app.sidebar-open .top::after,
+  .app:has(.side.collapsed:not(.user-closed).hover-open) .top::after {
+    left: 240px !important;
+    transition: left 500ms ease;
+  }
+
+  /* Sidebar closing (hover or toggle): awning must match sidebar's 500ms close speed,
+     not the base 220ms from Topbar.css, so it doesn't finish before the bar closes. */
+  .app:has(.side.collapsed:not(.hover-open)) .top::after {
+    transition: left 500ms ease;
+  }
+
+  .main:has(.side.collapsed:not(.user-closed).hover-open) {
+    margin-left: 240px;
+    transition: margin-left 500ms ease;
+  }
+
+  /* Main content closing (hover): match sidebar's 500ms close speed — return to collapsed rail width */
+  .main:has(.side.collapsed:not(.hover-open)) {
+    margin-left: 32px;
+    transition: margin-left 500ms ease;
+  }
+}
+
+/* Divider between groups */
+.nav-divider {
+  border: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 6px 10px;
+}
+
+/* Campus notice card pinned to the bottom via mt-auto */
 .side .campus {
+  margin: 8px 12px 8px 12px;
   margin-top: auto;
+  padding: 12px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 11px;
-  padding: 12px;
-  font-size: 11.5px;
-  color: var(--side-ink);
+  font-size: 11px;
+  color: #d6e2f3;
 }
 .side .campus b {
   display: block;
   color: #fff;
   margin-bottom: 3px;
 }
+
+/* Focus styles */
 .side :focus-visible {
-  outline-color: var(--yellow);
+  outline-color: #f4b63a;
 }
+
+/* ==========================================================================
+   MOBILE DRAWER (max-width: 900px) — overlay behavior unchanged
+   ========================================================================== */
 
 /* The dark overlay behind the drawer (only used on small screens) */
 .scrim {
   display: none;
+}
+.scrim.show {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 55;
+}
+
+/* Screen reader only: announces when the drawer opens/closes */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (max-width: 900px) {
   .side {
     position: fixed;
     left: 0;
-    top: 0;
-    bottom: 0;
-    width: 260px;
+    top: var(--navbar-height, 76px); /* start exactly below the topbar, no gap */
+    height: calc(100dvh - var(--navbar-height, 76px)); /* dynamic viewport height fits mobile browser chrome */
+    max-height: calc(100dvh - var(--navbar-height, 76px));
+    width: min(300px, 92vw);
+    max-width: 300px;
     z-index: 60;
     transform: translateX(-102%);
-    transition: transform 0.2s;
+    transition: transform 500ms cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden; /* clip so only .sidebar-scroll handles scrolling */
+    padding-top: 0;
+    /* Extra bottom padding so the campus notice card is never cut off by mobile browser UI */
+    padding-bottom: env(safe-area-inset-bottom);
   }
+
+  /* On mobile, ignore collapsed styling - drawer uses transform instead */
+  .side.collapsed {
+    width: min(300px, 92vw);
+  }
+
   .side.open {
     transform: none;
   }
+
+  /* Mobile drawer open: reveal sidebar content even though .collapsed class remains */
+  .side.open .sidebar-inner {
+    opacity: 1;
+    pointer-events: auto;
+    /* Restore position so content slides in from the left, not shifted left */
+    transform: translateX(0);
+    transition: opacity 500ms ease, transform 500ms ease;
+    transition-delay: 200ms;
+  }
+
+  /* Mobile: ensure the scrollable region fills the drawer height so content
+     can scroll all the way down to the campus notice card at the bottom.
+     touch-action: pan-y overrides the touch-action: none that AppLayout sets
+     on html/body when the drawer is open, so vertical scrolling works. */
+  .sidebar-scroll {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    /* Do not force full width — let flex + scrollbar-gutter reserve space so the
+       scrollbar sits in its own gutter to the right of the content, not on top of it. */
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable; /* reserve scrollbar slot so content never slides under it */
+    /* Mobile: always-visible scrollbar so users know content continues below */
+    scrollbar-color: #f4b63a rgba(255, 255, 255, 0.06);
+  }
+
+  /* Mobile scrollbar track: subtle so it doesn't compete with the drawer */
+  .sidebar-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.06);
+  }
+  /* Mobile scrollbar thumb: always visible gold, no hover required */
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: #f4b63a;
+    border: 2px solid #142444;
+  }
+
   .scrim.show {
     display: block;
     position: fixed;
-    inset: 0;
+    left: 0;
+    right: 0;
+    top: var(--navbar-height, 76px); /* start exactly below the topbar, no gap */
+    bottom: 0;
     background: rgba(0, 0, 0, 0.45);
     z-index: 55;
   }
+
+  /* Move the scalloped awning to the right of the mobile drawer when it's open,
+     matching PC view where the awning shifts beside the expanded sidebar instead
+     of sitting between the topbar and the drawer. */
+  .app.mobile-drawer-open .top::after {
+    left: min(300px, 92vw);
+    transition: left 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Mobile drawer: toggle button not needed (hamburger in topbar handles it) */
+  .sidebar-toggle {
+    display: none;
+  }
+
   .nav {
-    min-height: 36px;
+    min-height: 44px;               /* minimum touch target */
+    padding: 9px 12px;
+    font-size: 14px;
+    margin: 0 6px 5px 6px;          /* tighter margins for narrow drawers */
+  }
+
+  .nav .ico,
+  .nav svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .side-group {
+    gap: 4px;
+  }
+
+  .sect {
+    padding: 11px 32px 11px 14px;
+    font-size: 11px;
+    min-height: 44px;
+  }
+
+  .nav .badge {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .side .campus {
+    margin: 8px 8px 0 8px;
+    margin-top: auto; /* push to bottom of scrollable drawer */
+    margin-bottom: env(safe-area-inset-bottom);
+    padding: 12px;
+  }
+
+  .sidebar-inner {
+    padding: 14px 24px 0 6px;
+    min-height: 0; /* allow flex item to shrink so overflow-y works on .sidebar-scroll */
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
-  .side {
+  .side,
+  .sidebar-toggle,
+  .sidebar-inner {
     transition: none;
+  }
+}
+
+/* ==========================================================================
+   MOBILE UNIVERSAL — applies to all screens <= 900px without touching PC view
+   ========================================================================== */
+
+/* Prevent horizontal scroll on mobile devices */
+@media (max-width: 900px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Safe area support for notched phones (iPhone X, etc.) */
+  .side {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  /* Better tap feedback on mobile */
+  .nav,
+  .sect,
+  .sidebar-toggle,
+  .iconbtn,
+  .menu-btn {
+    -webkit-tap-highlight-color: rgba(244, 182, 58, 0.2);
+    -webkit-touch-callout: none;
+  }
+
+  /* Ensure all images scale down on mobile instead of overflowing */
+  img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  /* Page content: never wider than viewport on mobile */
+  .page,
+  .page-wrap {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* Make the topbar search input fully usable on small screens */
+  .top .search input {
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
+
+  /* Larger touch targets for mobile */
+  .nav {
+    min-height: 48px;
+  }
+
+  .sect {
+    min-height: 48px;
+  }
+}
+
+/* Extra small phones (<= 640px) */
+@media (max-width: 640px) {
+  .top {
+    padding: 10px max(10px, env(safe-area-inset-left))
+      10px max(10px, env(safe-area-inset-right));
+  }
+
+  .page {
+    padding-top: max(calc(var(--header-offset, 76px) + 10px), 85px);
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .side {
+    width: min(300px, 92vw);
   }
 }

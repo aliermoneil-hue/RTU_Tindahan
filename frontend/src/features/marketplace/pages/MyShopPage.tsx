@@ -843,6 +843,13 @@ export function MyShopPage() {
                                   <button
                                     type="button"
                                     className="btn ghost sm"
+                                    onClick={() => navigate(`product?id=${p.id}`)}
+                                  >
+                                    View
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn ghost sm"
                                     onClick={() => {
                                       setEditId(p.id)
                                       setOpName(p.name)
@@ -1032,13 +1039,22 @@ export function MyShopPage() {
                             <td>
                               <div className="row wrap" style={{ gap: 6 }}>
                                 {l.lid && (
-                                  <button
-                                    type="button"
-                                    className="btn ghost sm"
-                                    onClick={() => startEditListing(l.lid!)}
-                                  >
-                                    Edit
-                                  </button>
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="btn ghost sm"
+                                      onClick={() => navigate(`product?id=${l.lid}`)}
+                                    >
+                                      View
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn ghost sm"
+                                      onClick={() => startEditListing(l.lid!)}
+                                    >
+                                      Edit
+                                    </button>
+                                  </>
                                 )}
                                 {(l.status === 'Active' || l.status === 'Paused') && (
                                   <button

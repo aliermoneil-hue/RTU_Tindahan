@@ -44,8 +44,11 @@ export function ProductPage() {
     toast,
   } = useTindahan()
   const pid = params.get('id') || selectedProductId
-  const p = byId[pid ?? '']
+  const p = pid ? byId(pid) : undefined
+  const isOwner = Boolean(p && currentAccount && p.owner === currentAccount.email)
+  const canView = allOnSale.some((x) => x.id === p?.id) || isOwner || isStaffUser
   const [selectedOpts, setSelectedOpts] = useState<Record<string, string>>({})
+  const [variationWarned, setVariationWarned] = useState(false)
   const [qty, setQty] = useState(1)
   const [chosenFulfillment, setChosenFulfillment] = useState<ChosenFulfillment>('pickup')
   const [showMsgForm, setShowMsgForm] = useState(false)
@@ -109,7 +112,7 @@ export function ProductPage() {
       .sort((a, b) => b.ts - a.ts)
   }, [db.reviews, p])
 
-  if (!p || !allOnSale.some((x) => x.id === p.id)) {
+  if (!p || !canView) {
     return (
       <div
         className="card stack"
@@ -511,6 +514,7 @@ export function ProductPage() {
                                 [a.name]: prev[a.name] === v ? '' : v,
                               }))
                               setQty(1)
+                              setVariationWarned(false)
                             }}
                           >
                             {v}
@@ -559,10 +563,14 @@ export function ProductPage() {
               <button
                 type="button"
                 className="btn yellow grow"
-                disabled={(hasVariations && !chosenVar) || availStock < 1 || sellerFulfillment === 'none'}
+                disabled={availStock < 1 || sellerFulfillment === 'none'}
                 onClick={() => {
                   if (sellerFulfillment === 'none') {
                     toast('This listing does not have an active fulfillment method.')
+                    return
+                  }
+                  if (hasVariations && !chosenVar) {
+                    setVariationWarned(true)
                     return
                   }
                   const vid = ensureVariationPicked()
@@ -577,14 +585,33 @@ export function ProductPage() {
               </button>
             </div>
 
+            {hasVariations && !chosenVar && variationWarned && (
+              <div
+                className="note"
+                style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'flex-start', color: 'var(--red)' }}
+              >
+                <Icon name="info" size="sm" style={{ marginTop: 2 }} />
+                <span className="small">
+                  Please choose{' '}
+                  {p.vars?.attrs.map((a) => a.name.toLowerCase()).join(' and ')}
+                  {' '}
+                  to enable Reserve and Add to Cart.
+                </span>
+              </div>
+            )}
+
             <div className="row">
               <button
                 type="button"
                 className="btn ghost grow"
-                disabled={(hasVariations && !chosenVar) || availStock < 1 || sellerFulfillment === 'none'}
+                disabled={availStock < 1 || sellerFulfillment === 'none'}
                 onClick={() => {
                   if (sellerFulfillment === 'none') {
                     toast('This listing does not have an active fulfillment method.')
+                    return
+                  }
+                  if (hasVariations && !chosenVar) {
+                    setVariationWarned(true)
                     return
                   }
                   const vid = ensureVariationPicked()

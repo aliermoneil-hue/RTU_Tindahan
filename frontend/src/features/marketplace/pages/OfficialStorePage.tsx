@@ -70,7 +70,7 @@ export function OfficialStorePage() {
       {!listingsLoading && (
         <>
           <div className="srchead school">
-        <div className="stack" style={{ gap: 6, maxWidth: 620 }}>
+        <div className="stack" style={{ gap: 6, maxWidth: 'none' }}>
           <span className="pill yellow" style={{ alignSelf: 'flex-start' }}>
             <Icon name="shield" size="sm" />
             OFFICIAL RTU PASIG STORE
