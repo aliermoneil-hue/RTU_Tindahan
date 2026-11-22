@@ -128,7 +128,26 @@ with SPF and DKIM records pointed at a provider such as Mailtrap, Brevo, or
 Resend. Until then the From address is the Gmail account, and anyone who
 inspects the headers will see it.
 
-### 4.4 Limits to plan around
+### 4.4 The deployment sender
+
+The deployed backend on `kallisto-1` sends as **rtutindahan@gmail.com**, the
+project account rather than a member's personal address, so the sender outlives
+any one person's ownership of the repo. Switching it again is three lines in
+`backend/.env` (`EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`,
+`DEFAULT_FROM_EMAIL`); `backend/set-sender.sh` does it in one step, backs up
+`.env`, and restarts the service:
+
+    cd ~/RTU_Tindahan/backend
+    ./set-sender.sh --dry-run                 # show the diff, write nothing
+    ./set-sender.sh                           # change to rtutindahan@gmail.com
+    ./set-sender.sh --test you@example.com    # apply and send a real message
+
+The App Password is prompted without echo, so it never lands in shell history.
+A new App Password has to be generated for the new account first — an App
+Password is bound to the account that created it, and reusing the old one makes
+Gmail answer `535 5.7.8 Username and Password not accepted`.
+
+### 4.5 Limits to plan around
 
 - Gmail allows roughly 500 recipients per day from a free account.
 - Our throttles are 10 registrations per hour and 20 code resends per hour per

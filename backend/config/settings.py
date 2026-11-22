@@ -51,6 +51,13 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", FRONTEND_URL)
 
+# Behind a TLS-terminating proxy (the Cloudflare tunnel, Tailscale serve) the
+# request arrives over http and the proxy reports https in this header. Django
+# has to trust it at all times, not only when DEBUG is off: otherwise
+# build_absolute_uri() hands out http:// photo links, which an https frontend
+# refuses to load as mixed content. Harmless locally, where the header is absent.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # ---------------------------------------------------------------------------
 # Applications
 # ---------------------------------------------------------------------------
@@ -352,5 +359,6 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    # SECURE_PROXY_SSL_HEADER is set above, outside this block, so that photo
+    # URLs stay https in the deployed build even while DEBUG is on.
     X_FRAME_OPTIONS = "DENY"

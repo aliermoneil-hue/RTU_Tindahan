@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
+from django.views.static import serve as serve_media
 
 from config.views import api_root, health
 
@@ -18,3 +19,15 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+else:
+    # `static()` is a no-op when DEBUG is off, which would leave every uploaded
+    # listing photo as a 404 on the deployed site. The tunnel forwards /media/
+    # straight to this process, so serve it here rather than from a web server
+    # that is not in front of Django yet.
+    urlpatterns += [
+        re_path(
+            r"^media/(?P<path>.*)$",
+            serve_media,
+            {"document_root": settings.MEDIA_ROOT},
+        )
+    ]

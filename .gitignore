@@ -255,3 +255,10 @@ pnpm-debug.log*
 !.vscode/extensions.json
 Thumbs.db
 *.swp
+
+# Local Netlify folder
+.netlify
+
+# Local backup copies and tunnel state
+*.bak
+*.bak-*
