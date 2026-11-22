@@ -72,6 +72,12 @@ export function MyShopPage() {
 
   const sellerList = currentAccount.sellerList || []
   const sellerReq = currentAccount.sellerReq || []
+  // Requests that reached the server. These are what the seller actually
+  // receives; the prototype's sellerReq only ever holds same-browser rows.
+  const incomingApi = apiOrders.filter(
+    (o) => o.seller_email === currentAccount.email,
+  )
+  const openApi = incomingApi.filter((o) => o.is_open)
 
   const views = sellerList.reduce((a, l) => a + l.views, 0)
   const reqs = sellerList.reduce((a, l) => a + l.req, 0)
@@ -329,7 +335,13 @@ export function MyShopPage() {
         {(
           [
             ['overview', 'Overview', ''],
-            ['orders', 'Incoming orders', newCount ? `${newCount} new` : String(openReqs.length)],
+            [
+              'orders',
+              'Incoming orders',
+              newCount
+                ? `${newCount} new`
+                : String(openApi.length || openReqs.length),
+            ],
             [
               'listings',
               isStaffUser ? 'Official store products' : 'Listings',
@@ -350,10 +362,14 @@ export function MyShopPage() {
             {t[2] !== '' && (
               <span
                 className={
-                  t[0] === 'orders' && newCount ? 'pill yellow' : 'tnum muted'
+                  t[0] === 'orders' && (newCount || openApi.length)
+                    ? 'pill yellow'
+                    : 'tnum muted'
                 }
               >
-                {t[0] === 'orders' && newCount ? t[2] : ` (${t[2]})`}
+                {t[0] === 'orders' && (newCount || openApi.length)
+                  ? t[2]
+                  : ` (${t[2]})`}
               </span>
             )}
           </button>
@@ -716,6 +732,43 @@ export function MyShopPage() {
             </div>
           )}
 
+          {openApi.length > 0 && (
+            <div className="card stack">
+              <div className="row between wrap">
+                <b>Incoming orders waiting for you ({openApi.length})</b>
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => setShopTab('orders')}
+                >
+                  Open Incoming orders
+                </button>
+              </div>
+              {openApi.slice(0, 3).map((order) => (
+                <div key={order.reference} className="row between wrap small" style={{ gap: 8 }}>
+                  <span style={{ overflowWrap: 'anywhere', flex: 1 }}>
+                    <b>{order.reference}</b> · {order.buyer_name} ·{' '}
+                    {order.lines.map((l) => `${l.quantity} × ${l.title}`).join(', ')}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn sm"
+                    onClick={() => void actOnOrder(order.reference, 'accepted')}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={() => void actOnOrder(order.reference, 'declined')}
+                  >
+                    Decline
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {openReqs.length > 0 && (
             <div className="card stack">
               <div className="row between wrap">
@@ -745,9 +798,70 @@ export function MyShopPage() {
                   Accept to confirm the campus meetup, or message the buyer to agree on a time.
                 </p>
               </div>
-              <span className="pill">{openReqs.length} open</span>
+              <span className="pill">{openApi.length || openReqs.length} open</span>
             </div>
-            {openReqs.length ? (
+            {incomingApi.length ? (
+              <div className="stack" style={{ gap: 10 }}>
+                {incomingApi.map((order) => (
+                  <div
+                    key={order.reference}
+                    className="row between wrap small"
+                    style={{ gap: 8 }}
+                  >
+                    <span style={{ overflowWrap: 'anywhere', flex: 1 }}>
+                      <b>{order.reference}</b> · {order.buyer_name} ·{' '}
+                      {order.lines
+                        .map((l) => `${l.quantity} × ${l.title}`)
+                        .join(', ')}{' '}
+                      · {peso(Number(order.total_amount))}{' '}
+                      <span className="tiny muted">
+                        {order.meetup_place || 'Pickup'}
+                      </span>
+                    </span>
+                    <span
+                      className={`pill ${
+                        order.status === 'requested'
+                          ? 'yellow'
+                          : order.status === 'accepted'
+                            ? 'green'
+                            : order.status === 'completed'
+                              ? 'navy'
+                              : 'red'
+                      }`}
+                    >
+                      {order.status_display}
+                    </span>
+                    {order.status === 'requested' && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn sm"
+                          onClick={() => void actOnOrder(order.reference, 'accepted')}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          type="button"
+                          className="btn ghost sm"
+                          onClick={() => void actOnOrder(order.reference, 'declined')}
+                        >
+                          Decline
+                        </button>
+                      </>
+                    )}
+                    {order.status === 'accepted' && (
+                      <button
+                        type="button"
+                        className="btn sm"
+                        onClick={() => void actOnOrder(order.reference, 'completed')}
+                      >
+                        Mark completed
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : openReqs.length ? (
               openReqs.map(renderReqRow)
             ) : (
               <p className="small muted">
