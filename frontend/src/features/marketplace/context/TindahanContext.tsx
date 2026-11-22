@@ -260,7 +260,13 @@ function runBaoMigration(snap: DatabaseSnapshot): DatabaseSnapshot {
   const remainingUserListings: UserListingRecord[] = []
   snap.userListings.forEach((ul) => {
     const p = ul.product
-    if (p && !isSvc(p) && (staffEmails.has(ul.ownerEmail) || p.cat === 'Official')) {
+    // Products from the catalogue API already carry the backend's answer in
+    // `off`; promoting them by the owner's role would turn a staff member's
+    // ordinary listing into an Official Store item.
+    const fromApi = typeof p?.off === 'boolean'
+    const shouldPromote =
+      p && !isSvc(p) && (p.cat === 'Official' || (!fromApi && staffEmails.has(ul.ownerEmail)))
+    if (shouldPromote) {
       if (!snap.official.some((o) => o.id === p.id)) {
         const matchedType = baoMatchItemTypeForListing(bao, {
           cat: p.category || p.cat,
