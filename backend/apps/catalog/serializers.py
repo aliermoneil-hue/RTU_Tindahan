@@ -51,8 +51,11 @@ class ListingPhotoSerializer(serializers.ModelSerializer):
         fields = ("id", "url", "alt_text", "sort_order")
 
     def get_url(self, obj: ListingPhoto) -> str:
-        request = self.context.get("request")
-        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+        # Relative on purpose: the browser then fetches photos from the same
+        # origin it loaded the page from, so the host's /media proxy serves and
+        # caches them (a week) instead of every photo opening a second
+        # connection to the backend and skipping the cache.
+        return obj.image.url
 
 
 class ListingVariantSerializer(serializers.ModelSerializer):

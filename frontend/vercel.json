@@ -3,19 +3,19 @@
   "rewrites": [
     {
       "source": "/api/:path(.*)",
-      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/api/:path"
+      "destination": "https://kallisto-1.tail69492d.ts.net/api/:path"
     },
     {
       "source": "/admin/:path(.*)",
-      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/admin/:path"
+      "destination": "https://kallisto-1.tail69492d.ts.net/admin/:path"
     },
     {
       "source": "/static/:path(.*)",
-      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/static/:path"
+      "destination": "https://kallisto-1.tail69492d.ts.net/static/:path"
     },
     {
       "source": "/media/:path(.*)",
-      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/media/:path"
+      "destination": "https://kallisto-1.tail69492d.ts.net/media/:path"
     }
   ]
 }
