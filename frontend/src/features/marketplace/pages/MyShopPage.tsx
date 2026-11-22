@@ -6,6 +6,7 @@ import { isSvc, peso, stamp } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
 import { imgSrc } from '../imageStore'
 import { AvatarBadge } from '../components/AvatarBadge'
+import { PhotoUploader } from '../components/PhotoUploader'
 import { RatingText, StarsDisplay } from '../components/StarRating'
 import './MyShopPage.css'
 
@@ -38,6 +39,7 @@ export function MyShopPage() {
 
   // Quick inline edit state for Official RTU Store products in Admin | RTU Shop
   const [editId, setEditId] = useState<string | null>(null)
+  const [proofPhotos, setProofPhotos] = useState<Record<string, string[]>>({})
   const [opName, setOpName] = useState('')
   const [opType, setOpType] = useState('Uniform')
   const [opPrice, setOpPrice] = useState('')
@@ -172,6 +174,27 @@ export function MyShopPage() {
         </div>
       )}
 
+      {r.state === 'accepted' && (
+        <div className="card flat stack" style={{ background: 'var(--bg)', gap: 8, marginTop: 8 }}>
+          <div className="row between wrap">
+            <b className="small">Meetup / Pickup Photo Proof</b>
+          </div>
+          <p className="tiny muted" style={{ margin: 0 }}>
+            Upload 1 photo of the campus meetup handover as proof before marking picked up
+            (JPEG, PNG, or WebP, up to 5 MB).
+          </p>
+          <PhotoUploader
+            ids={proofPhotos[r.id] || []}
+            max={1}
+            label="Proof photo (1 photo)"
+            hint=""
+            onChange={(nextIds) =>
+              setProofPhotos((prev) => ({ ...prev, [r.id]: nextIds }))
+            }
+          />
+        </div>
+      )}
+
       <div className="row wrap">
         <button
           type="button"
@@ -220,7 +243,10 @@ export function MyShopPage() {
             <button
               type="button"
               className="btn sm"
-              onClick={() => respondSellerRequest(r.id, 'done')}
+              disabled={!(proofPhotos[r.id]?.length ?? false)}
+              onClick={() =>
+                respondSellerRequest(r.id, 'done', proofPhotos[r.id]?.[0] || null)
+              }
             >
               <Icon name="check" size="sm" />
               Mark picked up

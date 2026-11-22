@@ -135,6 +135,7 @@ export interface CartLine {
   deliverySpot?: string
   edit?: boolean
   editing?: boolean
+  selected?: boolean
 }
 
 export interface NotificationLink {

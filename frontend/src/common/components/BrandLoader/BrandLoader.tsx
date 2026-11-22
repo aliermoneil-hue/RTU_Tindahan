@@ -77,15 +77,6 @@ export interface BrandLoaderProps {
   immediate?: boolean;
 }
 
-function getInitialVariant(variant: BrandLoaderVariant): "full" | "compact" {
-  if (variant !== "auto") return variant;
-  try {
-    return window.sessionStorage.getItem(SESSION_KEY) ? "compact" : "full";
-  } catch {
-    return "full";
-  }
-}
-
 function markIntroSeen(): void {
   try {
     window.sessionStorage.setItem(SESSION_KEY, "1");
@@ -280,7 +271,6 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
               return "full";
             }
           })();
-    const currentOnExited = onExitedRef.current;
     const currentTimeScale = timeScaleRef.current;
 
     const prefersReduced = window.matchMedia(

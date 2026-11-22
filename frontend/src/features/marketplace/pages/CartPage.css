@@ -8,11 +8,70 @@
   gap: 18px;
   align-items: start;
 }
+
+/* Selection bar — design-system card pattern */
+.selection-bar {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+/* Checkbox wrapper — clean .check pattern beside thumbnail */
+.check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  gap: 9px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.check input[type="checkbox"] {
+  margin-top: 2px;
+  accent-color: var(--navy);
+  width: 15px;
+  height: 15px;
+}
+
+:root[data-theme='dark'] .check input[type="checkbox"] {
+  accent-color: var(--yellow);
+}
+
+/* Dim unselected cart items — subtle, clean state */
+.cart-item-dimmed {
+  background: var(--soft);
+  border-color: var(--line);
+  opacity: 0.68;
+}
+.cart-item-dimmed .price {
+  color: var(--muted);
+}
+
+/* Selected cart items — crisp */
+.cart-item-selected {
+  background: var(--card);
+  border-color: var(--blue);
+  opacity: 1;
+}
+:root[data-theme='dark'] .cart-item-selected {
+  border-color: var(--line);
+}
+
 .photo.cart-photo {
   width: 68px;
   aspect-ratio: 1;
   flex: none;
 }
+
 @media (max-width: 1000px) {
   .cart-two {
     grid-template-columns: minmax(0, 1fr);

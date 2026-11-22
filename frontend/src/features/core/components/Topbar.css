@@ -213,6 +213,10 @@
   display: block;
 }
 @media (max-width: 900px) {
+  .top::after,
+  .app.sidebar-open .top::after {
+    left: 0;
+  }
   .top {
     padding: 10px 14px;
     grid-template-columns: auto 1fr auto;

@@ -598,6 +598,9 @@ interface TindahanContextValue {
   setCartAgree: (b: boolean) => void
   cartErr: string
   setCartErr: (s: string) => void
+  selectedCartItems: Set<number>
+  toggleCartSelect: (idx: number) => void
+  toggleCartSelectAll: () => void
   addToCart: (id: string, qty: number, vid?: string, fulfillment?: ChosenFulfillment) => boolean
   reserveNow: (id: string, qty: number, vid?: string, fulfillment?: ChosenFulfillment) => void
   updateCartQty: (idx: number, delta: number) => void
@@ -873,6 +876,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   )
   const [cartAgree, setCartAgree] = useState(false)
   const [cartErr, setCartErr] = useState('')
+  const [selectedCartItems, setSelectedCartItems] = useState<Set<number>>(new Set())
   const [lastOrderId, setLastOrderId] = useState<string | null>(null)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [orderTab, setOrderTab] = useState<'Active' | 'Completed' | 'Cancelled'>('Active')
@@ -1624,6 +1628,32 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     [currentAccount],
   )
 
+  const toggleCartSelect = useCallback(
+    (idx: number) => {
+      setSelectedCartItems((prev) => {
+        const next = new Set(prev)
+        if (next.has(idx)) next.delete(idx)
+        else next.add(idx)
+        return next
+      })
+    },
+    [],
+  )
+
+  const toggleCartSelectAll = useCallback(() => {
+    if (!currentAccount) return
+    const allSelected = currentAccount.cart.every((_, i) => selectedCartItems.has(i))
+    setSelectedCartItems((prev) => {
+      const next = new Set(prev)
+      if (allSelected) {
+        currentAccount.cart.forEach((_, i) => next.delete(i))
+      } else {
+        currentAccount.cart.forEach((_, i) => next.add(i))
+      }
+      return next
+    })
+  }, [currentAccount, selectedCartItems])
+
   const updateCartMeetup = useCallback(
     (
       idx: number,
@@ -1681,10 +1711,16 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       setCartErr('Please confirm that you understand how payment works.')
       return
     }
-    if (!currentAccount.cart.length) return
+    const selectedIdx = Array.from(selectedCartItems)
+    if (!selectedIdx.length) {
+      setCartErr('Select at least 1 item to continue.')
+      toast('Select at least 1 item to continue.')
+      return
+    }
+    const selectedCart = selectedIdx.map((i) => currentAccount.cart[i]).filter(Boolean)
 
-    // Validate cart items
-    for (const c of currentAccount.cart) {
+    // Validate selected cart items
+    for (const c of selectedCart) {
       const p = byId(c.id)
       if (!p || !allOnSale.some((x) => x.id === c.id)) {
         const msg = 'An item in your cart is no longer available. Remove it to continue.'
@@ -1760,7 +1796,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         String(now.getDate()).padStart(2, '0')
 
       const groups = new Map<string, { c: CartLine; p: PrototypeProduct }[]>()
-      buyer.cart.forEach((c) => {
+      selectedIdx.forEach((idx) => {
+        const c = buyer.cart[idx]
+        if (!c) return
         const p = findProductInNext(c.id)
         if (!p) return
         if (!groups.has(p.seller)) groups.set(p.seller, [])
@@ -2115,7 +2153,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         conv.seen[buyer.email] = conv.msgs.length
       })
 
-      buyer.cart = []
+      // Remove only selected items from cart; unselected items stay
+      const selectedSet = new Set(selectedIdx)
+      buyer.cart = buyer.cart.filter((_, i) => !selectedSet.has(i))
       firstOrder = madeOrders[0] || null
       orderCount = madeOrders.length
       return next
@@ -2137,7 +2177,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         )
       }
     }, 0)
-  }, [currentAccount, cartAgree, cartMsg, byId, allOnSale, baoOrderProblem, toast])
+  }, [currentAccount, cartAgree, cartMsg, selectedCartItems, byId, allOnSale, baoOrderProblem, toast])
 
   // Buyer Order Actions
   const proposeOrderMeetup = useCallback(
@@ -7393,11 +7433,14 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       setCartAgree,
       cartErr,
       setCartErr,
+      selectedCartItems,
       addToCart,
       reserveNow,
       updateCartQty,
       removeCartLine,
       toggleCartEdit,
+      toggleCartSelect,
+      toggleCartSelectAll,
       updateCartMeetup,
       sendMeetupRequest,
       lastOrderId,
@@ -7553,6 +7596,8 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       updateCartQty,
       removeCartLine,
       toggleCartEdit,
+      toggleCartSelect,
+      toggleCartSelectAll,
       updateCartMeetup,
       sendMeetupRequest,
       lastOrderId,

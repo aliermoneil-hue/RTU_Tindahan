@@ -111,11 +111,18 @@ export function AppLayout({ user, activePath, children }: AppLayoutProps) {
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [isMobileMenuOpen])
+
+  // Safety net: close the mobile drawer whenever the route changes,
+  // so topbar navigation always dismisses the drawer.
+  useEffect(() => {
+    setIsMobileMenuOpen(false)
+  }, [activePath])
   return (
     <div className={`app ${isSidebarOpen ? 'sidebar-open' : ''} ${isMobileMenuOpen ? 'mobile-drawer-open' : ''}`}>
       <Topbar
         user={user}
         onMenuClick={() => setIsMobileMenuOpen((prev) => !prev)}
+        onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
       />
       {/* Mobile-only click-outside backdrop — renders only when drawer is open (< 768px) */}
       {isMobileMenuOpen && (
