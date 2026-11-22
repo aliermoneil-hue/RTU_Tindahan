@@ -150,9 +150,10 @@ export function mergeApiConversations<T extends { conv: Conversation[] }>(
   )
   const local = prev.conv.filter((c) => {
     if (c.id.startsWith(MESSAGE_ID_PREFIX)) return false
-    // A checkout used to leave an empty thread with no other side; nothing the
-    // user types there can ever be delivered.
-    if (!c.seller && c.msgs.length === 0) return false
+    // A thread with no other side cannot be delivered: it is either the old
+    // checkout's leftover or the prototype's "RTU Pasig Campus Store" chat.
+    // Keeping it in the list made one request look like two different people.
+    if (!c.seller) return false
     // A prototype duplicate of a pair the server already carries would split
     // the conversation in two.
     const pair = [c.buyer, c.seller || ''].sort().join('|')

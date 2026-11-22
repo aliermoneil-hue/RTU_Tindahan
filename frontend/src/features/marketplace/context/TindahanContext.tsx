@@ -4606,6 +4606,38 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       if (!cleanText) return false
       const o = currentAccount.orders.find((x) => x.id === orderId)
       if (!o) return false
+
+      // A request that lives on the server has a server thread. Writing this
+      // into the local snapshot instead invented a partner called "RTU Pasig
+      // Campus Store" that nobody could answer.
+      const remote = apiOrders.find((row) => row.reference === orderId)
+      if (remote) {
+        const asBuyer = remote.buyer_email === currentAccount.email
+        void (async () => {
+          try {
+            const conversation = await openConversation({
+              ...(asBuyer
+                ? { sellerEmail: remote.seller_email }
+                : { buyerEmail: remote.buyer_email }),
+              listingSlug: remote.lines[0]?.listing_slug || null,
+            })
+            await postChatMessage(conversation.id, cleanText)
+            await refreshConversations()
+            if (navigateToMessages) {
+              setSelectedConvId(`api:cv-${conversation.id}`)
+              navigate('messages')
+            }
+          } catch (err) {
+            toast(
+              err instanceof ApiRequestError
+                ? err.message
+                : 'That message could not be sent.',
+            )
+          }
+        })()
+        return true
+      }
+
       let targetConvId = ''
       const now = new Date().toISOString()
 
@@ -4677,7 +4709,13 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       }
       return true
     },
-    [currentAccount, isStaffUser, toast],
+    [
+      currentAccount,
+      isStaffUser,
+      toast,
+      apiOrders,
+      refreshConversations,
+    ],
   )
 
   const openSellerRequestChat = useCallback(
