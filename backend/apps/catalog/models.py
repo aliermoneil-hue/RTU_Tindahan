@@ -61,6 +61,11 @@ class Listing(models.Model):
         NEEDS_REVIEW = "needs_review", "Needs review"
         REJECTED = "rejected", "Rejected"
 
+    class Fulfillment(models.TextChoices):
+        PICKUP = "pickup", "Campus pickup"
+        DELIVERY = "delivery", "Campus delivery"
+        BOTH = "both", "Pickup or delivery"
+
     class AvailabilityStatus(models.TextChoices):
         AVAILABLE = "available", "Available"
         SOLD = "sold", "Sold"
@@ -96,6 +101,14 @@ class Listing(models.Model):
         default=1, validators=[MinValueValidator(1)]
     )
     meetup_place = models.CharField(max_length=200)
+    # What the seller offers for this item. The cart needs it before it can
+    # finish a request: a listing with no method reads "Not configured" and
+    # blocks checkout.
+    fulfillment = models.CharField(
+        max_length=10,
+        choices=Fulfillment.choices,
+        default=Fulfillment.PICKUP,
+    )
 
     # ST-01/ST-02: the Official Store reuses this model.
     is_official = models.BooleanField(default=False, db_index=True)

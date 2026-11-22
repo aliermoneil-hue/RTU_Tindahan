@@ -62,6 +62,7 @@ export interface ApiListing {
   status: string
   moderation_status: string
   availability_status: string
+  fulfillment: 'pickup' | 'delivery' | 'both'
   view_count: number
   sold_count: number
   created_at: string
@@ -203,6 +204,7 @@ export function toPrototypeProduct(dto: ApiListing): PrototypeProduct {
     vars,
     soldCount: dto.sold_count,
     hidden: false,
+    fulfillment: dto.fulfillment ?? 'pickup',
   }
 }
 
@@ -325,6 +327,8 @@ export interface NewListingInput {
   meetupPlace: string
   /** Stored draft images, in the order they should appear. */
   photos: string[]
+  /** What the seller offers: campus pickup, delivery, or either. */
+  fulfillment?: 'pickup' | 'delivery' | 'both'
 }
 
 /**
@@ -350,6 +354,7 @@ export async function createListing(input: NewListingInput): Promise<ApiListing>
   form.set('price', input.price.toFixed(2))
   form.set('quantity', String(Math.max(1, Math.floor(input.quantity))))
   form.set('meetup_place', input.meetupPlace.trim())
+  form.set('fulfillment', input.fulfillment ?? 'pickup')
 
   input.photos.forEach((src, index) => {
     const file = dataUrlToFile(src, index)

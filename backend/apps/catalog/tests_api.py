@@ -125,6 +125,45 @@ class ListingApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    # -- fulfillment method (what the cart needs to finish a request) -------
+
+    def test_a_new_listing_defaults_to_campus_pickup(self):
+        self.client.force_authenticate(self.seller)
+        response = self.client.post("/api/v1/listings/", self.payload(), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["fulfillment"], "pickup")
+        self.assertEqual(
+            Listing.objects.get(slug=response.json()["slug"]).fulfillment, "pickup"
+        )
+
+    def test_a_seller_can_offer_pickup_and_delivery(self):
+        self.client.force_authenticate(self.seller)
+        response = self.client.post(
+            "/api/v1/listings/", self.payload(fulfillment="both"), format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["fulfillment"], "both")
+
+    def test_an_unknown_fulfillment_method_is_rejected(self):
+        self.client.force_authenticate(self.seller)
+        response = self.client.post(
+            "/api/v1/listings/", self.payload(fulfillment="teleport"), format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("fulfillment", response.json())
+
+    def test_the_read_payload_carries_the_fulfillment_method(self):
+        self.make_listing(
+            moderation_status=Listing.ModerationStatus.APPROVED, fulfillment="delivery"
+        )
+
+        response = self.client.get("/api/v1/listings/")
+
+        self.assertEqual(response.json()["results"][0]["fulfillment"], "delivery")
+
     def test_filters_by_category_and_search(self):
         self.make_listing(moderation_status=Listing.ModerationStatus.APPROVED)
         self.make_listing(

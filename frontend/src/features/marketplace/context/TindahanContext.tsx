@@ -3421,9 +3421,16 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
             price: Number(draft.price) || 0,
             quantity: svc ? 1 : Math.floor(Number(draft.qty) || 1),
             meetupPlace: draft.place,
+            fulfillment:
+              draft.fulfillment === 'pickup' ||
+              draft.fulfillment === 'delivery' ||
+              draft.fulfillment === 'both'
+                ? draft.fulfillment
+                : 'pickup',
             photos: validImages.map((id) => imgSrc(id)).filter(Boolean),
           })
           await refreshListings()
+          await refreshMyListings()
           setDraft(blankDraft(isStaffUser))
           setDraftErrs({})
           setListStep(1)

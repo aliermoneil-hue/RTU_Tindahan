@@ -112,6 +112,7 @@ class ListingReadSerializer(serializers.ModelSerializer):
             "is_official",
             "moderation_status",
             "availability_status",
+            "fulfillment",
             "status",
             "rejection_reason",
             "view_count",
@@ -165,6 +166,7 @@ class ListingWriteSerializer(serializers.ModelSerializer):
             "price",
             "quantity",
             "meetup_place",
+            "fulfillment",
             "upload_photos",
         )
 
