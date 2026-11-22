@@ -56,6 +56,12 @@ import {
   type ApiPage,
 } from '../api/listings'
 import {
+  createOrder as createApiOrder,
+  fetchOrders as fetchApiOrders,
+  transitionOrder as transitionApiOrder,
+  type ApiOrder,
+} from '../api/orders'
+import {
   STORE_ID_PREFIX,
   createTicket,
   fetchStock,
@@ -576,6 +582,14 @@ interface TindahanContextValue {
   /** The signed-in member's own listings, any moderation state. */
   myListings: ApiListing[]
   refreshMyListings: () => Promise<void>
+  /** Server-side requests: what I bought and what I sold. */
+  apiOrders: ApiOrder[]
+  refreshOrders: () => Promise<void>
+  /** Seller side: accept, decline or complete. Buyer side: cancel. */
+  actOnOrder: (
+    reference: string,
+    status: 'accepted' | 'declined' | 'completed' | 'cancelled',
+  ) => Promise<boolean>
   /** Approve or reject a listing in Django, then refresh the queue and catalogue. */
   moderateListing: (slug: string, decision: 'approve' | 'reject', reason?: string) => Promise<boolean>
   hasSettledInitialFetch: boolean
@@ -860,6 +874,62 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Student-to-student requests live on the server too, so the seller really
+  // receives them. Both roles are fetched: one call returns what I bought and
+  // what I sold.
+  const [apiOrders, setApiOrders] = useState<ApiOrder[]>([])
+  const refreshOrders = useCallback(async () => {
+    if (!getToken()) {
+      setApiOrders([])
+      return
+    }
+    try {
+      const list = await fetchApiOrders()
+      setApiOrders(list)
+      // Keep the buyer's local order record in step with the seller's answer,
+      // so one screen cannot say "Awaiting seller" while the other says
+      // "Accepted".
+      const email = user?.email
+      if (email) {
+        setDb((prev) => {
+          const me = prev.accounts.find((a) => a.email === email)
+          if (!me) return prev
+          let changed = false
+          const orders = me.orders.map((order) => {
+            const remote = list.find((row) => row.reference === order.id)
+            if (!remote) return order
+            const status: OrderRecord['status'] =
+              remote.status === 'accepted'
+                ? 'Meetup set'
+                : remote.status === 'completed'
+                  ? 'Completed'
+                  : remote.status === 'requested'
+                    ? 'Awaiting seller'
+                    : 'Cancelled'
+            const tab: 'Active' | 'Completed' | 'Cancelled' =
+              remote.status === 'completed'
+                ? 'Completed'
+                : remote.status === 'cancelled' || remote.status === 'declined'
+                  ? 'Cancelled'
+                  : 'Active'
+            if (order.status === status && order.tab === tab) return order
+            changed = true
+            return { ...order, status, tab }
+          })
+          if (!changed) return prev
+          return {
+            ...prev,
+            accounts: prev.accounts.map((a) =>
+              a.email === email ? { ...a, orders } : a,
+            ),
+          }
+        })
+      }
+    } catch {
+      /* backend offline: keep what was loaded */
+    }
+  }, [user])
+
   // The moderation queue lives on the server; the mount effect fills it.
   const [pendingListings, setPendingListings] = useState<ApiListing[]>([])
   const refreshPendingListings = useCallback(async () => {
@@ -889,6 +959,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           await refreshListings()
           await refreshPendingListings()
           await refreshMyListings()
+          await refreshOrders()
         }
       } catch {
         /* backend offline or CORS blocked: keep the local catalogue */
@@ -901,7 +972,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [refreshListings, refreshPendingListings, refreshMyListings])
+  }, [refreshListings, refreshPendingListings, refreshMyListings, refreshOrders])
 
   // The Official Store's tickets and stock ledger live on the server too, but
   // only staff accounts may read them. The merge replaces the prototype's demo
@@ -1885,7 +1956,10 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const commit = (officialRef?: string) => {
+    const commit = (refs?: {
+      officialRef?: string
+      bySeller?: Record<string, string>
+    }) => {
     let firstOrder: OrderRecord | null = null
     let orderCount = 0
 
@@ -1922,12 +1996,13 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           ? next.accounts.find((a) => a.email === f.p.owner)
           : undefined
 
-        // An Official Store request already exists on the server, posted before
-        // this snapshot was built; its reference is the id both sides quote.
+        // A request may already exist on the server — an Official Store ticket
+        // or a student-to-student order — posted before this snapshot was
+        // built. Its reference is the id both sides quote.
+        const isOfficialGroup = !owner && (f.p.off === true || f.p.cat === 'Official')
         const serverRef =
-          !owner && (f.p.off === true || f.p.cat === 'Official') && officialRef
-            ? officialRef
-            : null
+          (isOfficialGroup ? refs?.officialRef : refs?.bySeller?.[f.p.owner || '']) ||
+          null
 
         const orderId =
           serverRef || `RTU-${dayCode}-${String(next.seq.o++).padStart(3, '0')}`
@@ -2302,51 +2377,108 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     const officialLines = currentAccount.cart
       .map((c) => ({ c, p: byId(c.id) }))
       .filter((x) => x.p && (x.p.off === true || x.p.cat === 'Official'))
-    const postableLines = officialLines.filter(
+    const postableOfficial = officialLines.filter(
       (x) => x.p?.apiListingId && /^v\d+$/.test(x.c.vid || ''),
     )
 
-    if (!getToken() || !postableLines.length || postableLines.length !== officialLines.length) {
+    // Everything else that came from the backend belongs to a student seller,
+    // and goes to /orders/ so that seller actually receives it.
+    const sellerGroups = new Map<
+      string,
+      Array<{ c: CartLine; p: PrototypeProduct }>
+    >()
+    currentAccount.cart.forEach((c) => {
+      const p = byId(c.id)
+      if (!p || p.off === true || p.cat === 'Official' || !p.apiListingId) return
+      const owner = p.owner || ''
+      if (!owner.includes('@') || owner === currentAccount.email) return
+      if (!sellerGroups.has(owner)) sellerGroups.set(owner, [])
+      sellerGroups.get(owner)!.push({ c, p })
+    })
+
+    const canPostOfficial =
+      Boolean(getToken()) &&
+      postableOfficial.length > 0 &&
+      postableOfficial.length === officialLines.length
+    const canPostOrders = Boolean(getToken()) && sellerGroups.size > 0
+
+    if (!canPostOfficial && !canPostOrders) {
       commit()
       return
     }
 
     void (async () => {
       try {
-        const ticket = await createTicket({
-          items: postableLines.map((x) => ({
-            listing: x.p!.apiListingId as number,
-            variant: Number((x.c.vid || '').slice(1)),
-            quantity: x.c.qty,
-          })),
-          pickupDate: null,
-          claimNotes: (cartMsg || '').trim(),
-        })
-        commit(ticket.reference)
+        let officialRef: string | undefined
+        const bySeller: Record<string, string> = {}
+
+        if (canPostOfficial) {
+          const ticket = await createTicket({
+            items: postableOfficial.map((x) => ({
+              listing: x.p!.apiListingId as number,
+              variant: Number((x.c.vid || '').slice(1)),
+              quantity: x.c.qty,
+            })),
+            pickupDate: null,
+            claimNotes: (cartMsg || '').trim(),
+          })
+          officialRef = ticket.reference
+        }
+
+        for (const [owner, items] of sellerGroups) {
+          const order = await createApiOrder({
+            lines: items.map((x) => ({
+              listing: x.p.apiListingId as number,
+              quantity: x.c.qty,
+            })),
+            fulfillment: items[0].p.fulfillment ?? 'pickup',
+            meetupPlace: items[0].c.place || items[0].p.when,
+            meetupTime: items[0].c.time || '',
+            note: (cartMsg || '').trim(),
+          })
+          bySeller[owner] = order.reference
+        }
+
+        commit({ officialRef, bySeller })
+
         // The snapshot update runs inside React's render pass, so the local
         // `firstOrder` may not be set by the time the inner timeout fires. The
         // reference is known here, so open the confirmation screen with it.
-        setTimeout(() => {
-          setLastOrderId(ticket.reference)
-          setSelectedOrderId(ticket.reference)
-          setOrderTab('Active')
-          setCartStep(1)
-          setCartAgree(false)
-          setCartErr('')
-          navigate('confirm')
-          toast(`Request sent. Your ticket is ${ticket.reference}.`)
-        }, 50)
+        const firstRef = officialRef || Object.values(bySeller)[0]
+        if (firstRef) {
+          setTimeout(() => {
+            setLastOrderId(firstRef)
+            setSelectedOrderId(firstRef)
+            setOrderTab('Active')
+            setCartStep(1)
+            setCartAgree(false)
+            setCartErr('')
+            navigate('confirm')
+            toast(`Request sent. Your reference is ${firstRef}.`)
+          }, 50)
+        }
         void refreshStore()
+        void refreshOrders()
       } catch (err) {
         const msg =
           err instanceof ApiRequestError
             ? err.message
-            : 'The store could not accept this request. Please try again.'
+            : 'The request could not be sent. Please try again.'
         setCartErr(msg)
         toast(msg)
       }
     })()
-  }, [currentAccount, cartAgree, cartMsg, byId, allOnSale, baoOrderProblem, toast, refreshStore])
+  }, [
+    currentAccount,
+    cartAgree,
+    cartMsg,
+    byId,
+    allOnSale,
+    baoOrderProblem,
+    toast,
+    refreshStore,
+    refreshOrders,
+  ])
 
   // Buyer Order Actions
   const proposeOrderMeetup = useCallback(
@@ -7721,7 +7853,31 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     return Math.max(1, Math.round(raw.length / 1024))
   }, [db])
 
-  const value = useMemo<TindahanContextValue>(
+    // One call for both sides of an order: the seller accepts, declines or
+  // completes; the buyer cancels. The server decides which is allowed.
+  const actOnOrder = useCallback(
+    async (
+      reference: string,
+      status: 'accepted' | 'declined' | 'completed' | 'cancelled',
+    ): Promise<boolean> => {
+      try {
+        await transitionApiOrder(reference, status)
+        await refreshOrders()
+        toast(`Order ${reference} is now ${status}.`)
+        return true
+      } catch (err) {
+        toast(
+          err instanceof ApiRequestError
+            ? err.message
+            : 'The server did not accept that change.',
+        )
+        return false
+      }
+    },
+    [refreshOrders, toast],
+  )
+
+const value = useMemo<TindahanContextValue>(
     () => ({
       db,
       currentAccount,
@@ -7733,6 +7889,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       pendingListings,
       myListings,
       refreshMyListings,
+      apiOrders,
+      refreshOrders,
+      actOnOrder,
       moderateListing,
       hasSettledInitialFetch,
       toastMsg,
@@ -7895,6 +8054,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       pendingListings,
       myListings,
       refreshMyListings,
+      apiOrders,
+      refreshOrders,
+      actOnOrder,
       moderateListing,
       currentAccount,
       isStaffUser,

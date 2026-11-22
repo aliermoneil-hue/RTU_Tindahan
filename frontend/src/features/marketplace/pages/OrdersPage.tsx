@@ -74,6 +74,9 @@ export function OrdersPage() {
     submitReview,
     openModal,
     toast,
+    apiOrders,
+    actOnOrder,
+    refreshOrders,
   } = useTindahan()
 
   const [openBox, setOpenBox] = useState<'' | 'msg' | 'edit' | 'cancel' | 'proof'>('')
@@ -139,6 +142,61 @@ export function OrdersPage() {
           Follow each meetup from request to in-person pickup.
         </p>
       </div>
+
+      {(() => {
+        // Requests this member sent to another student. They live on the
+        // server so the seller receives them; the status here is the seller's
+        // answer, not a local guess.
+        const sent = apiOrders.filter((o) => o.buyer_email === currentAccount.email)
+        if (!sent.length) return null
+        return (
+          <div className="card stack">
+            <div className="row between">
+              <b>Requests you sent</b>
+              <button
+                type="button"
+                className="btn ghost sm"
+                onClick={() => void refreshOrders()}
+              >
+                Refresh
+              </button>
+            </div>
+            <div className="stack" style={{ gap: 10 }}>
+              {sent.map((order) => (
+                <div key={order.reference} className="row between wrap small" style={{ gap: 8 }}>
+                  <span style={{ overflowWrap: 'anywhere', flex: 1 }}>
+                    <b>{order.reference}</b> · {order.seller_name} ·{' '}
+                    {order.lines.map((l) => `${l.quantity} × ${l.title}`).join(', ')} ·{' '}
+                    {peso(Number(order.total_amount))}
+                  </span>
+                  <span
+                    className={`pill ${
+                      order.status === 'requested'
+                        ? 'yellow'
+                        : order.status === 'accepted'
+                          ? 'green'
+                          : order.status === 'completed'
+                            ? 'navy'
+                            : 'red'
+                    }`}
+                  >
+                    {order.status_display}
+                  </span>
+                  {order.is_open && (
+                    <button
+                      type="button"
+                      className="btn ghost sm"
+                      onClick={() => void actOnOrder(order.reference, 'cancelled')}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="tabs" role="tablist">
         {tabs.map((t) => {

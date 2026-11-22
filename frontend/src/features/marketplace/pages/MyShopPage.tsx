@@ -55,6 +55,9 @@ export function MyShopPage() {
     setListStep,
     myListings,
     refreshMyListings,
+    apiOrders,
+    refreshOrders,
+    actOnOrder,
   } = useTindahan()
 
   // Quick inline edit state for Official RTU Store products in Admin | RTU Shop
@@ -456,6 +459,91 @@ export function MyShopPage() {
               </div>
             ))}
           </div>
+
+          {/* Requests from other students. These live on the server, which is
+              what makes them appear here at all — they used to be written into
+              the buyer's own browser and never arrived. */}
+          {(() => {
+            const incoming = apiOrders.filter(
+              (o) => o.seller_email === currentAccount.email,
+            )
+            if (!incoming.length) return null
+            return (
+              <div className="card stack">
+                <div className="row between">
+                  <b>Incoming requests</b>
+                  <span className="tiny muted">{incoming.length} total</span>
+                </div>
+                <div className="stack" style={{ gap: 10 }}>
+                  {incoming.map((order) => (
+                    <div
+                      key={order.reference}
+                      className="row between wrap small"
+                      style={{ gap: 8 }}
+                    >
+                      <span style={{ overflowWrap: 'anywhere', flex: 1 }}>
+                        <b>{order.reference}</b> · {order.buyer_name} ·{' '}
+                        {order.lines
+                          .map((l) => `${l.quantity} × ${l.title}`)
+                          .join(', ')}{' '}
+                        · {peso(Number(order.total_amount))}{' '}
+                        <span className="tiny muted">
+                          {order.meetup_place || 'Pickup'}
+                        </span>
+                      </span>
+                      <span
+                        className={`pill ${
+                          order.status === 'requested'
+                            ? 'yellow'
+                            : order.status === 'accepted'
+                              ? 'green'
+                              : order.status === 'completed'
+                                ? 'navy'
+                                : 'red'
+                        }`}
+                      >
+                        {order.status_display}
+                      </span>
+                      {order.status === 'requested' && (
+                        <>
+                          <button
+                            type="button"
+                            className="btn sm"
+                            onClick={() => void actOnOrder(order.reference, 'accepted')}
+                          >
+                            Accept
+                          </button>
+                          <button
+                            type="button"
+                            className="btn ghost sm"
+                            onClick={() => void actOnOrder(order.reference, 'declined')}
+                          >
+                            Decline
+                          </button>
+                        </>
+                      )}
+                      {order.status === 'accepted' && (
+                        <button
+                          type="button"
+                          className="btn sm"
+                          onClick={() => void actOnOrder(order.reference, 'completed')}
+                        >
+                          Mark completed
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="btn ghost sm"
+                  onClick={() => void refreshOrders()}
+                >
+                  Refresh
+                </button>
+              </div>
+            )
+          })()}
 
           {/* The marketplace only shows published rows, so a listing that is
               still waiting for approval would otherwise disappear from the
