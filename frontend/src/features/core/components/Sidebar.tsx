@@ -39,7 +39,7 @@ const PATH_ALIASES: Record<string, string> = {
  * Sections are collapsible accordions; the yellow scrollbar appears on hover.
  */
 export function Sidebar({ activePath, role, open, isOpen, onClose, onToggle }: SidebarProps) {
-  const { db, currentAccount, isStaffUser, clearBrowseFilters } = useTindahan()
+  const { db, currentAccount, isStaffUser, canModerate, clearBrowseFilters } = useTindahan()
 
   const normalizedActive = PATH_ALIASES[activePath] || activePath
   const showAdmin = isStaffUser || canSeeAdmin(role)
@@ -192,7 +192,7 @@ export function Sidebar({ activePath, role, open, isOpen, onClose, onToggle }: S
                   id={`section-${section}`}
                   className={`section-content ${isSectionCollapsed(section) ? 'collapsed-section' : ''}`}
                 >
-                  {APP_PAGES.filter((p) => p.section === section).map((p) => {
+                  {APP_PAGES.filter((p) => p.section === section && (p.path !== 'moderation' || canModerate)).map((p) => {
                     const badge = badgeFor(p.path)
                     const isOn = normalizedActive === p.path
                     return (

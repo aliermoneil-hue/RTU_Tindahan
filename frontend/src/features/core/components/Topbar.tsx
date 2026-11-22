@@ -31,6 +31,7 @@ export function Topbar({ user, onMenuClick }: TopbarProps) {
   const {
     currentAccount,
     isStaffUser,
+    canModerate,
     cartCount,
     unreadMessagesCount,
     browseState,
@@ -213,9 +214,11 @@ export function Topbar({ user, onMenuClick }: TopbarProps) {
                 {isStaffUser && (
                   <>
                     <hr />
-                    <Link to="moderation" className="mi" role="menuitem" onClick={() => setOpen('')}>
-                      <Icon name="flag" /> Listing approval
-                    </Link>
+                    {canModerate && (
+                      <Link to="moderation" className="mi" role="menuitem" onClick={() => setOpen('')}>
+                        <Icon name="flag" /> Listing approval
+                      </Link>
+                    )}
                     <Link to="staff" className="mi" role="menuitem" onClick={() => setOpen('')}>
                       <Icon name="sliders" /> Staff tools
                     </Link>

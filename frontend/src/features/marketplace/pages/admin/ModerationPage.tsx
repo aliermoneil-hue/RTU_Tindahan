@@ -3,6 +3,7 @@ import { Icon } from '@/common/components/Icon'
 import type { IconName } from '@/common/components/icons'
 import { navigate } from '@/common/router/router'
 import { catOf, peso, subOf } from '../../constants'
+import { API_ID_PREFIX } from '../../api/listings'
 import { useTindahan } from '../../context/TindahanContext'
 import { IMG_RULES, imgSrc, imgsOf } from '../../imageStore'
 import './ModerationPage.css'
@@ -10,7 +11,9 @@ import './ModerationPage.css'
 export function ModerationPage() {
   const {
     db,
-    isStaffUser,
+    canModerate,
+    pendingListings,
+    moderateListing,
     modTab,
     setModTab,
     selectedFlagId,
@@ -27,10 +30,29 @@ export function ModerationPage() {
   const [activeImgIdx, setActiveImgIdx] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
 
-  const openFlags = db.flags.filter((f) => f.state === 'open')
-  const doneFlags = db.flags.filter((f) => f.state !== 'open')
+  // The real queue comes from Django. Each row is shaped like a flag so the
+  // detail panel below can render it unchanged; `apiSlug` marks the ones whose
+  // decision must go to the server rather than to the local prototype state.
+  const apiRows = pendingListings.map(
+    (dto) =>
+      ({
+        id: `api-flag:${dto.slug}`,
+        lid: `${API_ID_PREFIX}${dto.slug}`,
+        state: 'open',
+        pri: 'Waiting for approval',
+        // The panel below reads these three straight off the row, so carry the
+        // listing's own values instead of leaving them blank.
+        title: dto.title,
+        price: Number(dto.price),
+        seller: dto.seller_name,
+      }) as (typeof db.flags)[number],
+  )
+  const openFlags = [...apiRows, ...db.flags.filter((x) => x.state === 'open')]
+  const doneFlags = db.flags.filter((x) => x.state !== 'open')
   const list = modTab === 'open' ? openFlags : doneFlags
   const f = list.find((x) => x.id === selectedFlagId) || list[0]
+  const apiSlug =
+    f && String(f.id).startsWith('api-flag:') ? String(f.id).slice('api-flag:'.length) : ''
   const lst = f ? db.userListings.find((l) => l.lid === f.lid) : undefined
   const p = lst?.product
 
@@ -40,10 +62,13 @@ export function ModerationPage() {
     setLightboxOpen(false)
   }, [f?.id])
 
-  if (!isStaffUser) {
+  if (!canModerate) {
     return (
       <div className="card stack">
-        <b>This page is for RTU staff accounts only.</b>
+        <b>Only a moderator or an administrator can approve listings.</b>
+        <span className="tiny muted">
+          Office Staff run the Official Store instead — see Store orders and Store inventory.
+        </span>
       </div>
     )
   }
@@ -174,7 +199,9 @@ export function ModerationPage() {
                   }}
                 >
                   <div className="row between">
-                    <span className="tiny muted">{x.id}</span>
+                    <span className="tiny muted">
+                      {String(x.id).startsWith('api-flag:') ? 'New submission' : x.id}
+                    </span>
                     <span
                       className={`pill ${
                         x.state === 'approved'
@@ -413,7 +440,8 @@ export function ModerationPage() {
                       type="button"
                       className="btn"
                       onClick={() => {
-                        decideFlag('approved', modNote)
+                        if (apiSlug) void moderateListing(apiSlug, 'approve')
+                        else decideFlag('approved', modNote)
                         setModNote('')
                       }}
                     >
@@ -424,7 +452,8 @@ export function ModerationPage() {
                       type="button"
                       className="btn danger"
                       onClick={() => {
-                        decideFlag('removed', modNote)
+                        if (apiSlug) void moderateListing(apiSlug, 'reject', modNote)
+                        else decideFlag('removed', modNote)
                         setModNote('')
                       }}
                     >

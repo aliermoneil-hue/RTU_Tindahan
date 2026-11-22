@@ -51,6 +51,8 @@ import {
   createListing,
   fetchListings,
   mergeApiCatalogue,
+  type ApiListing,
+  type ApiPage,
 } from '../api/listings'
 import { navigate } from '@/common/router/router'
 import { useAuth } from '@/features/authentication'
@@ -547,9 +549,19 @@ interface TindahanContextValue {
   db: DatabaseSnapshot
   currentAccount: PrototypeAccount | null
   isStaffUser: boolean
+  /**
+   * Listing approval belongs to moderators and administrators, per the role
+   * split in the SRS. Office Staff run the Official Store instead, so they see
+   * the store screens but not the moderation queue.
+   */
+  canModerate: boolean
   storageOk: boolean
   storageKb: number
   listingsLoading: boolean
+  /** Listings waiting for a moderator, straight from the server. */
+  pendingListings: ApiListing[]
+  /** Approve or reject a listing in Django, then refresh the queue and catalogue. */
+  moderateListing: (slug: string, decision: 'approve' | 'reject', reason?: string) => Promise<boolean>
   hasSettledInitialFetch: boolean
   toastMsg: string | null
   toast: (msg: string) => void
@@ -789,6 +801,7 @@ const TindahanContext = createContext<TindahanContextValue | null>(null)
 
 export function TindahanProvider({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth()
+  const canModerate = user?.role === 'moderator' || user?.role === 'administrator'
   const [db, setDb] = useState<DatabaseSnapshot>(() => {
     loadImgs()
     try {
@@ -820,6 +833,19 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     setDb((prev) => mergeApiCatalogue(prev, listings))
   }, [])
 
+  // The moderation queue lives on the server; the mount effect fills it.
+  const [pendingListings, setPendingListings] = useState<ApiListing[]>([])
+  const refreshPendingListings = useCallback(async () => {
+    try {
+      const page = await apiFetch<ApiPage<ApiListing>>(
+        '/listings/?status=pending_screening,needs_review',
+      )
+      setPendingListings(page.results ?? [])
+    } catch {
+      /* backend offline: leave the queue as it was */
+    }
+  }, [])
+
   // -----------------------------------------------------------------------
   // Load the published catalogue from Django once per page load.
   //
@@ -832,7 +858,10 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     const run = async () => {
       try {
-        if (!cancelled) await refreshListings()
+        if (!cancelled) {
+          await refreshListings()
+          await refreshPendingListings()
+        }
       } catch {
         /* backend offline or CORS blocked: keep the local catalogue */
       } finally {
@@ -844,7 +873,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [refreshListings])
+  }, [refreshListings, refreshPendingListings])
 
   // UI overlays
   const [toastMsg, setToastMsg] = useState<string | null>(null)
@@ -858,6 +887,35 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
 
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogConfig | null>(null)
+
+  // -----------------------------------------------------------------------
+  // Moderation decisions, straight from the catalogue API.
+  //
+  // The queue used to be prototype flags with no backend behind them. This
+  // power the staff decision buttons that actually change a listing in Django.
+  // -----------------------------------------------------------------------
+  /** Approve or reject a listing on the server, then refresh both lists. */
+  const moderateListing = useCallback(
+    async (slug: string, decision: 'approve' | 'reject', reason = '') => {
+      try {
+        await apiFetch<ApiListing>(`/listings/${encodeURIComponent(slug)}/${decision}/`, {
+          method: 'POST',
+          body: decision === 'reject' ? { reason } : {},
+        })
+        await Promise.all([refreshPendingListings(), refreshListings()])
+        toast(
+          decision === 'approve'
+            ? 'Listing approved and published.'
+            : 'Listing rejected. The seller can fix it and submit again.',
+        )
+        return true
+      } catch (err) {
+        toast(err instanceof ApiRequestError ? err.message : 'That decision could not be saved.')
+        return false
+      }
+    },
+    [refreshListings, refreshPendingListings, toast],
+  )
 
   const openModal = useCallback((m: ActiveModal) => setActiveModal(m), [])
   const closeModal = useCallback(() => setActiveModal(null), [])
@@ -7408,9 +7466,12 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       db,
       currentAccount,
       isStaffUser,
+      canModerate,
       storageOk,
       storageKb,
       listingsLoading,
+      pendingListings,
+      moderateListing,
       hasSettledInitialFetch,
       toastMsg,
       toast,
@@ -7569,8 +7630,11 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     }),
     [
       db,
+      pendingListings,
+      moderateListing,
       currentAccount,
       isStaffUser,
+      canModerate,
       storageOk,
       storageKb,
       toastMsg,
