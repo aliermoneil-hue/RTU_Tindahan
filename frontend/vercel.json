@@ -1,5 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [{ "key": "x-tindahan-config", "value": "loaded" }]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/__redir",
+      "destination": "https://example.com/",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:path*",
