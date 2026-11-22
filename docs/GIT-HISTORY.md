@@ -1,13 +1,15 @@
 # Commit history
 
-Generated 2026-11-22 from `git log main`.
+Generated 2026-11-22 from `git log main` at `2df5f51`.
 
 Every row is a permanent, individually inspectable commit: `git show <sha>` reproduces its
-diff, `git log --follow <file>` follows a file across renames. This table stays valid after
-future merges because it is generated from SHAs, not from branch names.
+diff, and `git log --follow <file>` follows a file across renames. This table stays valid
+after future merges and branch deletions because it is generated from SHAs.
 
 | Commit | Date | Author | Subject |
 |---|---|---|---|
+| `2df5f51` | 2026-11-22 | aliermoneil-hue | fix(backend): keep photo URLs https behind the tunnel and serve media when DEBUG is off |
+| `f34d8cc` | 2026-11-22 | aliermoneil-hue | docs: commit-history table for the documentation appendix |
 | `ef6e444` | 2026-11-22 | aliermoneil-hue | Merge branch 'Frontend': single trunk for the deployed site |
 | `10c02bf` | 2026-11-22 | aliermoneil-hue | fix(frontend): drop dead locals that break the strict TS build |
 | `48d5f6d` | 2026-11-22 | Najimi0-0 | TextSpacing-and-LoadingAnimationAdaptability |
@@ -49,9 +51,8 @@ future merges because it is generated from SHAs, not from branch names.
 | Ref | Commit | Meaning |
 |---|---|---|
 | tag `archive/frontend-before-trunk-merge` | `10c02bf` | Frontend tip immediately before Frontend was merged into main |
-| `origin/main` | `ef6e444` | tip at 2026-11-22 |
+| `origin/main` | `2df5f51` | tip at 2026-11-22 |
 | `origin/Frontend` | `10c02bf` | tip at 2026-11-22 |
 | `origin/feature/neil-reset-screens` | `85c2312` | tip at 2026-11-22 |
 
-Total commits reachable from main: 35.
-
+Total commits reachable from main: 37.
