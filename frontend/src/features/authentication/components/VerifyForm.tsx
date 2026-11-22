@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { navigate } from '@/common/router/router'
 import { Icon } from '@/common/components/Icon'
+import { Button } from '@/common/components/Button'
 import { useAuth } from '../AuthContext'
 
 const RTU_EMAIL = /^\d{4}-\d{6}@rtu\.edu\.ph$/i
@@ -56,6 +57,9 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
   const [pass2Err, setPass2Err] = useState<string | null>(null)
   const [codeErr, setCodeErr] = useState<string | null>(null)
   const [agreeErr, setAgreeErr] = useState<string | null>(null)
+  const [showPass, setShowPass] = useState(false)
+  const [showPass2, setShowPass2] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const clearAllErr = useCallback(() => {
     setFirstErr(null)
@@ -114,6 +118,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
       return
     }
 
+    setIsLoading(true)
     try {
       // Creates the visitor account and emails the 6-digit code.
       await register({
@@ -130,6 +135,8 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
       window.scrollTo(0, 0)
     } catch (err) {
       setEmailErr(err instanceof Error ? err.message : 'Account creation failed. Try again.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -139,11 +146,14 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault()
     clearAllErr()
+    setIsLoading(true)
     try {
       await resendCode(step1.email.trim().toLowerCase())
       window.scrollTo(0, 0)
     } catch (err) {
       setEmailErr(err instanceof Error ? err.message : 'Could not send code. Try again.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -152,10 +162,13 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
   // -----------------------------------------------------------------------
   const handleResendCode = async () => {
     clearAllErr()
+    setIsLoading(true)
     try {
       await resendCode(otp?.to || step1.email.trim().toLowerCase())
     } catch (err) {
       setEmailErr(err instanceof Error ? err.message : 'Could not resend code. Try again.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -171,6 +184,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
       setCodeErr('Enter the 6 digits from the email.')
       return
     }
+    setIsLoading(true)
     try {
       // Correct code activates the account and signs the user in.
       await confirmCode(otp?.to || step1.email, step1.code)
@@ -178,6 +192,8 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
       onStep3Complete?.()
     } catch (err) {
       setCodeErr(err instanceof Error ? err.message : 'Code verification failed. Try again.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -310,33 +326,53 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
             <div className="grid2">
               <div className="field">
                 <label htmlFor="v-pass">Password</label>
-                <input
-                  className={`input ${passErr ? 'border-red-500' : ''}`}
-                  id="v-pass"
-                  type="password"
-                  autoComplete="new-password"
-                  value={step1.pass}
-                  placeholder="At least 8 characters"
-                  onChange={(e) => {
-                    setStep1((prev) => ({ ...prev, pass: e.target.value }))
-                    setPassErr(null)
-                  }}
-                />
+                <div className="password-input">
+                  <input
+                    className={`input ${passErr ? 'border-red-500' : ''} pr-10`}
+                    id="v-pass"
+                    type={showPass ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={step1.pass}
+                    placeholder="At least 8 characters"
+                    onChange={(e) => {
+                      setStep1((prev) => ({ ...prev, pass: e.target.value }))
+                      setPassErr(null)
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowPass(!showPass)}
+                    aria-label={showPass ? 'Hide password' : 'Show password'}
+                  >
+                    <Icon name={showPass ? 'eye' : 'eyeoff'} size="sm" />
+                  </button>
+                </div>
                 {passErr && <p className="err" role="alert">{passErr}</p>}
               </div>
               <div className="field">
                 <label htmlFor="v-pass2">Confirm password</label>
-                <input
-                  className={`input ${pass2Err ? 'border-red-500' : ''}`}
-                  id="v-pass2"
-                  type="password"
-                  autoComplete="new-password"
-                  value={step1.pass2}
-                  onChange={(e) => {
-                    setStep1((prev) => ({ ...prev, pass2: e.target.value }))
-                    setPass2Err(null)
-                  }}
-                />
+                <div className="password-input">
+                  <input
+                    className={`input ${pass2Err ? 'border-red-500' : ''} pr-10`}
+                    id="v-pass2"
+                    type={showPass2 ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={step1.pass2}
+                    onChange={(e) => {
+                      setStep1((prev) => ({ ...prev, pass2: e.target.value }))
+                      setPass2Err(null)
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowPass2(!showPass2)}
+                    aria-label={showPass2 ? 'Hide password' : 'Show password'}
+                  >
+                    <Icon name={showPass2 ? 'eye' : 'eyeoff'} size="sm" />
+                  </button>
+                </div>
                 {pass2Err && <p className="err" role="alert">{pass2Err}</p>}
               </div>
             </div>
@@ -372,9 +408,9 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
             </button>
             <span className="row">
               <span className="small muted">Takes about 2 minutes</span>
-              <button className="btn lg" type="submit">
+              <Button variant="yellow" size="lg" isLoading={isLoading} className="block">
                 Continue
-              </button>
+              </Button>
             </span>
           </div>
         </>
@@ -409,9 +445,9 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
                 >
                   <Icon name="back" size="sm" /> Back
                 </button>
-                <button className="btn lg" type="button" onClick={handleSendCode}>
+                <Button variant="yellow" size="lg" isLoading={isLoading} className="block" onClick={handleSendCode}>
                   Send code
-                </button>
+                </Button>
               </div>
             </>
           ) : (
@@ -470,9 +506,9 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
                 >
                   <Icon name="back" size="sm" /> Back
                 </button>
-                <button className="btn lg" type="submit">
+                <Button variant="yellow" size="lg" isLoading={isLoading} className="block" type="submit">
                   Verify and create account
-                </button>
+                </Button>
               </div>
             </>
           )}

@@ -72,6 +72,7 @@
   justify-content: center;
   align-items: center;
   min-width: 0;
+  min-height: 100vh;            /* white panel covers the full screen */
   overflow: hidden;
 }
 
@@ -97,7 +98,7 @@
     gap: 16px;
   }
   .split .r {
-    padding: clamp(16px, 3vh, 24px) clamp(16px, 4vw, 48px);
+    padding: clamp(60px, 15vh, 120px) clamp(16px, 4vw, 48px) clamp(16px, 3vh, 24px) clamp(16px, 4vw, 48px);   /* top whitespace on phones */
   }
   .info-panel {
     margin: 0 clamp(16px, 4vw, 48px) clamp(8px, 2vw, 16px) clamp(16px, 4vw, 48px);
@@ -197,5 +198,127 @@
   }
   .login-carousel-card {
     height: clamp(110px, 28vh, 200px);
+  }
+}
+
+/* Password toggle inside input field */
+.password-input {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.password-input .input {
+  padding-right: 34px;
+  box-sizing: border-box;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.password-toggle:hover {
+  color: var(--ink);
+}
+
+.password-toggle:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Popup overlay — properly covers full viewport above split layout panels */
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.popup-box {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: popupSlideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  color: var(--ink);
+  position: relative;
+}
+
+.popup-box h3 {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  color: var(--navy);
+}
+
+/* Dark theme: keep modal heading legible on dark card */
+:root[data-theme='dark'] .popup-box h3 {
+  color: var(--ink);
+}
+
+.popup-box p {
+  margin: 0 0 16px 0;
+}
+
+.popup-box .btn {
+  width: auto;
+}
+
+/* Popup bullet list */
+.popup-list {
+  margin: 0 0 16px 0;
+  padding-left: 20px;
+  color: var(--ink);
+}
+
+.popup-list li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+  font-size: 14px;
+  position: relative;
+}
+
+.popup-list li::marker {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+@keyframes popupSlideUp {
+  0% { opacity: 0; transform: scale(0.9) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Mobile popup: never stick to screen edges */
+@media (max-width: 768px) {
+  .popup-overlay {
+    padding: 16px;
+  }
+  .popup-box {
+    max-width: 100%;
+    min-width: auto;
+    max-height: 90vh;
+    padding: 18px;
   }
 }

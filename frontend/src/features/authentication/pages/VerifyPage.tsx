@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { navigate } from '@/common/router/router'
 import { Icon } from '@/common/components/Icon'
 import { VerifyForm } from '../components/VerifyForm'
@@ -13,6 +13,14 @@ const STEPS = [
 
 export function VerifyPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1)
+
+  // Always scroll down when entering the sign-up page
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleStep3Complete = () => {
     setStep(3)

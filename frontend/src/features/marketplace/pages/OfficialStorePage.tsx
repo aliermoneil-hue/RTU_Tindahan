@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Icon } from '@/common/components/Icon'
 import { playHeart } from '@/common/sounds'
 import { navigate } from '@/common/router/router'
+import { MiniLoader } from '@/common/components/BrandLoader'
 import { baoItemType } from '../baoHelpers'
 import { useTindahan } from '../context/TindahanContext'
 import { ProductCard } from '../components/ProductCard'
@@ -18,6 +19,7 @@ export function OfficialStorePage() {
     toggleSellerFav,
     setDraft,
     setListStep,
+    listingsLoading,
   } = useTindahan()
   const [storeTab, setStoreTab] = useState<string>('All')
 
@@ -60,8 +62,15 @@ export function OfficialStorePage() {
 
   return (
     <>
-      <div className="srchead school">
-        <div className="stack" style={{ gap: 6, maxWidth: 620 }}>
+      {listingsLoading && (
+        <div style={{ padding: 40, textAlign: 'center', minHeight: 400 }}>
+          <MiniLoader variant="section" size="lg" label="Loading campus listings…" />
+        </div>
+      )}
+      {!listingsLoading && (
+        <>
+          <div className="srchead school">
+        <div className="stack" style={{ gap: 6, maxWidth: 'none' }}>
           <span className="pill yellow" style={{ alignSelf: 'flex-start' }}>
             <Icon name="shield" size="sm" />
             OFFICIAL RTU PASIG STORE
@@ -182,6 +191,7 @@ export function OfficialStorePage() {
           </p>
         </div>
       </div>
+      </>)}
     </>
   )
 }

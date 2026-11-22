@@ -538,6 +538,8 @@ interface TindahanContextValue {
   isStaffUser: boolean
   storageOk: boolean
   storageKb: number
+  listingsLoading: boolean
+  hasSettledInitialFetch: boolean
   toastMsg: string | null
   toast: (msg: string) => void
   activeModal: ActiveModal
@@ -795,6 +797,8 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   })
   const [imgVersion, setImgVersion] = useState(0)
   const bumpImgVersion = useCallback(() => setImgVersion((v) => v + 1), [])
+  const [listingsLoading, setListingsLoading] = useState<boolean>(true)
+  const [hasSettledInitialFetch, setHasSettledInitialFetch] = useState<boolean>(false)
 
   // -----------------------------------------------------------------------
   // Load the published catalogue from Django once per page load.
@@ -813,6 +817,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         setDb((prev) => mergeApiCatalogue(prev, listings))
       } catch {
         /* backend offline or CORS blocked: keep the local catalogue */
+      } finally {
+        setListingsLoading(false)
+        setHasSettledInitialFetch(true)
       }
     }
     void run()
@@ -7338,6 +7345,8 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       isStaffUser,
       storageOk,
       storageKb,
+      listingsLoading,
+      hasSettledInitialFetch,
       toastMsg,
       toast,
       activeModal,

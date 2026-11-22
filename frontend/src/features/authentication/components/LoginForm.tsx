@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { navigate } from '@/common/router/router'
 import { Icon } from '@/common/components/Icon'
+import { Button } from '@/common/components/Button'
 import type { LoginCredentials } from '../types'
 
 interface LoginFormProps {
@@ -17,6 +18,7 @@ export function LoginForm({ onSubmit, isLoading, error, onForgotPassword }: Logi
   const [password, setPassword] = useState('')
   const [emailErr, setEmailErr] = useState<string | null>(null)
   const [passErr, setPassErr] = useState<string | null>(null)
+  const [showPass, setShowPass] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -69,23 +71,33 @@ export function LoginForm({ onSubmit, isLoading, error, onForgotPassword }: Logi
             Forgot password?
           </button>
         </div>
-        <input
-          id="lg-pass"
-          type="password"
-          autoComplete="current-password"
-          required
-          className={`input ${passErr ? 'border-red-500' : ''}`}
-          placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <div className="password-input">
+          <input
+            id="lg-pass"
+            type={showPass ? 'text' : 'password'}
+            autoComplete="current-password"
+            required
+            className={`input ${passErr ? 'border-red-500' : ''} pr-10`}
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button
+            type="button"
+            className="password-toggle"
+            onClick={() => setShowPass(!showPass)}
+            aria-label={showPass ? 'Hide password' : 'Show password'}
+          >
+            <Icon name={showPass ? 'eye' : 'eyeoff'} size="sm" />
+          </button>
+        </div>
       </div>
       {emailErr && <p className="err" role="alert">{emailErr}</p>}
       {passErr && <p className="err" role="alert">{passErr}</p>}
       {error && <p className="err" role="alert">{error}</p>}
-      <button className="btn block lg" type="submit" disabled={isLoading}>
+      <Button variant="yellow" size="lg" isLoading={isLoading} className="block">
         <Icon name="lock" size="sm" /> Sign in with RTU account
-      </button>
+      </Button>
       <p className="small muted" style={{ textAlign: 'center' }}>
         First time here?{' '}
         <button type="button" className="link" onClick={() => navigate('register')}>

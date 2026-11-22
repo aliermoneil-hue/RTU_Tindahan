@@ -1,63 +1,216 @@
-/* Grid: sidebar column + main column (prototype: .app, .main, .page) */
+/* Column stack: full-width fixed topbar, then sidebar + page side by side (prototype: .app, .main, .page) */
 .app {
-  display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   background: var(--bg, #f4f6fa);
+  --sidebar-expanded-width: 256px;
+}
+/* Global viewport scrollbar: hidden by default, appears on hover */
+html,
+body {
+  scrollbar-width: thin;
+  scrollbar-color: transparent #f1f5f9;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: transparent;
+}
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(26, 47, 87, 0.28);
+  border: 2px solid #f1f5f9;
+  box-shadow: inset 0 0 0 2px #f1f5f9;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+html[data-theme='dark'],
+html[data-theme='dark'] body {
+  scrollbar-color: transparent var(--bg);
+}
+html[data-theme='dark']::-webkit-scrollbar-track,
+html[data-theme='dark'] body::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+html[data-theme='dark']::-webkit-scrollbar-thumb,
+html[data-theme='dark'] body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border: 2px solid var(--bg);
+  box-shadow: inset 0 0 0 2px var(--bg);
+}
+html[data-theme='dark']:hover::-webkit-scrollbar-thumb:hover,
+html[data-theme='dark'] body:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--yellow);
+}
+html:hover::-webkit-scrollbar,
+body:hover::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+html:hover::-webkit-scrollbar-thumb:hover,
+body:hover::-webkit-scrollbar-thumb:hover {
+  background: #1a2f57;
+}
+html:hover::-webkit-scrollbar-thumb:active,
+body:hover::-webkit-scrollbar-thumb:active {
+  background: #ffbd59;
 }
 .main {
   min-width: 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  min-height: 100dvh;
   min-height: 100vh;
+  flex: 1;
   background: var(--bg, #f4f6fa);
+  /* Collapsed sidebar width by default; expanded overridden by .sidebar-open */
+  margin-left: 32px;
+  transition: margin-left 500ms cubic-bezier(0.4, 0, 0.2, 1);
 }
+.app.sidebar-open .main {
+  margin-left: 240px;
+}
+.page-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+/* Page content sits below the fixed topbar+awning with breathing room.
+   Safe fallback of 108px if --header-offset hasn't been measured yet. */
 .page {
-  padding: 28px 22px 22px;
+  padding: max(calc(var(--header-offset, 76px) + 24px), 100px) 22px 22px;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  max-width: 1180px;
   width: 100%;
-  flex: 1;
-  /* Ensure page fills at least the entire viewport so footer is below the fold and only shows on scroll */
+  flex: 1 0 auto;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 100dvh;
   min-height: 100vh;
+  padding-bottom: 64px;
+  background: var(--bg, #f4f6fa);
+}
+
+/* Every direct child of .page stretches to fill the available width
+   and never overflows when the sidebar collapses/expands. */
+.page > * {
+  max-width: 100%;
   box-sizing: border-box;
 }
-.page h1 {
-  font-size: 28px;
-  line-height: 1.12;
-  letter-spacing: -0.02em;
+
+/* Centered content shell: locks page width so it never stretches when sidebar toggles */
+.page-content-shell {
+  width: 100%;
+  max-width: min(1240px, calc(100vw - var(--sidebar-expanded-width, 256px) - 120px));
+  margin-inline: auto;
 }
-.crumbs {
-  font-size: 12px;
-  color: var(--muted);
+
+/* Restore vertical flex gap inside .page > .page-content-shell so sections
+   keep their spacing. Scoped strictly to .page so SiteFooter's wrapper is
+   unaffected. */
+.page > .page-content-shell {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
 }
-@media (min-width: 1700px) {
-  .app {
-    grid-template-columns: 260px minmax(0, 1fr);
+
+.page > .page-content-shell > * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Desktop (>= 768px): give <main> horizontal padding so outside buttons never clip */
+@media (min-width: 768px) {
+  .page {
+    padding-inline: 56px;
+  }
+}
+
+/* Mobile (< 768px): full width shell, no horizontal constraint */
+@media (max-width: 767px) {
+  .page-content-shell {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
+    padding-left: 0;
+    padding-right: 0;
   }
   .page {
-    max-width: 1680px;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }
+
+/* Mobile drawer (<= 900px): stack sidebar drawer over page content */
 @media (max-width: 900px) {
   .app {
-    grid-template-columns: minmax(0, 1fr);
+    overflow-x: hidden;
   }
+
+  .main {
+    flex-direction: column;
+    margin-left: 0;
+    min-height: auto;
+    height: auto;
+  }
+
+  /* When mobile drawer is open, push page content down instead of beside */
+  .app .main {
+    position: relative;
+  }
+
+  /* Ensure page content is scrollable, not the whole body, when drawer is open */
   .page {
-    padding: 16px 16px 28px;
+    min-height: 100dvh;
+    min-height: 100vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-left: 16px;
+    padding-right: 16px;
   }
-  .page h1 {
-    font-size: 22px;
+
+  /* Mobile drawer backdrop: prevent body scroll when open */
+  .mobile-backdrop {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: var(--navbar-height, 76px);
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 55;
+    backdrop-filter: blur(2px);
+  }
+
+  /* When mobile drawer is open, prevent page content from scrolling */
+  .app.mobile-drawer-open .page {
+    overflow: hidden !important;
+  }
+
+  /* Topbar height adjustment for mobile safe areas */
+  .top {
+    padding-top: max(14px, env(safe-area-inset-top));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
   }
 }
+
+/* Small mobile (<= 640px): tighter spacing */
 @media (max-width: 640px) {
   .page {
-    padding: 14px 14px 28px;
+    padding-top: max(calc(var(--header-offset, 76px) + 14px), 90px);
     gap: 14px;
+    padding-bottom: 60px;
+  }
+  .page h1 {
+    font-size: 20px;
   }
 }

@@ -10,22 +10,48 @@
   min-width: 0;
 }
 .catrow {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 10px;
+  position: relative;
+  display: block;
+  width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  scroll-snap-type: x proximity;
-  scroll-behavior: smooth;
+  padding: 4px 24px 8px 24px;
+  outline-offset: 2px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding: 4px 2px 8px;
-  flex: 1;
-  min-width: 0;
-  outline-offset: 2px;
+}
+/* Right-edge scroll hint on mobile to indicate swipable categories */
+.catrow::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to right, transparent 0%, var(--bg, #f4f6fa) 100%);
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+@media (max-width: 640px) {
+  .catrow::after {
+    opacity: 0.5;
+  }
 }
 .catrow::-webkit-scrollbar {
   display: none;
+}
+.catrow .marquee-track {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  width: max-content;
+  will-change: transform;
+}
+.catrow .marquee-group {
+  display: flex;
+  flex-wrap: nowrap;
 }
 .catchip {
   flex: 0 0 auto;
@@ -34,6 +60,7 @@
   align-items: center;
   gap: 8px;
   white-space: nowrap;
+  margin-right: 8px;
   padding: 10px 16px;
   border-radius: 999px;
   border: 1px solid var(--line);
@@ -43,6 +70,8 @@
   font-size: 13px;
   box-shadow: var(--shadow);
   transition: border-color 0.15s, color 0.15s, transform 0.05s;
+  /* 44px minimum touch target on mobile */
+  min-height: 44px;
 }
 .catchip:hover {
   border-color: var(--navy);

@@ -3,7 +3,8 @@
    ========================================================================== */
 
 .fcol.wide {
-  max-width: 980px;
+  width: 100%;
+  max-width: none;
 }
 .frquote {
   background: var(--soft);

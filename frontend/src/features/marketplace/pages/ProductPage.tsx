@@ -2,6 +2,7 @@ import { baoLimitFor, baoWindowState, baoWindowText } from '../baoHelpers'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { Icon } from '@/common/components/Icon'
 import { navigate, useRoute } from '@/common/router/router'
+import { MiniLoader } from '@/common/components/BrandLoader'
 import {
   catOf,
   hasVars,
@@ -12,7 +13,7 @@ import {
   varLabel,
 } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
-import type { ChosenFulfillment, FulfillmentMethod } from '../types'
+import type { ChosenFulfillment, FulfillmentMethod, ProductVariationAttr, ProductVariationRow } from '../types'
 import { AvatarBadge } from '../components/AvatarBadge'
 import { ProductGallery } from '../components/PhotoUploader'
 import { RatingText, StarsDisplay } from '../components/StarRating'
@@ -22,6 +23,7 @@ export function ProductPage() {
   const { params } = useRoute()
   const {
     db,
+    listingsLoading,
     currentAccount,
     isStaffUser,
     selectedProductId,
@@ -41,12 +43,13 @@ export function ProductPage() {
     openModal,
     toast,
   } = useTindahan()
-
   const pid = params.get('id') || selectedProductId
   const p = pid ? byId(pid) : undefined
-
-  const [qty, setQty] = useState(1)
+  const isOwner = Boolean(p && currentAccount && p.owner === currentAccount.email)
+  const canView = allOnSale.some((x) => x.id === p?.id) || isOwner || isStaffUser
   const [selectedOpts, setSelectedOpts] = useState<Record<string, string>>({})
+  const [variationWarned, setVariationWarned] = useState(false)
+  const [qty, setQty] = useState(1)
   const [chosenFulfillment, setChosenFulfillment] = useState<ChosenFulfillment>('pickup')
   const [showMsgForm, setShowMsgForm] = useState(false)
   const [msgText, setMsgText] = useState('')
@@ -109,7 +112,7 @@ export function ProductPage() {
       .sort((a, b) => b.ts - a.ts)
   }, [db.reviews, p])
 
-  if (!p || !allOnSale.some((x) => x.id === p.id)) {
+  if (!p || !canView) {
     return (
       <div
         className="card stack"
@@ -139,7 +142,7 @@ export function ProductPage() {
   const sfav = Boolean(currentAccount?.sfavs?.includes(skey))
   const isOwnListing = Boolean(p.owner && currentAccount && p.owner === currentAccount.email)
 
-  const [place, win] = (p.when || '').split(',').map((s) => s.trim())
+  const [place, win] = (p.when || '').split(',').map((s: string) => s.trim())
   const hasVariations = hasVars(p) && p.vars
 
   // Resolve matching variation row when all attributes are selected (selVar in js/9d-listings.js)
@@ -149,8 +152,8 @@ export function ProductPage() {
       if (!selectedOpts[a.name]) return null
     }
     return (
-      p.vars.rows.find((r) =>
-        p.vars!.attrs.every((a) => r.opts[a.name] === selectedOpts[a.name]),
+      p.vars.rows.find((r: ProductVariationRow) =>
+        p.vars!.attrs.every((a: ProductVariationAttr) => r.opts[a.name] === selectedOpts[a.name]),
       ) || null
     )
   }, [hasVariations, p.vars, selectedOpts])
@@ -167,7 +170,7 @@ export function ProductPage() {
     if (chosenVar) return chosenVar.id
     toast(
       'Please choose your ' +
-        p.vars.attrs.map((a) => a.name.toLowerCase()).join(' and ') +
+        p.vars.attrs.map((a: ProductVariationAttr) => a.name.toLowerCase()).join(' and ') +
         ' first.',
     )
     return null
@@ -176,16 +179,16 @@ export function ProductPage() {
   // Option availability helper (matching varPickerHtml in js/9d-listings.js)
   const isOptSoldOut = (attrName: string, optVal: string): boolean => {
     if (!hasVariations || !p.vars) return false
-    const matchingRows = p.vars.rows.filter((r) => {
+    const matchingRows = p.vars.rows.filter((r: ProductVariationRow) => {
       if (r.opts[attrName] !== optVal) return false
       return p.vars!.attrs.every(
-        (other) =>
+        (other: ProductVariationAttr) =>
           other.name === attrName ||
           !selectedOpts[other.name] ||
           r.opts[other.name] === selectedOpts[other.name],
       )
     })
-    return matchingRows.reduce((sum, r) => sum + r.qty, 0) < 1
+    return matchingRows.reduce((sum: number, r: ProductVariationRow) => sum + r.qty, 0) < 1
   }
 
   const itemRating = ratingOf('item', p.id)
@@ -204,6 +207,12 @@ export function ProductPage() {
 
   return (
     <>
+      {listingsLoading ? (
+        <div style={{ padding: 40, textAlign: 'center', minHeight: 400 }}>
+          <MiniLoader variant="section" size="lg" label="Loading campus listings…" />
+        </div>
+      ) : (
+        <>
       <div className="crumbs">
         <button type="button" onClick={() => navigate('marketplace')}>
           Marketplace
@@ -475,7 +484,7 @@ export function ProductPage() {
             {/* Per-attribute variation picker (varPickerHtml in js/9d-listings.js) */}
             {hasVariations && p.vars && (
               <div className="stack" style={{ gap: 10 }}>
-                {p.vars.attrs.map((a) => (
+                {p.vars.attrs.map((a: ProductVariationAttr) => (
                   <div key={a.name} className="stack" style={{ gap: 6 }}>
                     <div className="row between">
                       <b className="small">{a.name}</b>
@@ -489,7 +498,7 @@ export function ProductPage() {
                       aria-label={a.name}
                       style={{ gap: 6 }}
                     >
-                      {a.opts.map((v) => {
+                      {a.opts.map((v: string) => {
                         const on = selectedOpts[a.name] === v
                         const out = isOptSoldOut(a.name, v)
                         return (
@@ -505,6 +514,7 @@ export function ProductPage() {
                                 [a.name]: prev[a.name] === v ? '' : v,
                               }))
                               setQty(1)
+                              setVariationWarned(false)
                             }}
                           >
                             {v}
@@ -553,10 +563,14 @@ export function ProductPage() {
               <button
                 type="button"
                 className="btn yellow grow"
-                disabled={(hasVariations && !chosenVar) || availStock < 1 || sellerFulfillment === 'none'}
+                disabled={availStock < 1 || sellerFulfillment === 'none'}
                 onClick={() => {
                   if (sellerFulfillment === 'none') {
                     toast('This listing does not have an active fulfillment method.')
+                    return
+                  }
+                  if (hasVariations && !chosenVar) {
+                    setVariationWarned(true)
                     return
                   }
                   const vid = ensureVariationPicked()
@@ -571,14 +585,33 @@ export function ProductPage() {
               </button>
             </div>
 
+            {hasVariations && !chosenVar && variationWarned && (
+              <div
+                className="note"
+                style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'flex-start', color: 'var(--red)' }}
+              >
+                <Icon name="info" size="sm" style={{ marginTop: 2 }} />
+                <span className="small">
+                  Please choose{' '}
+                  {p.vars?.attrs.map((a) => a.name.toLowerCase()).join(' and ')}
+                  {' '}
+                  to enable Reserve and Add to Cart.
+                </span>
+              </div>
+            )}
+
             <div className="row">
               <button
                 type="button"
                 className="btn ghost grow"
-                disabled={(hasVariations && !chosenVar) || availStock < 1 || sellerFulfillment === 'none'}
+                disabled={availStock < 1 || sellerFulfillment === 'none'}
                 onClick={() => {
                   if (sellerFulfillment === 'none') {
                     toast('This listing does not have an active fulfillment method.')
+                    return
+                  }
+                  if (hasVariations && !chosenVar) {
+                    setVariationWarned(true)
                     return
                   }
                   const vid = ensureVariationPicked()
@@ -848,6 +881,8 @@ export function ProductPage() {
           </p>
         )}
       </section>
+        </>
+      )}
     </>
   )
 }

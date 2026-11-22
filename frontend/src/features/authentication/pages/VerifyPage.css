@@ -124,7 +124,8 @@
     gap: 16px;
   }
   .split.rev .r {
-    padding: 24px clamp(16px, 4vw, 48px);
+    padding: clamp(60px, 15vh, 120px) clamp(16px, 4vw, 48px) 24px clamp(16px, 4vw, 48px);   /* top whitespace on phones */
+    min-height: 100vh;
   }
 }
 
