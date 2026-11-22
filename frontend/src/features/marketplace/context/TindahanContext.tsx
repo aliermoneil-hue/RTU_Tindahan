@@ -56,6 +56,7 @@ import {
 } from '../api/listings'
 import {
   STORE_ID_PREFIX,
+  createTicket,
   fetchStock,
   fetchStoreSettings,
   fetchTickets,
@@ -1866,6 +1867,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    const commit = (officialRef?: string) => {
     let firstOrder: OrderRecord | null = null
     let orderCount = 0
 
@@ -1902,7 +1904,15 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           ? next.accounts.find((a) => a.email === f.p.owner)
           : undefined
 
-        const orderId = `RTU-${dayCode}-${String(next.seq.o++).padStart(3, '0')}`
+        // An Official Store request already exists on the server, posted before
+        // this snapshot was built; its reference is the id both sides quote.
+        const serverRef =
+          !owner && (f.p.off === true || f.p.cat === 'Official') && officialRef
+            ? officialRef
+            : null
+
+        const orderId =
+          serverRef || `RTU-${dayCode}-${String(next.seq.o++).padStart(3, '0')}`
         const title =
           items.length === 1
             ? `${f.c.qty > 1 ? f.c.qty + ' × ' : ''}${vLineName(f.p, f.c.vid)}`
@@ -2018,7 +2028,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         }))
         const svcCount = txnLines.filter((l) => l.kind === 'service').length
         const isOfficial = f.p.cat === 'Official' || (owner && owner.role === 'moderator')
-        const txnId = `TXN-${dayCode}-${String(++next.seq.tx).padStart(3, '0')}`
+        const txnId = serverRef
+          ? STORE_ID_PREFIX + serverRef
+          : `TXN-${dayCode}-${String(++next.seq.tx).padStart(3, '0')}`
 
         // BAO v1.6 queue number & ledger lines for Official Store requests
         let queueVal: string | null = null
@@ -2262,7 +2274,61 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         )
       }
     }, 0)
-  }, [currentAccount, cartAgree, cartMsg, byId, allOnSale, baoOrderProblem, toast])
+    }
+
+    // An Official RTU Store request belongs to the backend: it holds the
+    // reservation, enforces the per-student limit and the ordering window, and
+    // mints the ticket reference the office works from. Post it first, then
+    // build the local order around the server's reference. Anything still
+    // prototype-local (or a signed-out visitor) keeps the old path.
+    const officialLines = currentAccount.cart
+      .map((c) => ({ c, p: byId(c.id) }))
+      .filter((x) => x.p && (x.p.off === true || x.p.cat === 'Official'))
+    const postableLines = officialLines.filter(
+      (x) => x.p?.apiListingId && /^v\d+$/.test(x.c.vid || ''),
+    )
+
+    if (!getToken() || !postableLines.length || postableLines.length !== officialLines.length) {
+      commit()
+      return
+    }
+
+    void (async () => {
+      try {
+        const ticket = await createTicket({
+          items: postableLines.map((x) => ({
+            listing: x.p!.apiListingId as number,
+            variant: Number((x.c.vid || '').slice(1)),
+            quantity: x.c.qty,
+          })),
+          pickupDate: null,
+          claimNotes: (cartMsg || '').trim(),
+        })
+        commit(ticket.reference)
+        // The snapshot update runs inside React's render pass, so the local
+        // `firstOrder` may not be set by the time the inner timeout fires. The
+        // reference is known here, so open the confirmation screen with it.
+        setTimeout(() => {
+          setLastOrderId(ticket.reference)
+          setSelectedOrderId(ticket.reference)
+          setOrderTab('Active')
+          setCartStep(1)
+          setCartAgree(false)
+          setCartErr('')
+          navigate('confirm')
+          toast(`Request sent. Your ticket is ${ticket.reference}.`)
+        }, 50)
+        void refreshStore()
+      } catch (err) {
+        const msg =
+          err instanceof ApiRequestError
+            ? err.message
+            : 'The store could not accept this request. Please try again.'
+        setCartErr(msg)
+        toast(msg)
+      }
+    })()
+  }, [currentAccount, cartAgree, cartMsg, byId, allOnSale, baoOrderProblem, toast, refreshStore])
 
   // Buyer Order Actions
   const proposeOrderMeetup = useCallback(
