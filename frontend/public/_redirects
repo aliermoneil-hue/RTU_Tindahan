@@ -8,9 +8,9 @@
 #
 # Upstream = the Cloudflare quick tunnel for kallisto-1:8000. Regenerate these
 # three lines with `tindahan-netlify-sync` when the tunnel host changes.
-/api/*     https://hdtv-commission-accepted-cos.trycloudflare.com/api/:splat  200
-/admin/*   https://hdtv-commission-accepted-cos.trycloudflare.com/admin/:splat  200
-/static/*  https://hdtv-commission-accepted-cos.trycloudflare.com/static/:splat  200
+/api/*      https://hdtv-commission-accepted-cos.trycloudflare.com/api/:splat  200
+/admin/*    https://hdtv-commission-accepted-cos.trycloudflare.com/admin/:splat  200
+/static/*   https://hdtv-commission-accepted-cos.trycloudflare.com/static/:splat  200
 
 # Everything else is the SPA (hash routing, so no deep-link rewrite needed).
 /*  /index.html  200
