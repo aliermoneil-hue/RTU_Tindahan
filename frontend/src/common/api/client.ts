@@ -41,23 +41,61 @@ export class ApiRequestError extends Error {
   }
 }
 
-/** Turns Django's error JSON ({detail} or {field: [msgs]}) into one sentence. */
+/** First human-readable string anywhere in Django's error JSON. */
+function firstMessage(value: unknown, depth = 0): string | null {
+  if (depth > 3) return null
+  if (typeof value === 'string') return value.trim() || null
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = firstMessage(item, depth + 1)
+      if (found) return found
+    }
+    return null
+  }
+  if (value && typeof value === 'object') {
+    for (const item of Object.values(value as Record<string, unknown>)) {
+      const found = firstMessage(item, depth + 1)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+/** Turns Django's error JSON ({detail}, {field: [msgs]} or nested upload errors) into one sentence. */
 function messageFrom(data: unknown, fallback: string): string {
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>
     if (typeof obj.detail === 'string') return obj.detail
     if (Array.isArray(obj.detail) && typeof obj.detail[0] === 'string') return obj.detail[0]
-    for (const value of Object.values(obj)) {
-      if (Array.isArray(value) && typeof value[0] === 'string') return value[0]
-      if (typeof value === 'string') return value
-    }
   }
-  return fallback
+  // Photo errors arrive nested, e.g. {"upload_photos": {"0": ["..."]}}, so a
+  // one-level walk would miss them and show a generic message.
+  return firstMessage(data, 1) ?? fallback
 }
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
   body?: unknown
+}
+
+async function parse<T>(response: Response): Promise<T> {
+  if (response.status === 204) return undefined as T
+
+  let data: unknown = null
+  try {
+    data = await response.json()
+  } catch {
+    /* empty or non-JSON body */
+  }
+
+  if (!response.ok) {
+    const code =
+      data && typeof data === 'object' && typeof (data as { code?: unknown }).code === 'string'
+        ? ((data as { code: string }).code)
+        : undefined
+    throw new ApiRequestError(messageFrom(data, 'Something went wrong. Please try again.'), response.status, code)
+  }
+  return data as T
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -77,21 +115,29 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     throw new ApiRequestError('Cannot reach the server. Check your connection and try again.', 0)
   }
 
-  if (response.status === 204) return undefined as T
+  return parse<T>(response)
+}
 
-  let data: unknown = null
+/**
+ * POST multipart/form-data — used for anything carrying a file, such as a
+ * listing with photos. The browser sets the Content-Type (with its boundary),
+ * so this must not set it by hand.
+ */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  const token = getToken()
+  if (token) headers.Authorization = `Token ${token}`
+
+  let response: Response
   try {
-    data = await response.json()
+    response = await fetch(`${BASE_URL}${path}`, {
+      method: 'POST',
+      headers,
+      body: form,
+    })
   } catch {
-    /* empty or non-JSON body */
+    throw new ApiRequestError('Cannot reach the server. Check your connection and try again.', 0)
   }
 
-  if (!response.ok) {
-    const code =
-      data && typeof data === 'object' && typeof (data as { code?: unknown }).code === 'string'
-        ? ((data as { code: string }).code)
-        : undefined
-    throw new ApiRequestError(messageFrom(data, 'Something went wrong. Please try again.'), response.status, code)
-  }
-  return data as T
+  return parse<T>(response)
 }

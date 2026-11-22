@@ -16,7 +16,7 @@
  * Everything is public: these endpoints need no token.
  */
 
-import { apiFetch } from '@/common/api/client'
+import { ApiRequestError, apiFetch, apiUpload } from '@/common/api/client'
 import type { IconName } from '@/common/components/icons'
 
 import { CAT_META, OFFCAT } from '../constants'
@@ -238,6 +238,101 @@ export async function fetchListing(slug: string): Promise<ApiListing | undefined
 
 export async function fetchCategories(): Promise<ApiCategory[]> {
   return apiFetch<ApiCategory[]>('/categories/')
+}
+
+// ---------------------------------------------------------------------------
+// Writing: create a listing
+// ---------------------------------------------------------------------------
+
+/**
+ * The browse pages group items into their own eight categories; the backend
+ * uses a wider table. Each UI category lists the backend names it may map to,
+ * in order of preference, with 'Other' as the final fallback.
+ */
+const CATEGORY_TARGETS: Record<string, string[]> = {
+  'Books and Academic Materials': ['Books and Academic Materials'],
+  'School Supplies': ['School Supplies'],
+  'Food and Snacks': ['Food and Snacks'],
+  'RTU Merchandise': ['Merchandise, Clothes, Accessories, and Gadgets', 'Merchandise'],
+  'Clothing and Accessories': ['Clothing', 'Clothing and Accessories', 'Uniforms'],
+  'Electronics and Gadgets': ['Gadgets', 'Electronics and Gadgets'],
+  'Knickknacks and Collectibles': ['Other', 'Collectibles'],
+  'Other Items': ['Other'],
+  Services: ['Services'],
+}
+
+let categoryCache: ApiCategory[] | null = null
+
+async function categories(): Promise<ApiCategory[]> {
+  if (!categoryCache) categoryCache = await fetchCategories()
+  return categoryCache
+}
+
+/** The backend category id for a UI category, or null when there is no match. */
+export async function resolveCategoryId(uiCategory: string): Promise<number | null> {
+  const list = await categories()
+  const wanted = CATEGORY_TARGETS[uiCategory] ?? [uiCategory]
+  for (const name of wanted) {
+    const hit = list.find((c) => c.name.toLowerCase() === name.toLowerCase())
+    if (hit) return hit.id
+  }
+  const other = list.find((c) => c.name.toLowerCase() === 'other')
+  return other ? other.id : null
+}
+
+/** A stored draft image (a data: URL) as a File the browser can upload. */
+function dataUrlToFile(src: string, index: number): File | null {
+  const match = /^data:([^;]+);base64,(.*)$/s.exec(src)
+  if (!match) return null
+  const mime = match[1]
+  const bytes = Uint8Array.from(atob(match[2]), (ch) => ch.charCodeAt(0))
+  const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg'
+  return new File([bytes], `photo-${index + 1}.${ext}`, { type: mime })
+}
+
+export interface NewListingInput {
+  title: string
+  description: string
+  categoryName: string
+  listingType: 'product' | 'service'
+  condition: 'new' | 'used' | 'na'
+  price: number
+  quantity: number
+  meetupPlace: string
+  /** Stored draft images, in the order they should appear. */
+  photos: string[]
+}
+
+/**
+ * Create a listing on the server. Returns the saved listing, whose `slug` the
+ * caller can use to open it. Errors are ApiRequestError, with the backend's
+ * field message already turned into a sentence.
+ */
+export async function createListing(input: NewListingInput): Promise<ApiListing> {
+  const categoryId = await resolveCategoryId(input.categoryName)
+  if (categoryId === null) {
+    throw new ApiRequestError(
+      `The server has no category that matches "${input.categoryName}". Ask an administrator to add one.`,
+      400,
+    )
+  }
+
+  const form = new FormData()
+  form.set('category', String(categoryId))
+  form.set('title', input.title.trim())
+  form.set('description', input.description.trim())
+  form.set('listing_type', input.listingType)
+  form.set('condition', input.condition)
+  form.set('price', input.price.toFixed(2))
+  form.set('quantity', String(Math.max(1, Math.floor(input.quantity))))
+  form.set('meetup_place', input.meetupPlace.trim())
+
+  input.photos.forEach((src, index) => {
+    const file = dataUrlToFile(src, index)
+    if (file) form.append('upload_photos', file)
+  })
+
+  return apiUpload<ApiListing>('/listings/', form)
 }
 
 // ---------------------------------------------------------------------------

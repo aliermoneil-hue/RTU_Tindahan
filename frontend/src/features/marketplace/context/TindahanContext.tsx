@@ -45,8 +45,13 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { apiFetch, getToken } from '@/common/api/client'
-import { fetchListings, mergeApiCatalogue } from '../api/listings'
+import { ApiRequestError, apiFetch, getToken } from '@/common/api/client'
+import {
+  API_ID_PREFIX,
+  createListing,
+  fetchListings,
+  mergeApiCatalogue,
+} from '../api/listings'
 import { navigate } from '@/common/router/router'
 import { useAuth } from '@/features/authentication'
 import type { User } from '@/common/types'
@@ -805,6 +810,15 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   const bumpImgVersion = useCallback(() => setImgVersion((v) => v + 1), [])
   const [listingsLoading, setListingsLoading] = useState<boolean>(true)
   const [hasSettledInitialFetch, setHasSettledInitialFetch] = useState<boolean>(false)
+  // Guards against a double click posting the same new listing twice.
+  const publishingRef = useRef(false)
+
+  /** Re-read the published catalogue and fold it into the snapshot. */
+  const refreshListings = useCallback(async () => {
+    const listings = await fetchListings()
+    if (listings.length === 0) return
+    setDb((prev) => mergeApiCatalogue(prev, listings))
+  }, [])
 
   // -----------------------------------------------------------------------
   // Load the published catalogue from Django once per page load.
@@ -818,9 +832,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     const run = async () => {
       try {
-        const listings = await fetchListings()
-        if (cancelled || listings.length === 0) return
-        setDb((prev) => mergeApiCatalogue(prev, listings))
+        if (!cancelled) await refreshListings()
       } catch {
         /* backend offline or CORS blocked: keep the local catalogue */
       } finally {
@@ -832,7 +844,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [refreshListings])
 
   // UI overlays
   const [toastMsg, setToastMsg] = useState<string | null>(null)
@@ -3185,6 +3197,48 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     const formattedWin = winText(sMin, eMin)
     const svc = draft.type === 'service'
     const validImages = draft.images.filter((id) => imgSrc(id)).slice(0, IMG_RULES.listing)
+
+    // A new listing belongs to Django, not to this browser's snapshot: POST it,
+    // re-read the catalogue, and open the listing that was actually saved.
+    // Editing an existing listing and an offline (no token) session stay local.
+    if (!draft.editLid && getToken() && !publishingRef.current) {
+      publishingRef.current = true
+      const publish = async () => {
+        try {
+          const created = await createListing({
+            title: draft.title,
+            description: draft.desc,
+            categoryName: svc ? SERVICES_CAT : draft.cat,
+            listingType: svc ? 'service' : 'product',
+            condition: svc
+              ? 'na'
+              : ['Pre-loved', 'Like new', 'Used'].includes(draft.cond)
+                ? 'used'
+                : 'new',
+            price: Number(draft.price) || 0,
+            quantity: svc ? 1 : Math.floor(Number(draft.qty) || 1),
+            meetupPlace: draft.place,
+            photos: validImages.map((id) => imgSrc(id)).filter(Boolean),
+          })
+          await refreshListings()
+          setDraft(blankDraft(isStaffUser))
+          setDraftErrs({})
+          setListStep(1)
+          toast('Listing saved. It is checked by RTU staff before buyers can see it.')
+          openProduct(API_ID_PREFIX + created.slug)
+        } catch (err) {
+          toast(
+            err instanceof ApiRequestError
+              ? err.message
+              : 'The listing could not be saved. Please try again.',
+          )
+        } finally {
+          publishingRef.current = false
+        }
+      }
+      void publish()
+      return
+    }
 
     const buildProduct = (id: string, pub: number): PrototypeProduct => {
       const base: PrototypeProduct = {
