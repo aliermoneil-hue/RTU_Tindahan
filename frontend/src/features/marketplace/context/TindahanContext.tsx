@@ -1043,6 +1043,27 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     void refreshStore()
   }, [refreshStore])
 
+  // Keep the shared lists fresh: a reply, a new request or a status change
+  // should land on its own, not only after a reload.
+  useEffect(() => {
+    if (!getToken()) return
+    const tick = () => {
+      void refreshConversations()
+      void refreshOrders()
+    }
+    const timer = window.setInterval(tick, 10000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    window.addEventListener('focus', tick)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', tick)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [refreshConversations, refreshOrders])
+
   // UI overlays
   const [toastMsg, setToastMsg] = useState<string | null>(null)
   const toastTimerRef = useRef<number | null>(null)
@@ -2339,6 +2360,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           )
         }
 
+        // A server order has a server thread; a local one would be a second,
+        // empty conversation nobody on the other side can see.
+        if (!serverRef) {
         // Open or append Order Conversation (CONV)
         const sellerEmail = o.sellerEmail || null
         const pk = pairKey(buyer.email, sellerEmail)
@@ -2377,6 +2401,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         conv.ref = ref
         conv.last = now.toISOString()
         conv.seen[buyer.email] = conv.msgs.length
+        }
       })
 
       buyer.cart = []
@@ -2471,6 +2496,20 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
             note: (cartMsg || '').trim(),
           })
           bySeller[owner] = order.reference
+
+          // Open the thread on the server right away: both sides then find it
+          // in Messages, and the note the buyer typed is its first message.
+          // A thread failure must not undo a request that already exists.
+          try {
+            const conversation = await openConversation({
+              sellerEmail: owner,
+              listingSlug: items[0].p.id.replace(/^api:/, ''),
+            })
+            const note = (cartMsg || '').trim()
+            if (note) await postChatMessage(conversation.id, note)
+          } catch {
+            /* the order is what matters; the thread can be opened from Messages */
+          }
         }
 
         commit({ officialRef, bySeller })

@@ -145,7 +145,19 @@ export function mergeApiConversations<T extends { conv: Conversation[] }>(
   conversations: ApiConversation[],
   me?: string | null,
 ): T {
-  const local = prev.conv.filter((c) => !c.id.startsWith(MESSAGE_ID_PREFIX))
+  const pairs = new Set(
+    conversations.map((dto) => [dto.buyer_email, dto.seller_email].sort().join('|')),
+  )
+  const local = prev.conv.filter((c) => {
+    if (c.id.startsWith(MESSAGE_ID_PREFIX)) return false
+    // A checkout used to leave an empty thread with no other side; nothing the
+    // user types there can ever be delivered.
+    if (!c.seller && c.msgs.length === 0) return false
+    // A prototype duplicate of a pair the server already carries would split
+    // the conversation in two.
+    const pair = [c.buyer, c.seller || ''].sort().join('|')
+    return !pairs.has(pair)
+  })
   return {
     ...prev,
     conv: [...conversations.map((dto) => toConversation(dto, me)), ...local],
