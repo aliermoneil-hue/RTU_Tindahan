@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    CollegeListView,
     LoginView,
     LogoutAllView,
     LogoutView,
@@ -18,6 +19,8 @@ from .views import (
 app_name = "accounts"
 
 urlpatterns = [
+    # The picklist the sign-up form renders, so a typo cannot invent a college.
+    path("colleges/", CollegeListView.as_view(), name="colleges"),
     path("auth/register/", RegisterView.as_view(), name="register"),
     # The code that the sign-up screens use.
     path("auth/verify-code/", VerifyCodeView.as_view(), name="verify-code"),

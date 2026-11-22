@@ -1,7 +1,26 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import User
+from .models import College, CollegeAlias, User
+
+
+class CollegeAliasInline(admin.TabularInline):
+    model = CollegeAlias
+    extra = 1
+    verbose_name = "alternative spelling"
+    verbose_name_plural = "alternative spellings"
+
+
+@admin.register(College)
+class CollegeAdmin(admin.ModelAdmin):
+    list_display = ("name", "code", "kind", "is_active", "sort_order", "members")
+    list_filter = ("kind", "is_active")
+    search_fields = ("name", "code", "aliases__text")
+    inlines = (CollegeAliasInline,)
+
+    @admin.display(description="accounts")
+    def members(self, obj):
+        return obj.members.count()
 
 
 @admin.register(User)
@@ -17,8 +36,8 @@ class UserAdmin(BaseUserAdmin):
         "is_verified",
         "date_joined",
     )
-    list_filter = ("role", "member_type", "status", "is_active", "is_staff")
-    search_fields = ("email", "display_name", "college")
+    list_filter = ("role", "member_type", "status", "college", "is_active", "is_staff")
+    search_fields = ("email", "display_name", "college__name", "college__code")
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),

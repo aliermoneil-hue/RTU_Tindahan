@@ -2,13 +2,17 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import User
+from .models import College, User
 from .validators import normalize_email, validate_rtu_email
 
 
 class UserSerializer(serializers.ModelSerializer):
     is_verified = serializers.BooleanField(read_only=True)
     student_number = serializers.SerializerMethodField()
+    # Kept as the plain name so existing clients keep reading a string; the
+    # code is exposed alongside it for anything that needs a stable key.
+    college = serializers.SerializerMethodField()
+    college_code = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -19,6 +23,7 @@ class UserSerializer(serializers.ModelSerializer):
             "role",
             "member_type",
             "college",
+            "college_code",
             "year_level",
             "student_number",
             "contact_number",
@@ -33,6 +38,12 @@ class UserSerializer(serializers.ModelSerializer):
         from .validators import student_number_from_email
 
         return student_number_from_email(obj.email)
+
+    def get_college(self, obj: User) -> str | None:
+        return obj.college.name if obj.college else None
+
+    def get_college_code(self, obj: User) -> str | None:
+        return obj.college.code if obj.college else None
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -90,10 +101,29 @@ class RegisterSerializer(serializers.Serializer):
                 {"year_level": "Only students have a year level."}
             )
 
-        if not attrs["college"].strip():
+        raw_college = (attrs.get("college") or "").strip()
+        if not raw_college:
             raise serializers.ValidationError(
                 {"college": "Enter your college, institute, or office."}
             )
+        # The college is a dimension row, not text: resolve the code, the name or
+        # a synonym, and refuse anything unknown so a typo cannot create a
+        # second row for an existing college.
+        place = College.resolve(raw_college)
+        if place is None:
+            allowed = ", ".join(
+                f"{code} ({name})" if code else name
+                for code, name in College.objects.filter(is_active=True)
+                .order_by("sort_order", "name")
+                .values_list("code", "name")
+            )
+            raise serializers.ValidationError(
+                {
+                    "college": f"Unknown college '{raw_college}'."
+                    + (f" Choose one of: {allowed}." if allowed else "")
+                }
+            )
+        attrs["college"] = place
 
         # PR-02: the privacy notice must be accepted at registration.
         if not attrs["privacy_consent"]:
@@ -112,7 +142,7 @@ class RegisterSerializer(serializers.Serializer):
             display_name=validated_data["display_name"],
             password=validated_data["password"],
             member_type=validated_data["member_type"],
-            college=validated_data["college"].strip(),
+            college=validated_data["college"],
             year_level=validated_data.get("year_level"),
             contact_number=validated_data.get("contact_number", "").strip(),
             role=User.Role.VISITOR,

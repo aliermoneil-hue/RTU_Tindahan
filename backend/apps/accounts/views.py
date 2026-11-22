@@ -18,7 +18,7 @@ from .emails import (
     send_verification_code_email,
     send_verification_email,
 )
-from .models import User
+from .models import College, User
 from .serializers import (
     LoginSerializer,
     PasswordResetConfirmSerializer,
@@ -61,6 +61,22 @@ def auth_payload(user: User) -> dict:
         token = Token.objects.create(user=user)
 
     return {"token": token.key, "user": UserSerializer(user).data}
+
+
+class CollegeListView(APIView):
+    """The picklist for the sign-up form: one row per college, institute, office."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        places = College.objects.filter(is_active=True).order_by("sort_order", "name")
+        return Response(
+            [
+                {"code": place.code, "name": place.name, "kind": place.kind}
+                for place in places
+            ]
+        )
 
 
 class RegisterView(APIView):
