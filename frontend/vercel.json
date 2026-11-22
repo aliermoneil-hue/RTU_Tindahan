@@ -1,59 +1,21 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "x-tindahan-config",
-          "value": "loaded"
-        }
-      ]
-    }
-  ],
-  "redirects": [
-    {
-      "source": "/__redir",
-      "destination": "https://example.com/",
-      "permanent": false
-    }
-  ],
   "rewrites": [
     {
-      "source": "/__rw2/:path*",
-      "destination": "https://example.com/:path*"
+      "source": "/api/:path(.*)",
+      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/api/:path"
     },
     {
-      "source": "/__rw4",
-      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/api/v1/listings/"
+      "source": "/admin/:path(.*)",
+      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/admin/:path"
     },
     {
-      "source": "/__rw5/:path*",
-      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/api/:path*"
+      "source": "/static/:path(.*)",
+      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/static/:path"
     },
     {
-      "source": "/__rw1",
-      "destination": "https://example.com/"
-    },
-    {
-      "source": "/__tunnel/:path*",
-      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/:path*"
-    },
-    {
-      "source": "/api/:path*",
-      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/api/:path*"
-    },
-    {
-      "source": "/admin/:path*",
-      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/admin/:path*"
-    },
-    {
-      "source": "/static/:path*",
-      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/static/:path*"
-    },
-    {
-      "source": "/media/:path*",
-      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/media/:path*"
+      "source": "/media/:path(.*)",
+      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/media/:path"
     }
   ]
 }
