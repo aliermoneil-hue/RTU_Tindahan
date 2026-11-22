@@ -91,25 +91,47 @@ class ListingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        params = self.request.query_params
         queryset = Listing.objects.select_related("seller", "category").prefetch_related(
             "photos", "variants", "screening_results"
         )
 
-        # Visibility: staff see every status, a seller sees their own, and
-        # everyone else sees only approved listings that are still available
-        # (BD-01, LS-05).
+        # Visibility: staff see every status, a seller sees their own rows only
+        # when they ask for them, and everyone else sees only approved listings
+        # that are still available (BD-01, LS-05).
+        #
+        # "Ask for them" is explicit: ?seller=me (the seller dashboard) or any
+        # status filter (the moderation queue). The bare /listings/ call is the
+        # marketplace, so an unpublished listing must never ride along there —
+        # the browser has no way to tell the two apart, and a pending item
+        # showed up in the shop grid the moment its seller was signed in.
+        # Retrieve stays owner-permissive: the page opened right after
+        # publishing, and the edit screen behind it, must be able to read the
+        # seller's own unpublished listing.
         visible = Q(
             moderation_status=Listing.ModerationStatus.APPROVED,
             availability_status=Listing.AvailabilityStatus.AVAILABLE,
         )
+        own = Q(seller=user)
+        asked_for_own = params.get("seller") == "me" or any(
+            params.get(name)
+            for name in (
+                "status",
+                "moderation_status",
+                "moderation",
+                "availability_status",
+                "availability",
+            )
+        )
         if user.is_authenticated and user.is_moderator:
             pass
         elif user.is_authenticated:
-            queryset = queryset.filter(visible | Q(seller=user))
+            if self.action == "retrieve" or asked_for_own:
+                queryset = queryset.filter(visible | own)
+            else:
+                queryset = queryset.filter(visible)
         else:
             queryset = queryset.filter(visible)
-
-        params = self.request.query_params
 
         def asked_values(name):
             raw = params.get(name)

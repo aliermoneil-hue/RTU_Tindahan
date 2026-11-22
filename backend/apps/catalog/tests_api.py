@@ -74,15 +74,56 @@ class ListingApiTests(APITestCase):
             [row["title"] for row in response.json()["results"]], ["Fresh Lumpia"]
         )
 
-    def test_seller_sees_their_own_pending_listing(self):
+    def test_a_seller_does_not_see_their_pending_listing_in_the_marketplace(self):
+        # The bug this guards: a signed-in seller used to receive their own
+        # pending rows from the bare /listings/ call, which is the marketplace
+        # feed, so a brand-new item appeared in the shop before approval.
         self.make_listing(moderation_status=Listing.ModerationStatus.PENDING_SCREENING)
         self.client.force_authenticate(self.seller)
 
         response = self.client.get("/api/v1/listings/")
 
-        self.assertEqual(
-            [row["title"] for row in response.json()["results"]], ["Fresh Lumpia"]
+        self.assertEqual(response.json()["results"], [])
+
+    def test_a_seller_can_ask_for_their_own_listings(self):
+        pending = self.make_listing(
+            moderation_status=Listing.ModerationStatus.PENDING_SCREENING
         )
+        self.make_listing(
+            title="Someone else's",
+            seller=self.other,
+            moderation_status=Listing.ModerationStatus.PENDING_SCREENING,
+        )
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.get("/api/v1/listings/?seller=me")
+
+        self.assertEqual(
+            [row["title"] for row in response.json()["results"]], [pending.title]
+        )
+
+    def test_a_seller_can_open_their_own_pending_listing(self):
+        # The page opened right after publishing reads the detail endpoint, and
+        # so does the edit screen.
+        listing = self.make_listing(
+            moderation_status=Listing.ModerationStatus.PENDING_SCREENING
+        )
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.get(f"/api/v1/listings/{listing.slug}/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["moderation_status"], "pending_screening")
+
+    def test_a_seller_cannot_open_another_sellers_pending_listing(self):
+        listing = self.make_listing(
+            moderation_status=Listing.ModerationStatus.PENDING_SCREENING
+        )
+        self.client.force_authenticate(self.other)
+
+        response = self.client.get(f"/api/v1/listings/{listing.slug}/")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_filters_by_category_and_search(self):
         self.make_listing(moderation_status=Listing.ModerationStatus.APPROVED)

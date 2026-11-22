@@ -126,10 +126,15 @@ class ListingSplitApiTests(APITestCase):
         self.assertEqual(titles, ["On sale"])
 
     def test_the_owner_still_sees_their_sold_listing(self):
+        # ...but only when they ask for their own rows. The bare /listings/ call
+        # is the marketplace, and a sold item does not belong in it for anyone,
+        # the seller included (BD-01).
         self.listing("Sold out", "approved", "sold")
         self.client.force_authenticate(self.seller)
-        response = self.client.get("/api/v1/listings/")
-        self.assertEqual([row["title"] for row in response.json()["results"]], ["Sold out"])
+        marketplace = self.client.get("/api/v1/listings/")
+        own = self.client.get("/api/v1/listings/?seller=me")
+        self.assertEqual([row["title"] for row in marketplace.json()["results"]], [])
+        self.assertEqual([row["title"] for row in own.json()["results"]], ["Sold out"])
 
     def test_availability_can_be_filtered_directly(self):
         self.listing("Sold out", "approved", "sold")
