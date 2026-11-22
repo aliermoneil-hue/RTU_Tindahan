@@ -255,6 +255,8 @@ export async function createTicket(input: {
   items: Array<{ listing: number; variant: number; quantity: number }>
   pickupDate?: string | null
   claimNotes?: string
+  /** Office staff only: record the request for another member. */
+  buyerEmail?: string
 }): Promise<ApiTicket> {
   return apiFetch<ApiTicket>('/store/tickets/', {
     method: 'POST',
@@ -262,6 +264,7 @@ export async function createTicket(input: {
       items: input.items,
       pickup_date: input.pickupDate || null,
       claim_notes: input.claimNotes || '',
+      ...(input.buyerEmail ? { buyer_email: input.buyerEmail } : {}),
     },
   })
 }

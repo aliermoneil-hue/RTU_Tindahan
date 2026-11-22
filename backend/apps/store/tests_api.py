@@ -80,6 +80,102 @@ class TicketApiTests(StoreApiTestCase):
         self.assertEqual(self.variant.available, 7)
         self.assertEqual(self.variant.reserved, 3)
 
+    # -- face to face: office staff recording a walk-in request ------------
+
+    def staff_order_for(self, email, quantity=1):
+        self.client.force_authenticate(self.staff)
+        return self.client.post(
+            "/api/v1/store/tickets/",
+            {
+                "buyer_email": email,
+                "items": [
+                    {
+                        "listing": self.listing.pk,
+                        "variant": self.variant.pk,
+                        "quantity": quantity,
+                    }
+                ],
+            },
+            format="json",
+        )
+
+    def test_office_staff_can_record_a_walk_in_request_for_a_student(self):
+        response = self.staff_order_for(self.student.email, 2)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        ticket = OfficialTicket.objects.get(reference=response.json()["reference"])
+        self.assertEqual(ticket.buyer, self.student)
+        self.assertEqual(ticket.status, OfficialTicket.Status.REQUEST_RECEIVED)
+
+        self.variant.refresh_from_db()
+        self.assertEqual(self.variant.reserved, 2)
+
+    def test_an_unknown_buyer_email_is_reported(self):
+        response = self.staff_order_for("nobody@rtu.edu.ph")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("buyer_email", response.json())
+        self.assertEqual(OfficialTicket.objects.count(), 0)
+
+    def test_an_unverified_buyer_cannot_be_ordered_for(self):
+        unverified = User.objects.create_user(
+            email="2024-999999@rtu.edu.ph",
+            display_name="Unverified",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=1,
+        )
+
+        response = self.staff_order_for(unverified.email)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(OfficialTicket.objects.count(), 0)
+
+    def test_a_student_cannot_name_another_buyer(self):
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/v1/store/tickets/",
+            {
+                "buyer_email": self.other.email,
+                "items": [
+                    {
+                        "listing": self.listing.pk,
+                        "variant": self.variant.pk,
+                        "quantity": 1,
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("buyer_email", response.json())
+        self.assertEqual(OfficialTicket.objects.count(), 0)
+
+    def test_a_blank_buyer_email_still_orders_for_the_caller(self):
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/v1/store/tickets/",
+            {
+                "buyer_email": "",
+                "items": [
+                    {
+                        "listing": self.listing.pk,
+                        "variant": self.variant.pk,
+                        "quantity": 1,
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            OfficialTicket.objects.get().buyer,
+            self.student,
+        )
+
     def test_ordering_more_than_is_available_returns_400_not_500(self):
         response = self.order(11)
 
@@ -247,6 +343,67 @@ class StockApiTests(StoreApiTestCase):
 
 
 class StoreSettingApiTests(StoreApiTestCase):
+    # -- the policy the staff screen writes is the policy that is enforced --
+
+    def test_the_per_student_limit_blocks_an_order(self):
+        setting = StoreSetting.get_solo()
+        setting.max_quantity_per_student = 2
+        setting.save()
+
+        response = self.order(3)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("per student", response.text)
+        self.assertEqual(OfficialTicket.objects.count(), 0)
+
+    def test_the_per_student_limit_counts_open_tickets(self):
+        setting = StoreSetting.get_solo()
+        setting.max_quantity_per_student = 3
+        setting.save()
+        self.assertEqual(self.order(2).status_code, status.HTTP_201_CREATED)
+
+        second = self.order(2)
+
+        self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("per student", second.text)
+        self.assertEqual(OfficialTicket.objects.count(), 1)
+
+    def test_the_ordering_window_closes_the_store(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        # A window that cannot contain "now": whether the clock is near midnight
+        # or not, start > now or end < now, so the store reads as closed.
+        now = timezone.localtime()
+        setting = StoreSetting.get_solo()
+        setting.ordering_window_enabled = True
+        setting.ordering_window_start = (now + timedelta(hours=12)).time().replace(
+            microsecond=0
+        )
+        setting.ordering_window_end = (now + timedelta(hours=13)).time().replace(
+            microsecond=0
+        )
+        setting.save()
+
+        response = self.order(1)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("closed", response.text.lower())
+
+    def test_a_window_that_is_open_lets_the_order_through(self):
+        from datetime import time as clock
+
+        setting = StoreSetting.get_solo()
+        setting.ordering_window_enabled = True
+        setting.ordering_window_start = clock(0, 0, 0)
+        setting.ordering_window_end = clock(23, 59, 59)
+        setting.save()
+
+        response = self.order(1)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
     def test_anyone_can_read_the_policy(self):
         response = self.client.get("/api/v1/store/settings/")
 

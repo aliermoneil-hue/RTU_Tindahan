@@ -8,6 +8,7 @@ The serializers only translate JSON into model objects and turn Django's
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from apps.accounts.models import User
 from apps.catalog.models import Listing, ListingVariant
 
 from .models import (
@@ -193,24 +194,50 @@ class TicketLineSerializer(serializers.Serializer):
 
 
 class OfficialTicketCreateSerializer(serializers.Serializer):
-    """A student's request. Stock, limits, and windows are checked in services."""
+    """A student's request. Stock, limits, and windows are checked in services.
+
+    Office Staff may name another buyer (``buyer_email``) to record a walk-in
+    face-to-face request: the student is standing at the window and may not be
+    signed in on the office machine. Everyone else always orders for themselves,
+    whatever the payload says.
+    """
 
     items = TicketLineSerializer(many=True)
     pickup_date = serializers.DateField(required=False, allow_null=True)
     claim_notes = serializers.CharField(
         required=False, allow_blank=True, default="", max_length=1000
     )
+    buyer_email = serializers.EmailField(required=False, allow_blank=True, default="")
 
     def validate_items(self, value):
         if not value:
             raise serializers.ValidationError("Add at least one item.")
         return value
 
+    def validate(self, attrs):
+        request = self.context["request"]
+        wanted = (attrs.get("buyer_email") or "").strip().lower()
+        if not wanted:
+            attrs["buyer"] = request.user
+            return attrs
+
+        if not getattr(request.user, "is_office_staff", False):
+            raise serializers.ValidationError(
+                {"buyer_email": "Only office staff can order for another student."}
+            )
+        buyer = User.objects.filter(email__iexact=wanted).first()
+        if buyer is None:
+            raise serializers.ValidationError(
+                {"buyer_email": "No RTU Tindahan member uses that email."}
+            )
+        attrs["buyer"] = buyer
+        return attrs
+
     def create(self, validated_data):
         request = self.context["request"]
         try:
             return place_official_order(
-                buyer=request.user,
+                buyer=validated_data["buyer"],
                 items=validated_data["items"],
                 pickup_date=validated_data.get("pickup_date"),
                 claim_notes=validated_data.get("claim_notes", ""),

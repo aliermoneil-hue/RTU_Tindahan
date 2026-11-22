@@ -61,6 +61,8 @@ import {
   fetchStoreSettings,
   fetchTickets,
   mergeApiStore,
+  patchStoreSettings,
+  recordDailyCount,
   stockIn as postStockIn,
   transitionTicket as postTicketTransition,
 } from '../api/store'
@@ -794,7 +796,7 @@ interface TindahanContextValue {
     date: string
     notes: string
     lines: Array<{ pid: string; vid: string; qty: number }>
-  }) => { ok: boolean; msg?: string; txnId?: string; queue?: string | null }
+  }) => Promise<{ ok: boolean; msg?: string; txnId?: string; queue?: string | null }>
   baoSaveDailyReconciliation: (
     counts: Record<string, string>,
     reasons: Record<string, string>,
@@ -7146,21 +7148,38 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         })
         return next
       })
+      // The backend enforces the window and the limit when a student orders,
+      // so the policy has to live there too, not only in this browser.
+      void patchStoreSettings({
+        ordering_window_enabled: win.enabled,
+        ordering_window_start: win.start ? `${win.start}:00` : null,
+        ordering_window_end: win.end ? `${win.end}:00` : null,
+        max_quantity_per_student: limitPerStudent,
+      })
+        .then(() => refreshStore())
+        .catch((err: unknown) => {
+          toast(
+            err instanceof ApiRequestError
+              ? err.message
+              : 'The server did not accept those rules.',
+          )
+          void refreshStore()
+        })
       toast('Saved.')
       return true
     },
-    [currentAccount, isStaffUser, toast],
+    [currentAccount, isStaffUser, refreshStore, toast],
   )
 
   const baoCreateFaceToFaceOrder = useCallback(
-    (input: {
+    async (input: {
       name: string
       sid: string
       email: string
       date: string
       notes: string
       lines: Array<{ pid: string; vid: string; qty: number }>
-    }): { ok: boolean; msg?: string; txnId?: string; queue?: string | null } => {
+    }): Promise<{ ok: boolean; msg?: string; txnId?: string; queue?: string | null }> => {
       if (!currentAccount || !isStaffUser) {
         return { ok: false, msg: 'Only RTU staff can do that.' }
       }
@@ -7219,6 +7238,56 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // A walk-in sale is a ticket that is claimed on the spot: create it for
+      // the student's account, then claim it, so stock, the sales counter and
+      // the office's own history all move the way they do online. Lines that
+      // are still prototype-local, or a walk-in with no email, keep the local
+      // path below.
+      const backendLines = input.lines
+        .map((l) => {
+          const product = db.official.find((x) => x.id === l.pid)
+          return {
+            l,
+            listing: product?.apiListingId ?? null,
+            variant: /^v\d+$/.test(l.vid || '') ? Number(l.vid.slice(1)) : null,
+          }
+        })
+      const postable =
+        Boolean(getToken()) &&
+        Boolean(email) &&
+        backendLines.length > 0 &&
+        backendLines.every((x) => x.listing && x.variant)
+
+      let serverRef: string | undefined
+      if (postable) {
+        try {
+          const ticket = await createTicket({
+            items: backendLines.map((x) => ({
+              listing: x.listing as number,
+              variant: x.variant as number,
+              quantity: x.l.qty,
+            })),
+            buyerEmail: email,
+            claimNotes: input.notes.trim(),
+          })
+          // The status graph is strict: requested -> confirmed -> ready ->
+          // claimed. Walk it so the sale is recorded the same way an online
+          // request would be, instead of jumping straight to claimed.
+          await postTicketTransition(ticket.reference, 'Confirmed', 'Walk-in at the counter')
+          await postTicketTransition(ticket.reference, 'Ready for Pickup', 'Handed over at the counter')
+          await postTicketTransition(ticket.reference, 'Claimed', 'Face to face entry at the counter')
+          serverRef = ticket.reference
+        } catch (err) {
+          return {
+            ok: false,
+            msg:
+              err instanceof ApiRequestError
+                ? err.message
+                : 'The store could not record that request.',
+          }
+        }
+      }
+
       let outcome: { ok: boolean; msg?: string; txnId?: string; queue?: string | null } = {
         ok: true,
       }
@@ -7228,7 +7297,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         const whenDate =
           input.date === todayStr ? new Date() : new Date(input.date + 'T12:00:00')
         const day = baoDayKey(whenDate)
-        const txnId = `TXN-${day}-${String(next.seq.tx + 1).padStart(3, '0')}`
+        const txnId = serverRef
+          ? STORE_ID_PREFIX + serverRef
+          : `TXN-${day}-${String(next.seq.tx + 1).padStart(3, '0')}`
 
         const builtLines = input.lines.map((l) => {
           const p = next.official.find((x) => x.id === l.pid)!
@@ -7261,7 +7332,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         }
 
         next.seq.tx += 1
-        const oid = `FTF-${day}-${String(next.seq.o++).padStart(3, '0')}`
+        const oid = serverRef || `FTF-${day}-${String(next.seq.o++).padStart(3, '0')}`
         const firstProd = next.official.find((x) => x.id === builtLines[0].pid)!
         const total = builtLines.reduce((a, l) => a + l.price * l.qty, 0)
 
@@ -7508,9 +7579,28 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         return next
       })
 
+      // The server keeps its own count rows and writes the adjustment from
+      // them; the local record above is the screen's log. One POST per counted
+      // variant, because the API takes one variant at a time.
+      if (outcome.ok) {
+        lines.forEach((l) => {
+          if (!/^v\d+$/.test(l.u.vid)) return
+          void recordDailyCount(Number(l.u.vid.slice(1)), l.n, l.reason)
+            .then(() => refreshStore())
+            .catch((err: unknown) => {
+              toast(
+                err instanceof ApiRequestError
+                  ? err.message
+                  : 'The server did not accept that count.',
+              )
+              void refreshStore()
+            })
+        })
+      }
+
       return outcome
     },
-    [currentAccount, isStaffUser, db.official],
+    [currentAccount, isStaffUser, db.official, refreshStore, toast],
   )
 
   const baoSaveEmailSettings = useCallback(

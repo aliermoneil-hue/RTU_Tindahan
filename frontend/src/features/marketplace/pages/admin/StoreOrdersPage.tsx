@@ -708,9 +708,9 @@ export function StoreOrdersPage() {
           <form
             className="stack"
             noValidate
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault()
-              const res = baoCreateFaceToFaceOrder({
+              const res = await baoCreateFaceToFaceOrder({
                 name: f2fName,
                 sid: f2fSid,
                 email: f2fEmail,
