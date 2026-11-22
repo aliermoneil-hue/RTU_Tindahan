@@ -15,6 +15,14 @@
   ],
   "rewrites": [
     {
+      "source": "/__rw1",
+      "destination": "https://example.com/"
+    },
+    {
+      "source": "/__tunnel/:path*",
+      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/:path*"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/api/:path*"
     },
