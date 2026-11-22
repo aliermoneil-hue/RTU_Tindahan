@@ -91,8 +91,7 @@ def run_screening(listing) -> ScreeningResult:
             raw=verdict.raw,
         )
 
-    if result.is_flagged and listing.status != Listing.Status.NEEDS_REVIEW:
-        listing.status = Listing.Status.NEEDS_REVIEW
-        listing.save(update_fields=["status", "updated_at"])
+    if result.is_flagged and listing.moderation_status != Listing.ModerationStatus.NEEDS_REVIEW:
+        listing.send_to_review()
 
     return result

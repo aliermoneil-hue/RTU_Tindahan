@@ -58,7 +58,8 @@ class Command(BaseCommand):
                     "quantity": 1,
                     "meetup_place": "OSA Office",
                     "is_official": True,
-                    "status": Listing.Status.APPROVED,
+                    "moderation_status": Listing.ModerationStatus.APPROVED,
+                    "availability_status": Listing.AvailabilityStatus.AVAILABLE,
                 },
             )
             if listing.published_at is None:

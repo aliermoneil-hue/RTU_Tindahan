@@ -87,6 +87,9 @@ class ListingReadSerializer(serializers.ModelSerializer):
     photos = ListingPhotoSerializer(many=True, read_only=True)
     variants = ListingVariantSerializer(many=True, read_only=True)
     is_published = serializers.BooleanField(read_only=True)
+    # The pre-split single value, now derived. Declared explicitly so DRF reads
+    # the model property instead of looking for a database column.
+    status = serializers.CharField(read_only=True)
     # AI-03: the moderator queue needs to know why a listing was flagged.
     # Everyone else gets null, so a seller never sees the scoring rules.
     screening = serializers.SerializerMethodField()
@@ -107,6 +110,8 @@ class ListingReadSerializer(serializers.ModelSerializer):
             "quantity",
             "meetup_place",
             "is_official",
+            "moderation_status",
+            "availability_status",
             "status",
             "rejection_reason",
             "view_count",
@@ -189,7 +194,8 @@ class ListingWriteSerializer(serializers.ModelSerializer):
         photos = validated_data.pop("upload_photos", [])
         listing = Listing.objects.create(
             seller=self.context["request"].user,
-            status=Listing.Status.PENDING_SCREENING,  # LS-05 / AI-02
+            moderation_status=Listing.ModerationStatus.PENDING_SCREENING,  # LS-05 / AI-02
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
             **validated_data,
         )
         for index, image in enumerate(photos):

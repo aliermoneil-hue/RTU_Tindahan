@@ -64,8 +64,8 @@ class ListingApiTests(APITestCase):
     # -- reading -----------------------------------------------------------
 
     def test_anonymous_sees_only_approved_listings(self):
-        self.make_listing(status=Listing.Status.APPROVED)
-        self.make_listing(title="Hidden", status=Listing.Status.PENDING_SCREENING)
+        self.make_listing(moderation_status=Listing.ModerationStatus.APPROVED)
+        self.make_listing(title="Hidden", moderation_status=Listing.ModerationStatus.PENDING_SCREENING)
 
         response = self.client.get("/api/v1/listings/")
 
@@ -75,7 +75,7 @@ class ListingApiTests(APITestCase):
         )
 
     def test_seller_sees_their_own_pending_listing(self):
-        self.make_listing(status=Listing.Status.PENDING_SCREENING)
+        self.make_listing(moderation_status=Listing.ModerationStatus.PENDING_SCREENING)
         self.client.force_authenticate(self.seller)
 
         response = self.client.get("/api/v1/listings/")
@@ -85,11 +85,11 @@ class ListingApiTests(APITestCase):
         )
 
     def test_filters_by_category_and_search(self):
-        self.make_listing(status=Listing.Status.APPROVED)
+        self.make_listing(moderation_status=Listing.ModerationStatus.APPROVED)
         self.make_listing(
             title="Notebook",
             description="Ruled, 80 leaves.",
-            status=Listing.Status.APPROVED,
+            moderation_status=Listing.ModerationStatus.APPROVED,
         )
 
         by_search = self.client.get("/api/v1/listings/?search=notebook")
@@ -101,9 +101,9 @@ class ListingApiTests(APITestCase):
     # -- browsing: price range and sales ordering (BD-03, BD-06) -----------
 
     def test_price_filters_are_inclusive_and_combinable(self):
-        self.make_listing(title="Candy", price="10.00", status=Listing.Status.APPROVED)
-        self.make_listing(title="Lumpia", price="50.00", status=Listing.Status.APPROVED)
-        self.make_listing(title="Jacket", price="500.00", status=Listing.Status.APPROVED)
+        self.make_listing(title="Candy", price="10.00", moderation_status=Listing.ModerationStatus.APPROVED)
+        self.make_listing(title="Lumpia", price="50.00", moderation_status=Listing.ModerationStatus.APPROVED)
+        self.make_listing(title="Jacket", price="500.00", moderation_status=Listing.ModerationStatus.APPROVED)
 
         def titles(query):
             response = self.client.get(f"/api/v1/listings/?{query}")
@@ -134,9 +134,9 @@ class ListingApiTests(APITestCase):
         self.assertIn("min_price", response.json())
 
     def test_best_selling_orders_by_units_sold(self):
-        self.make_listing(title="Quiet", status=Listing.Status.APPROVED, sold_count=0)
-        self.make_listing(title="Steady", status=Listing.Status.APPROVED, sold_count=5)
-        self.make_listing(title="Brisk", status=Listing.Status.APPROVED, sold_count=12)
+        self.make_listing(title="Quiet", moderation_status=Listing.ModerationStatus.APPROVED, sold_count=0)
+        self.make_listing(title="Steady", moderation_status=Listing.ModerationStatus.APPROVED, sold_count=5)
+        self.make_listing(title="Brisk", moderation_status=Listing.ModerationStatus.APPROVED, sold_count=12)
 
         best = self.client.get("/api/v1/listings/?ordering=best-selling")
         least = self.client.get("/api/v1/listings/?ordering=least-sold")
@@ -196,9 +196,9 @@ class ListingApiTests(APITestCase):
         self.assertTrue(seen.json()["screening"]["reasons"])
 
     def test_the_moderator_queue_asks_for_a_status(self):
-        self.make_listing(title="Live one", status=Listing.Status.APPROVED)
-        self.make_listing(title="Waiting one", status=Listing.Status.PENDING_SCREENING)
-        self.make_listing(title="Flagged one", status=Listing.Status.NEEDS_REVIEW)
+        self.make_listing(title="Live one", moderation_status=Listing.ModerationStatus.APPROVED)
+        self.make_listing(title="Waiting one", moderation_status=Listing.ModerationStatus.PENDING_SCREENING)
+        self.make_listing(title="Flagged one", moderation_status=Listing.ModerationStatus.NEEDS_REVIEW)
 
         self.client.force_authenticate(self.moderator)
         waiting = self.client.get("/api/v1/listings/?status=pending_screening")
@@ -212,7 +212,7 @@ class ListingApiTests(APITestCase):
         self.assertEqual(len(queue.json()["results"]), 2)
 
     def test_a_visitor_cannot_use_status_to_see_hidden_listings(self):
-        self.make_listing(status=Listing.Status.PENDING_SCREENING)
+        self.make_listing(moderation_status=Listing.ModerationStatus.PENDING_SCREENING)
 
         response = self.client.get("/api/v1/listings/?status=pending_screening")
 
@@ -225,7 +225,7 @@ class ListingApiTests(APITestCase):
         self.assertIn("status", response.json())
 
     def test_detail_counts_a_view(self):
-        listing = self.make_listing(status=Listing.Status.APPROVED)
+        listing = self.make_listing(moderation_status=Listing.ModerationStatus.APPROVED)
 
         self.client.get(f"/api/v1/listings/{listing.slug}/")
 
@@ -251,7 +251,7 @@ class ListingApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         listing = Listing.objects.get(slug=response.json()["slug"])
         self.assertEqual(listing.seller, self.seller)
-        self.assertEqual(listing.status, Listing.Status.PENDING_SCREENING)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.PENDING_SCREENING)
         self.assertFalse(listing.is_published)
 
     def test_cannot_publish_is_official_over_http(self):
@@ -277,7 +277,7 @@ class ListingApiTests(APITestCase):
         self.assertIn("condition", response.json())
 
     def test_a_seller_cannot_edit_someone_elses_listing(self):
-        listing = self.make_listing(status=Listing.Status.APPROVED)
+        listing = self.make_listing(moderation_status=Listing.ModerationStatus.APPROVED)
         self.client.force_authenticate(self.other)
 
         response = self.client.patch(
@@ -347,7 +347,7 @@ class ListingApiTests(APITestCase):
         self.assertEqual(missing.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(given.status_code, status.HTTP_200_OK)
         listing.refresh_from_db()
-        self.assertEqual(listing.status, Listing.Status.REJECTED)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.REJECTED)
         self.assertEqual(listing.rejection_reason, "Prohibited item.")
 
 

@@ -58,7 +58,7 @@ class ListingTests(TestCase):
 
     def test_defaults_to_pending_screening(self):
         listing = self.make_listing()
-        self.assertEqual(listing.status, Listing.Status.PENDING_SCREENING)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.PENDING_SCREENING)
         self.assertFalse(listing.is_published)
 
     def test_service_requires_not_applicable_condition(self):
@@ -139,7 +139,7 @@ class ListingTests(TestCase):
         listing.approve()
         listing.refresh_from_db()
 
-        self.assertEqual(listing.status, Listing.Status.APPROVED)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.APPROVED)
         self.assertIsNotNone(listing.published_at)
         self.assertTrue(listing.is_published)
 

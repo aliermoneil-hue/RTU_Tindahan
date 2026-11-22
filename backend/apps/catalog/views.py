@@ -49,7 +49,11 @@ ORDERING = {
     "least-sold": ("sold_count", "-created_at"),
 }
 TRUE_VALUES = {"1", "true", "yes"}
-STATUS_VALUES = {choice for choice, _ in Listing.Status.choices}
+MODERATION_VALUES = {choice for choice, _ in Listing.ModerationStatus.choices}
+AVAILABILITY_VALUES = {choice for choice, _ in Listing.AvailabilityStatus.choices}
+# What `?status=` accepted before the split, kept so existing callers (the
+# moderator queue included) keep working unchanged.
+STATUS_VALUES = MODERATION_VALUES | AVAILABILITY_VALUES
 
 
 def price_bound(params, key):
@@ -92,36 +96,68 @@ class ListingViewSet(viewsets.ModelViewSet):
         )
 
         # Visibility: staff see every status, a seller sees their own, and
-        # everyone else sees only approved listings (BD-01, LS-05).
+        # everyone else sees only approved listings that are still available
+        # (BD-01, LS-05).
+        visible = Q(
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+        )
         if user.is_authenticated and user.is_moderator:
             pass
         elif user.is_authenticated:
-            queryset = queryset.filter(
-                Q(status=Listing.Status.APPROVED) | Q(seller=user)
-            )
+            queryset = queryset.filter(visible | Q(seller=user))
         else:
-            queryset = queryset.filter(status=Listing.Status.APPROVED)
+            queryset = queryset.filter(visible)
 
         params = self.request.query_params
-        # AI-03: the moderator queue asks for one status at a time, e.g.
-        # ?status=pending_screening or ?status=pending_screening,needs_review.
-        # The visibility filter above already limits a visitor to approved
-        # listings, so narrowing by status here cannot reveal anything new.
-        if raw_status := params.get("status"):
-            asked = [
-                value.strip().lower()
-                for value in raw_status.split(",")
-                if value.strip()
+
+        def asked_values(name):
+            raw = params.get(name)
+            if not raw:
+                return []
+            return [
+                value.strip().lower() for value in raw.split(",") if value.strip()
             ]
-            unknown = [value for value in asked if value not in STATUS_VALUES]
+
+        def check_known(name, values, valid):
+            unknown = [value for value in values if value not in valid]
             if unknown:
                 raise ValidationError(
                     {
-                        "status": f"Unknown status: {', '.join(unknown)}. "
-                        f"Valid values: {', '.join(sorted(STATUS_VALUES))}."
+                        name: f"Unknown {name}: {', '.join(unknown)}. "
+                        f"Valid values: {', '.join(sorted(valid))}."
                     }
                 )
-            queryset = queryset.filter(status__in=asked)
+
+        # AI-03: the moderator queue asks for one moderation state at a time,
+        # e.g. ?status=pending_screening or ?status=pending_screening,needs_review.
+        # The visibility filter above already limits a visitor to approved
+        # listings, so narrowing here cannot reveal anything new.
+        #
+        # `status` is the pre-split parameter and still works: moderation values
+        # narrow moderation_status, availability values narrow
+        # availability_status, and a mixed list narrows both.
+        legacy = asked_values("status")
+        check_known("status", legacy, STATUS_VALUES)
+        moderation_asked = [v for v in legacy if v in MODERATION_VALUES]
+        availability_asked = [v for v in legacy if v in AVAILABILITY_VALUES]
+
+        explicit_moderation = asked_values("moderation_status") or asked_values(
+            "moderation"
+        )
+        check_known("moderation_status", explicit_moderation, MODERATION_VALUES)
+        moderation_asked += explicit_moderation
+
+        explicit_availability = asked_values("availability_status") or asked_values(
+            "availability"
+        )
+        check_known("availability_status", explicit_availability, AVAILABILITY_VALUES)
+        availability_asked += explicit_availability
+
+        if moderation_asked:
+            queryset = queryset.filter(moderation_status__in=set(moderation_asked))
+        if availability_asked:
+            queryset = queryset.filter(availability_status__in=set(availability_asked))
         if category := params.get("category"):
             queryset = queryset.filter(category__slug=category)
         if search := params.get("search"):

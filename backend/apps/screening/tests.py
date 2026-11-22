@@ -91,7 +91,7 @@ class RunScreeningTests(TestCase):
 
         listing.refresh_from_db()
         self.assertEqual(result.verdict, ScreeningResult.Verdict.CLEAN)
-        self.assertEqual(listing.status, Listing.Status.PENDING_SCREENING)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.PENDING_SCREENING)
         self.assertEqual(listing.screening_results.count(), 1)
 
     def test_a_flagged_listing_is_pulled_to_review(self):
@@ -104,7 +104,7 @@ class RunScreeningTests(TestCase):
 
         listing.refresh_from_db()
         self.assertEqual(result.verdict, ScreeningResult.Verdict.FLAGGED)
-        self.assertEqual(listing.status, Listing.Status.NEEDS_REVIEW)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.NEEDS_REVIEW)
         self.assertTrue(result.reasons)
 
     @override_settings(SCREENING_PROVIDER="some-model-nobody-registered")
@@ -116,7 +116,7 @@ class RunScreeningTests(TestCase):
         listing.refresh_from_db()
         self.assertEqual(result.provider, "some-model-nobody-registered+fallback")
         self.assertEqual(result.verdict, ScreeningResult.Verdict.CLEAN)
-        self.assertEqual(listing.status, Listing.Status.PENDING_SCREENING)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.PENDING_SCREENING)
 
     @override_settings(
         SCREENING_PROVIDER="some-model-nobody-registered", SCREENING_FALLBACK=False
@@ -129,7 +129,7 @@ class RunScreeningTests(TestCase):
         listing.refresh_from_db()
         self.assertEqual(result.provider, "error")
         self.assertIsNone(result.score)
-        self.assertEqual(listing.status, Listing.Status.NEEDS_REVIEW)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.NEEDS_REVIEW)
 
     def test_screening_never_publishes(self):
         listing = make_listing()
@@ -227,7 +227,7 @@ class GeminiFallbackTests(TestCase):
         self.assertEqual(result.provider, "gemini+fallback")
         self.assertEqual(result.verdict, ScreeningResult.Verdict.CLEAN)
         self.assertTrue(any("rules check" in reason for reason in result.reasons))
-        self.assertEqual(listing.status, Listing.Status.PENDING_SCREENING)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.PENDING_SCREENING)
 
     @override_settings(SCREENING_FALLBACK=False)
     def test_with_the_fallback_off_a_failure_goes_to_a_moderator(self):
@@ -240,7 +240,7 @@ class GeminiFallbackTests(TestCase):
 
         listing.refresh_from_db()
         self.assertEqual(result.provider, "error")
-        self.assertEqual(listing.status, Listing.Status.NEEDS_REVIEW)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.NEEDS_REVIEW)
 
     def test_a_live_provider_answers_are_used_when_it_works(self):
         listing = make_listing()
@@ -254,4 +254,4 @@ class GeminiFallbackTests(TestCase):
         listing.refresh_from_db()
         self.assertEqual(result.provider, "gemini")
         self.assertEqual(result.score, 88)
-        self.assertEqual(listing.status, Listing.Status.NEEDS_REVIEW)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.NEEDS_REVIEW)

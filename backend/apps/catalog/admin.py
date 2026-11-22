@@ -39,11 +39,18 @@ class ListingAdmin(admin.ModelAdmin):
         "category",
         "listing_type",
         "price",
-        "status",
+        "moderation_status",
+        "availability_status",
         "is_official",
         "created_at",
     )
-    list_filter = ("status", "listing_type", "is_official", "category")
+    list_filter = (
+        "moderation_status",
+        "availability_status",
+        "listing_type",
+        "is_official",
+        "category",
+    )
     search_fields = ("title", "description", "seller__email", "seller__display_name")
     list_select_related = ("seller", "category")
     inlines = [ListingVariantInline, ListingPhotoInline]

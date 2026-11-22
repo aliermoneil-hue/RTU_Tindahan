@@ -54,12 +54,15 @@ class Listing(models.Model):
         USED = "used", "Used"
         NOT_APPLICABLE = "na", "Not applicable"
 
-    class Status(models.TextChoices):
+    class ModerationStatus(models.TextChoices):
         DRAFT = "draft", "Draft"
         PENDING_SCREENING = "pending_screening", "Pending screening"
         APPROVED = "approved", "Approved"
         NEEDS_REVIEW = "needs_review", "Needs review"
         REJECTED = "rejected", "Rejected"
+
+    class AvailabilityStatus(models.TextChoices):
+        AVAILABLE = "available", "Available"
         SOLD = "sold", "Sold"
         UNAVAILABLE = "unavailable", "Unavailable"
         REMOVED = "removed", "Removed"
@@ -98,10 +101,19 @@ class Listing(models.Model):
     is_official = models.BooleanField(default=False, db_index=True)
 
     # LS-05, AI-02: new listings wait for screening before publication.
-    status = models.CharField(
+    # Moderation and availability are independent facts: a listing can be
+    # approved and sold, or approved and temporarily unavailable. They were once
+    # one column, which made "approved but out of stock" inexpressible.
+    moderation_status = models.CharField(
         max_length=30,
-        choices=Status.choices,
-        default=Status.PENDING_SCREENING,
+        choices=ModerationStatus.choices,
+        default=ModerationStatus.PENDING_SCREENING,
+        db_index=True,
+    )
+    availability_status = models.CharField(
+        max_length=20,
+        choices=AvailabilityStatus.choices,
+        default=AvailabilityStatus.AVAILABLE,
         db_index=True,
     )
     rejection_reason = models.TextField(blank=True)
@@ -117,9 +129,9 @@ class Listing(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["status", "published_at"]),
-            models.Index(fields=["category", "status"]),
-            models.Index(fields=["seller", "status"]),
+            models.Index(fields=["moderation_status", "published_at"]),
+            models.Index(fields=["category", "moderation_status"]),
+            models.Index(fields=["seller", "moderation_status"]),
         ]
         constraints = [
             models.CheckConstraint(
@@ -129,6 +141,15 @@ class Listing(models.Model):
             models.CheckConstraint(
                 condition=models.Q(quantity__gte=1),
                 name="catalog_listing_quantity_at_least_1",
+            ),
+            # A rejected listing cannot be on sale; the two fields must agree
+            # on that one combination.
+            models.CheckConstraint(
+                condition=~(
+                    models.Q(moderation_status="rejected")
+                    & models.Q(availability_status="sold")
+                ),
+                name="catalog_rejected_listing_not_sold",
             ),
         ]
 
@@ -174,24 +195,68 @@ class Listing(models.Model):
                 {"is_official": "Only Office Staff may publish official items."}
             )
 
+    # -- State transitions -------------------------------------------------
+
     def approve(self):
-        self.status = self.Status.APPROVED
+        self.moderation_status = self.ModerationStatus.APPROVED
         if self.published_at is None:
             self.published_at = timezone.now()
-        self.save(update_fields=["status", "published_at", "updated_at"])
+        self.save(update_fields=["moderation_status", "published_at", "updated_at"])
 
     def reject(self, reason=""):
-        self.status = self.Status.REJECTED
+        self.moderation_status = self.ModerationStatus.REJECTED
+        self.availability_status = self.AvailabilityStatus.UNAVAILABLE
         self.rejection_reason = reason
-        self.save(update_fields=["status", "rejection_reason", "updated_at"])
+        self.save(
+            update_fields=[
+                "moderation_status",
+                "availability_status",
+                "rejection_reason",
+                "updated_at",
+            ]
+        )
+
+    def send_to_review(self):
+        self.moderation_status = self.ModerationStatus.NEEDS_REVIEW
+        self.save(update_fields=["moderation_status", "updated_at"])
 
     def mark_sold(self):
-        self.status = self.Status.SOLD
-        self.save(update_fields=["status", "updated_at"])
+        self.availability_status = self.AvailabilityStatus.SOLD
+        self.save(update_fields=["availability_status", "updated_at"])
+
+    def mark_unavailable(self):
+        self.availability_status = self.AvailabilityStatus.UNAVAILABLE
+        self.save(update_fields=["availability_status", "updated_at"])
+
+    def mark_removed(self):
+        self.availability_status = self.AvailabilityStatus.REMOVED
+        self.save(update_fields=["availability_status", "updated_at"])
+
+    @property
+    def status(self) -> str:
+        """The combined value this row had before the split.
+
+        Read-only and derived: kept so responses and older clients that read a
+        single `status` string keep working now that the column is two fields.
+        """
+        availability = self.availability_status
+        moderation = self.moderation_status
+        if availability == self.AvailabilityStatus.SOLD:
+            return "sold"
+        if moderation == self.ModerationStatus.REJECTED:
+            return "rejected"
+        if availability == self.AvailabilityStatus.REMOVED:
+            return "removed"
+        if availability == self.AvailabilityStatus.UNAVAILABLE:
+            return "unavailable"
+        return str(moderation)
 
     @property
     def is_published(self):
-        return self.status == self.Status.APPROVED
+        return (
+            self.moderation_status == self.ModerationStatus.APPROVED
+            and self.availability_status == self.AvailabilityStatus.AVAILABLE
+        )
 
 
 class ListingPhoto(models.Model):
