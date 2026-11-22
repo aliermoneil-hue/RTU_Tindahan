@@ -5,9 +5,28 @@ import { baoItemType, baoReserved, baoUnits } from '../baoHelpers'
 import { isSvc, peso, stamp } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
 import { imgSrc } from '../imageStore'
+import { API_ID_PREFIX, type ApiListing } from '../api/listings'
 import { AvatarBadge } from '../components/AvatarBadge'
 import { RatingText, StarsDisplay } from '../components/StarRating'
 import './MyShopPage.css'
+
+/** How one of the member's own listings reads on screen. */
+function myListingState(listing: ApiListing): {
+  label: string
+  tone: string
+} {
+  if (listing.moderation_status === 'pending_screening')
+    return { label: 'Waiting for approval', tone: 'yellow' }
+  if (listing.moderation_status === 'needs_review')
+    return { label: 'Needs review', tone: 'yellow' }
+  if (listing.moderation_status === 'rejected')
+    return { label: 'Rejected', tone: 'red' }
+  if (listing.moderation_status === 'draft') return { label: 'Draft', tone: 'navy' }
+  if (listing.availability_status === 'sold') return { label: 'Sold', tone: 'navy' }
+  if (listing.availability_status !== 'available')
+    return { label: 'Unavailable', tone: 'navy' }
+  return { label: 'Live', tone: 'green' }
+}
 
 export function MyShopPage() {
   const {
@@ -34,6 +53,8 @@ export function MyShopPage() {
     openModal,
     setDraft,
     setListStep,
+    myListings,
+    refreshMyListings,
   } = useTindahan()
 
   // Quick inline edit state for Official RTU Store products in Admin | RTU Shop
@@ -434,6 +455,66 @@ export function MyShopPage() {
                 </span>
               </div>
             ))}
+          </div>
+
+          {/* The marketplace only shows published rows, so a listing that is
+              still waiting for approval would otherwise disappear from the
+              seller's view the moment they posted it. */}
+          <div className="card stack">
+            <div className="row between">
+              <b>My listings</b>
+              <span className="tiny muted">
+                {myListings.length
+                  ? `${myListings.length} total`
+                  : 'Nothing posted yet'}
+              </span>
+            </div>
+            {myListings.length ? (
+              <>
+                <div className="stack" style={{ gap: 10 }}>
+                  {myListings.map((listing) => {
+                    const state = myListingState(listing)
+                    return (
+                      <div
+                        key={listing.slug}
+                        className="row between small"
+                        style={{ gap: 10 }}
+                      >
+                        <span style={{ overflowWrap: 'anywhere', flex: 1 }}>
+                          {listing.title}
+                          <span className="tiny muted">
+                            {' '}
+                            · {peso(Number(listing.price))}
+                          </span>
+                        </span>
+                        <span className={`pill ${state.tone}`}>{state.label}</span>
+                        <button
+                          type="button"
+                          className="btn ghost sm"
+                          onClick={() => {
+                            navigate(`product?id=${API_ID_PREFIX}${listing.slug}`)
+                          }}
+                        >
+                          Open
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+                <button
+                  type="button"
+                  className="btn ghost sm"
+                  onClick={() => void refreshMyListings()}
+                >
+                  Refresh
+                </button>
+              </>
+            ) : (
+              <p className="small muted">
+                A listing appears here the moment you post it, and stays while it
+                waits for approval.
+              </p>
+            )}
           </div>
 
           {/* Requirement #1: Removed ADMIN | RTU Shop Guide for staff; keep First-time seller guide for students */}

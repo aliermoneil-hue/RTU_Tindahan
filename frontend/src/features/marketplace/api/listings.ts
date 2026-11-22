@@ -16,7 +16,7 @@
  * Everything is public: these endpoints need no token.
  */
 
-import { ApiRequestError, apiFetch, apiUpload } from '@/common/api/client'
+import { ApiRequestError, apiFetch, apiUpload, getToken } from '@/common/api/client'
 import type { IconName } from '@/common/components/icons'
 
 import { CAT_META, OFFCAT } from '../constants'
@@ -60,6 +60,8 @@ export interface ApiListing {
   meetup_place: string
   is_official: boolean
   status: string
+  moderation_status: string
+  availability_status: string
   view_count: number
   sold_count: number
   created_at: string
@@ -224,6 +226,27 @@ export async function fetchListings(maxPages = 5): Promise<ApiListing[]> {
     const data: ApiPage<ApiListing> = await apiFetch<ApiPage<ApiListing>>(path)
     collected.push(...(data.results ?? []))
     path = data.next ? pathFromNextUrl(data.next) : null
+  }
+  return collected
+}
+
+/**
+ * The signed-in member's own listings, whatever their moderation state.
+ *
+ * The bare `/listings/` call is the marketplace and returns published items
+ * only; `?seller=me` is what makes an unapproved listing visible to the person
+ * who posted it.
+ */
+export async function fetchMyListings(maxPages = 5): Promise<ApiListing[]> {
+  if (!getToken()) return []
+  const collected: ApiListing[] = []
+  let path: string | null = '/listings/?seller=me'
+  for (let page = 0; page < maxPages && path; page += 1) {
+    const data: ApiPage<ApiListing> = await apiFetch<ApiPage<ApiListing>>(path)
+    collected.push(...(data.results ?? []))
+    path = data.next
+      ? data.next.slice(data.next.indexOf('/api/v1') + '/api/v1'.length)
+      : null
   }
   return collected
 }

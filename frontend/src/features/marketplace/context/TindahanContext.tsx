@@ -50,6 +50,7 @@ import {
   API_ID_PREFIX,
   createListing,
   fetchListings,
+  fetchMyListings,
   mergeApiCatalogue,
   type ApiListing,
   type ApiPage,
@@ -572,6 +573,9 @@ interface TindahanContextValue {
   listingsLoading: boolean
   /** Listings waiting for a moderator, straight from the server. */
   pendingListings: ApiListing[]
+  /** The signed-in member's own listings, any moderation state. */
+  myListings: ApiListing[]
+  refreshMyListings: () => Promise<void>
   /** Approve or reject a listing in Django, then refresh the queue and catalogue. */
   moderateListing: (slug: string, decision: 'approve' | 'reject', reason?: string) => Promise<boolean>
   hasSettledInitialFetch: boolean
@@ -845,6 +849,17 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     setDb((prev) => mergeApiCatalogue(prev, listings))
   }, [])
 
+  // The seller's own rows, including the ones still waiting for approval. The
+  // public feed never carries those, so they are fetched separately.
+  const [myListings, setMyListings] = useState<ApiListing[]>([])
+  const refreshMyListings = useCallback(async () => {
+    try {
+      setMyListings(await fetchMyListings())
+    } catch {
+      /* backend offline: leave whatever was loaded */
+    }
+  }, [])
+
   // The moderation queue lives on the server; the mount effect fills it.
   const [pendingListings, setPendingListings] = useState<ApiListing[]>([])
   const refreshPendingListings = useCallback(async () => {
@@ -873,6 +888,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           await refreshListings()
           await refreshPendingListings()
+          await refreshMyListings()
         }
       } catch {
         /* backend offline or CORS blocked: keep the local catalogue */
@@ -885,7 +901,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [refreshListings, refreshPendingListings])
+  }, [refreshListings, refreshPendingListings, refreshMyListings])
 
   // The Official Store's tickets and stock ledger live on the server too, but
   // only staff accounts may read them. The merge replaces the prototype's demo
@@ -7708,6 +7724,8 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       storageKb,
       listingsLoading,
       pendingListings,
+      myListings,
+      refreshMyListings,
       moderateListing,
       hasSettledInitialFetch,
       toastMsg,
@@ -7868,6 +7886,8 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     [
       db,
       pendingListings,
+      myListings,
+      refreshMyListings,
       moderateListing,
       currentAccount,
       isStaffUser,
