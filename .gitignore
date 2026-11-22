@@ -258,3 +258,10 @@ Thumbs.db
 
 # Local snapshot archives must never be committed
 *.tar.gz
+
+# Local Netlify folder
+.netlify
+
+# Local backup copies and tunnel state
+*.bak
+*.bak-*
