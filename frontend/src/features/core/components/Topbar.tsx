@@ -19,13 +19,14 @@ const MEMBER_LABEL: Record<User['member_type'], string> = {
 interface TopbarProps {
   user: User
   onMenuClick: () => void
+  onCloseMobileMenu?: () => void
 }
 
 /**
  * TOP BAR for signed-in pages: menu button (phones), search, messages,
  * notifications, cart and the user menu.
  */
-export function Topbar({ user, onMenuClick }: TopbarProps) {
+export function Topbar({ user, onMenuClick, onCloseMobileMenu }: TopbarProps) {
   const { logout } = useAuth()
   const { theme, toggle } = useTheme()
   const {
@@ -58,6 +59,7 @@ export function Topbar({ user, onMenuClick }: TopbarProps) {
     e.preventDefault()
     const q = query.trim()
     browseFor({ q, goBrowse: true })
+    onCloseMobileMenu?.()
   }
 
   const toggleMenu = (which: 'bell' | 'user') => setOpen((cur) => (cur === which ? '' : which))
@@ -73,10 +75,26 @@ export function Topbar({ user, onMenuClick }: TopbarProps) {
   return (
     <header className="top">
       <div className="top-start">
-        <Link to="marketplace" className="logo-link" aria-label="RTU Tindahan Home">
+        <Link
+          to="marketplace"
+          className="logo-link"
+          aria-label="RTU Tindahan Home"
+          onClick={() => {
+            setOpen('')
+            onCloseMobileMenu?.()
+          }}
+        >
           <img src={logoImg} alt="RTU Tindahan" className="topbar-logo" />
         </Link>
-        <button type="button" className="menu-btn" aria-label="Open menu" onClick={onMenuClick}>
+        <button
+          type="button"
+          className="menu-btn"
+          aria-label="Open menu"
+          onClick={() => {
+            setOpen('')
+            onMenuClick()
+          }}
+        >
           <Icon name="menu" />
         </button>
       </div>
@@ -88,12 +106,22 @@ export function Topbar({ user, onMenuClick }: TopbarProps) {
           aria-label="Search marketplace"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => onCloseMobileMenu?.()}
         />
       </form>
 
       <div className="top-end">
         <div className="right-actions">
-          <Link to="messages" className="iconbtn" aria-label="Messages" title="Messages">
+          <Link
+            to="messages"
+            className="iconbtn"
+            aria-label="Messages"
+            title="Messages"
+            onClick={() => {
+              setOpen('')
+              onCloseMobileMenu?.()
+            }}
+          >
             <Icon name="msg" />
             {unreadMessagesCount > 0 && <span className="dot">{unreadMessagesCount}</span>}
           </Link>
@@ -105,7 +133,10 @@ export function Topbar({ user, onMenuClick }: TopbarProps) {
               aria-label="Notifications"
               aria-haspopup="true"
               aria-expanded={open === 'bell'}
-              onClick={() => toggleMenu('bell')}
+              onClick={() => {
+                toggleMenu('bell')
+                onCloseMobileMenu?.()
+              }}
             >
               <Icon name="bell" />
               {unreadNotifs > 0 && <span className="dot">{unreadNotifs}</span>}
@@ -152,7 +183,16 @@ export function Topbar({ user, onMenuClick }: TopbarProps) {
             )}
           </div>
 
-          <Link to="cart" className="iconbtn" aria-label="Pickup cart" title="Pickup cart">
+          <Link
+            to="cart"
+            className="iconbtn"
+            aria-label="Pickup cart"
+            title="Pickup cart"
+            onClick={() => {
+              setOpen('')
+              onCloseMobileMenu?.()
+            }}
+          >
             <Icon name="cart" />
             {cartCount > 0 && <span className="dot">{cartCount}</span>}
           </Link>
@@ -163,7 +203,10 @@ export function Topbar({ user, onMenuClick }: TopbarProps) {
               className="userbtn"
               aria-haspopup="true"
               aria-expanded={open === 'user'}
-              onClick={() => toggleMenu('user')}
+              onClick={() => {
+                toggleMenu('user')
+                onCloseMobileMenu?.()
+              }}
             >
               <span className="avw av-sm">
                 <span className={`avatar ${isStaffUser ? 'staff' : ''}`.trim()}>

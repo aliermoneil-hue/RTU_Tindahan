@@ -13,8 +13,6 @@ import './CartPage.css'
 export function CartPage() {
   const {
     currentAccount,
-    cartCount,
-    cartTotal,
     cartStep,
     setCartStep,
     cartMsg,
@@ -28,8 +26,11 @@ export function CartPage() {
     updateCartQty,
     removeCartLine,
     toggleCartEdit,
+    toggleCartSelect,
+    toggleCartSelectAll,
     updateCartMeetup,
     sendMeetupRequest,
+    selectedCartItems,
     toast,
   } = useTindahan()
 
@@ -38,18 +39,25 @@ export function CartPage() {
 
   if (!currentAccount) return null
   const cart = currentAccount.cart || []
-  const sellers = new Set(
-    cart.map((c) => byId(c.id)?.seller).filter(Boolean),
+  const selectedCount = selectedCartItems.size
+
+  const selectedSellers = new Set(
+    cart
+      .filter((_, i) => selectedCartItems.has(i))
+      .map((c) => byId(c.id)?.seller)
+      .filter(Boolean),
   ).size
 
-  // Check if any line has an invalid or unconfigured fulfillment method
-  const hasInvalidFulfillment = cart.some((c) => {
+  const hasInvalidFulfillment = cart.some((c, i) => {
+    if (!selectedCartItems.has(i)) return false
     const p = byId(c.id)
     if (!p) return true
     const avail: FulfillmentMethod | 'none' =
       p.cat === 'Official' && !p.fulfillment
         ? 'pickup'
-        : p.fulfillment === 'pickup' || p.fulfillment === 'delivery' || p.fulfillment === 'both'
+        : p.fulfillment === 'pickup' ||
+            p.fulfillment === 'delivery' ||
+            p.fulfillment === 'both'
           ? p.fulfillment
           : 'none'
     if (avail === 'none') return true
@@ -59,6 +67,20 @@ export function CartPage() {
     if (avail === 'delivery' && chosen !== 'delivery') return true
     return false
   })
+
+  const selectedCartCount = cart.reduce(
+    (acc, _, i) => (selectedCartItems.has(i) ? acc + 1 : acc),
+    0,
+  )
+  const selectedCartTotal = cart.reduce(
+    (acc, c, i) => {
+      if (!selectedCartItems.has(i)) return acc
+      const p = byId(c.id)
+      if (!p) return acc
+      return acc + unitPrice(p, c.vid) * c.qty
+    },
+    0,
+  )
 
   const handleSend = () => {
     if (hasInvalidFulfillment) {
@@ -121,6 +143,25 @@ export function CartPage() {
       ) : (
         <div className="cart-two two">
           <div className="stack">
+            <div className="selection-bar">
+              <label className="check row between wrap">
+                <input
+                  type="checkbox"
+                  checked={selectedCount > 0 && selectedCount === cart.length}
+                  onChange={() => toggleCartSelectAll()}
+                />
+                <span>
+                  <b>Select all</b> ({selectedCount} of {cart.length} selected)
+                </span>
+              </label>
+              {selectedCount > 0 && (
+                <span className="tiny muted">
+                  {selectedCartTotal > 0 ? peso(selectedCartTotal) : ''} ·{' '}
+                  {selectedCartCount} item{selectedCartCount === 1 ? '' : 's'}
+                </span>
+              )}
+            </div>
+
             {cart.map((c, idx) => {
               const p = byId(c.id)
               if (!p) return null
@@ -152,13 +193,17 @@ export function CartPage() {
                 : sellerTimeSlots[0] || c.time
               const officialPlace = (p.when.split(',')[0] || 'BAU Office').trim()
 
-              // Compute available dates based on seller schedule
               const { options: dateOpts, todayStatus, windowEndText } = getPickupDates(p)
               const activeDateLabel =
                 c.date || (dateOpts.length ? dateOpts[0].label : 'Today')
 
+              const isSelected = selectedCartItems.has(idx)
+
               return (
-                <div key={`${c.id}-${c.vid || ''}-${idx}`} className="card stack">
+                <div
+                  key={`${c.id}-${c.vid || ''}-${idx}`}
+                  className={`card stack ${isSelected ? 'cart-item-selected' : 'cart-item-dimmed'}`}
+                >
                   <div className="row between wrap">
                     <div className="row" style={{ minWidth: 0 }}>
                       <div
@@ -183,8 +228,7 @@ export function CartPage() {
                         <span className="price tnum">{peso(pr)}</span>
                       </div>
                     </div>
-
-                    <div className="row">
+                    <div className="row" style={{ gap: 8, alignItems: 'center' }}>
                       <div className="qty" role="group" aria-label={`Quantity for ${p.name}`}>
                         <button
                           type="button"
@@ -217,10 +261,17 @@ export function CartPage() {
                       >
                         <Icon name="trash" />
                       </button>
+                      <label className="check">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleCartSelect(idx)}
+                          aria-label={`Select ${p.name}`}
+                        />
+                      </label>
                     </div>
                   </div>
 
-                  {/* Requirement #1: Fulfillment method selection per cart line */}
                   <div
                     className="card flat stack"
                     style={{ background: 'var(--bg)', padding: 12, gap: 10 }}
@@ -291,87 +342,45 @@ export function CartPage() {
                             : c.place}{' '}
                         · <b>{activeDateLabel}</b> · {activeTime}
                       </span>
-                      {!isOfficial ? (
-                        <button
-                          type="button"
-                          className="link"
-                          onClick={() => {
-                            toggleCartEdit(idx)
-                          }}
-                        >
-                          {(c.edit || c.editing)
-                            ? 'Done'
-                            : `Change ${chosenMethod === 'delivery' ? 'delivery' : 'pickup'} date & time`}
-                        </button>
-                      ) : (
-                        <span className="tiny muted">
-                          <Icon name="shield" size="sm" /> Location & open hours set by RTU Admin
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        className="link"
+                        onClick={() => {
+                          toggleCartEdit(idx)
+                        }}
+                      >
+                        {c.edit || c.editing
+                          ? 'Done'
+                          : `Change ${chosenMethod === 'delivery' ? 'delivery' : 'pickup'} date & time`}
+                      </button>
                     </div>
 
-                    {isOfficial ? (
-                      <div className="grid2" style={{ marginTop: 4 }}>
-                        <div className="field">
-                          <label htmlFor={`cd-${idx}`}>Pickup date (within store schedule)</label>
-                          <select
-                            className="input"
-                            id={`cd-${idx}`}
-                            value={activeDateLabel}
-                            onChange={(e) => {
-                              updateCartMeetup(idx, 'date', e.target.value)
-                            }}
-                          >
-                            {dateOpts.map((opt) => (
-                              <option key={opt.id} value={opt.label}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="field">
-                          <label>Official Store Location & Time Window (Fixed by Admin)</label>
-                          <div
-                            className="input"
-                            style={{
-                              background: 'var(--soft)',
-                              color: 'var(--muted)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              fontWeight: 600,
-                            }}
-                          >
-                            {officialPlace} · {activeTime}
+                    {(c.edit || c.editing || chosenMethod === 'delivery' || cartStep === 2) ? (
+                      <div className="stack" style={{ gap: 10, marginTop: 4 }}>
+                        {chosenMethod === 'delivery' && (
+                          <div className="field">
+                            <label htmlFor={`cdspot-${idx}`}>
+                              Campus delivery drop-off spot (room / building / landmark)
+                            </label>
+                            <input
+                              className="input"
+                              id={`cdspot-${idx}`}
+                              placeholder={`e.g. Room 304 or ${c.place}`}
+                              value={c.deliverySpot || ''}
+                              onChange={(e) =>
+                                updateCartMeetup(idx, 'deliverySpot', e.target.value)
+                              }
+                            />
                           </div>
-                        </div>
-                      </div>
-                    ) : (
-                      (c.edit || c.editing || chosenMethod === 'delivery' || cartStep === 2) && (
-                        <div className="stack" style={{ gap: 10, marginTop: 4 }}>
-                          {chosenMethod === 'delivery' && (
-                            <div className="field">
-                              <label htmlFor={`cdspot-${idx}`}>
-                                Campus delivery drop-off spot (room / building / landmark)
-                              </label>
-                              <input
-                                className="input"
-                                id={`cdspot-${idx}`}
-                                placeholder={`e.g. Room 304 or ${c.place}`}
-                                value={c.deliverySpot || ''}
-                                onChange={(e) =>
-                                  updateCartMeetup(idx, 'deliverySpot', e.target.value)
-                                }
-                              />
-                            </div>
-                          )}
+                        )}
 
-                          {(c.edit || c.editing || cartStep === 2) && (
-                            <>
-                              <div className="grid2">
-                                {/* Date Selector */}
+                        {(c.edit || c.editing || cartStep === 2) && (
+                          <>
+                            {isOfficial ? (
+                              <div className="stack" style={{ gap: 8 }}>
                                 <div className="field">
                                   <label htmlFor={`cd-${idx}`}>
-                                    {chosenMethod === 'delivery' ? 'Delivery date' : 'Pickup date'}
+                                    Pickup date (within store schedule)
                                   </label>
                                   <select
                                     className="input"
@@ -389,94 +398,141 @@ export function CartPage() {
                                   </select>
                                 </div>
 
-                                {/* Time window restricted strictly to seller's time window */}
                                 <div className="field">
-                                  <label htmlFor={`ct-${idx}`}>
-                                    Seller’s available time window
-                                  </label>
-                                  <select
+                                  <label>Official Store Location & Time Window (Fixed by Admin)</label>
+                                  <div
                                     className="input"
-                                    id={`ct-${idx}`}
-                                    value={activeTime}
-                                    onChange={(e) => {
-                                      updateCartMeetup(idx, 'time', e.target.value)
+                                    style={{
+                                      background: 'var(--soft)',
+                                      color: 'var(--muted)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      fontWeight: 600,
                                     }}
                                   >
-                                    {sellerTimeSlots.map((tm) => (
-                                      <option key={tm} value={tm}>
-                                        {tm}
-                                      </option>
-                                    ))}
-                                  </select>
+                                    <span className="tiny" style={{ color: 'var(--yellow)' }}>
+                                      <Icon name="shield" size="sm" />{' '}
+                                      Location & open hours set by RTU Admin
+                                    </span>
+                                    <span className="small" style={{ marginLeft: 6 }}>
+                                      {officialPlace} · {activeTime}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
+                            ) : (
+                              <>
+                                {chosenMethod === 'delivery' ? null : null}
+                                <div className="grid2">
+                                  <div className="field">
+                                    <label htmlFor={`cd-${idx}`}>
+                                      {chosenMethod === 'delivery'
+                                        ? 'Delivery date'
+                                        : 'Pickup date'}
+                                    </label>
+                                    <select
+                                      className="input"
+                                      id={`cd-${idx}`}
+                                      value={activeDateLabel}
+                                      onChange={(e) => {
+                                        updateCartMeetup(idx, 'date', e.target.value)
+                                      }}
+                                    >
+                                      {dateOpts.map((opt) => (
+                                        <option key={opt.id} value={opt.label}>
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
 
-                              <div className="field">
-                                <label htmlFor={`cp-${idx}`}>
-                                  {chosenMethod === 'delivery'
-                                    ? 'Campus building / area'
-                                    : 'Campus meetup location'}
-                                </label>
-                                <select
-                                  className="input"
-                                  id={`cp-${idx}`}
-                                  value={
-                                    othersCartIdx[idx] || !presetPlaces.includes(c.place)
-                                      ? 'Others'
-                                      : c.place
-                                  }
-                                  onChange={(e) => {
-                                    const val = e.target.value
-                                    if (val === 'Others') {
-                                      setOthersCartIdx((prev) => ({ ...prev, [idx]: true }))
-                                    } else {
-                                      setOthersCartIdx((prev) => ({ ...prev, [idx]: false }))
-                                      updateCartMeetup(idx, 'place', val)
-                                    }
-                                  }}
-                                >
-                                  {PLACES.map((pl) => (
-                                    <option key={pl} value={pl}>
-                                      {pl}
-                                    </option>
-                                  ))}
-                                </select>
-                                {(othersCartIdx[idx] || !presetPlaces.includes(c.place)) && (
-                                  <input
-                                    className="input"
-                                    style={{ marginTop: 8 }}
-                                    placeholder="Write specific campus place (e.g. Gate 2 bench, Room 402)..."
-                                    value={presetPlaces.includes(c.place) ? '' : c.place}
-                                    onChange={(e) => {
-                                      updateCartMeetup(idx, 'place', e.target.value)
-                                    }}
-                                  />
+                                  <div className="field">
+                                    <label htmlFor={`ct-${idx}`}>
+                                      Seller’s available time window
+                                    </label>
+                                    <select
+                                      className="input"
+                                      id={`ct-${idx}`}
+                                      value={activeTime}
+                                      onChange={(e) => {
+                                        updateCartMeetup(idx, 'time', e.target.value)
+                                      }}
+                                    >
+                                      {sellerTimeSlots.map((tm) => (
+                                        <option key={tm} value={tm}>
+                                          {tm}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div className="field">
+                                    <label htmlFor={`cp-${idx}`}>
+                                      {chosenMethod === 'delivery'
+                                        ? 'Campus building / area'
+                                        : 'Campus meetup location'}
+                                    </label>
+                                    <select
+                                      className="input"
+                                      id={`cp-${idx}`}
+                                      value={
+                                        othersCartIdx[idx] || !presetPlaces.includes(c.place)
+                                          ? 'Others'
+                                          : c.place
+                                      }
+                                      onChange={(e) => {
+                                        const val = e.target.value
+                                        if (val === 'Others') {
+                                          setOthersCartIdx((prev) => ({ ...prev, [idx]: true }))
+                                        } else {
+                                          setOthersCartIdx((prev) => ({ ...prev, [idx]: false }))
+                                          updateCartMeetup(idx, 'place', val)
+                                        }
+                                      }}
+                                    >
+                                      {PLACES.map((pl) => (
+                                        <option key={pl} value={pl}>
+                                          {pl}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {(othersCartIdx[idx] || !presetPlaces.includes(c.place)) && (
+                                      <input
+                                        className="input"
+                                        style={{ marginTop: 8 }}
+                                        placeholder="Write specific campus place (e.g. Gate 2 bench, Room 402)..."
+                                        value={presetPlaces.includes(c.place) ? '' : c.place}
+                                        onChange={(e) => {
+                                          updateCartMeetup(idx, 'place', e.target.value)
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                </div>
+
+                                {svc && (
+                                  <div className="tiny muted" style={{ color: 'var(--blue)' }}>
+                                    <Icon name="info" size="sm" /> Services must be scheduled in advance
+                                    (earliest available date is selected).
+                                  </div>
                                 )}
-                              </div>
-                            </>
-                          )}
-
-                        {/* Informative notice for same-day and advance service scheduling rules */}
-                        {svc && (
-                          <div className="tiny muted" style={{ color: 'var(--blue)' }}>
-                            <Icon name="info" size="sm" /> Services must be scheduled in advance
-                            (earliest available date is selected).
-                          </div>
-                        )}
-                        {!svc && todayStatus === 'window_closed' && (
-                          <div className="tiny muted" style={{ color: 'var(--amber, #c27b00)' }}>
-                            <Icon name="info" size="sm" /> Today’s window ({windowEndText})
-                            has closed. Earliest available date is selected.
-                          </div>
-                        )}
-                        {!svc && todayStatus === 'not_selling_day' && (
-                          <div className="tiny muted">
-                            <Icon name="info" size="sm" /> Seller is available on {p.avail || 'weekdays'}.
-                          </div>
+                                {!svc && todayStatus === 'window_closed' && (
+                                  <div className="tiny muted" style={{ color: 'var(--amber, #c27b00)' }}>
+                                    <Icon name="info" size="sm" /> Today’s window ({windowEndText})
+                                    has closed. Earliest available date is selected.
+                                  </div>
+                                )}
+                                {!svc && todayStatus === 'not_selling_day' && (
+                                  <div className="tiny muted">
+                                    <Icon name="info" size="sm" /> Seller is available on {p.avail || 'weekdays'}.
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </>
                         )}
                       </div>
-                    )
-                    )}
+                    ) : null}
                   </div>
                 </div>
               )
@@ -520,41 +576,50 @@ export function CartPage() {
           <div className="card stack">
             <b>Request summary</b>
             <div className="row between small">
-              <span className="muted">Items ({cartCount})</span>
-              <span className="tnum">{peso(cartTotal)}</span>
+              <span className="muted">Items ({selectedCartCount})</span>
+              <span className="tnum">{peso(selectedCartTotal)}</span>
             </div>
             <div className="row between small">
               <span className="muted">Sellers</span>
               <span className="tnum">
-                {sellers} ({sellers > 1 ? 'separate requests' : '1 request'})
+                {selectedSellers} ({selectedSellers > 1 ? 'separate requests' : '1 request'})
               </span>
             </div>
             <div className="stack" style={{ gap: 4 }}>
               <span className="tiny muted">SELECTED FULFILLMENT</span>
-              {cart.map((c, idx) => {
-                const p = byId(c.id)
-                if (!p) return null
-                const avail: FulfillmentMethod =
-                  p.fulfillment === 'delivery' || p.fulfillment === 'both'
-                    ? p.fulfillment
-                    : 'pickup'
-                const chosen: ChosenFulfillment =
-                  avail === 'delivery'
-                    ? 'delivery'
-                    : avail === 'pickup'
-                      ? 'pickup'
-                      : c.fulfillment || 'pickup'
-                return (
-                  <div key={idx} className="row between tiny">
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 165 }}>
-                      {p.name}
-                    </span>
-                    <span className={`pill ${chosen === 'delivery' ? 'blue' : 'green'}`}>
-                      {chosen === 'delivery' ? 'Delivery' : 'Pickup'}
-                    </span>
-                  </div>
-                )
-              })}
+              {cart
+                .filter((_, i) => selectedCartItems.has(i))
+                .map((c, sidx) => {
+                  const p = byId(c.id)
+                  if (!p) return null
+                  const avail: FulfillmentMethod =
+                    p.fulfillment === 'delivery' || p.fulfillment === 'both'
+                      ? p.fulfillment
+                      : 'pickup'
+                  const chosen: ChosenFulfillment =
+                    avail === 'delivery'
+                      ? 'delivery'
+                      : avail === 'pickup'
+                        ? 'pickup'
+                        : c.fulfillment || 'pickup'
+                  return (
+                    <div key={sidx} className="row between tiny">
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: 165,
+                        }}
+                      >
+                        {p.name}
+                      </span>
+                      <span className={`pill ${chosen === 'delivery' ? 'blue' : 'green'}`}>
+                        {chosen === 'delivery' ? 'Delivery' : 'Pickup'}
+                      </span>
+                    </div>
+                  )
+                })}
             </div>
             <div className="row between small">
               <span className="muted">Platform fee</span>
@@ -564,7 +629,7 @@ export function CartPage() {
             <div className="row between">
               <b>Pay in person</b>
               <span className="price tnum" style={{ fontSize: 22 }}>
-                {peso(cartTotal)}
+                {peso(selectedCartTotal)}
               </span>
             </div>
             <div className="note">
@@ -573,7 +638,14 @@ export function CartPage() {
                 Bring exact cash or agree on e-wallet in person after inspecting the item.
               </span>
             </div>
-            {cartStep === 1 ? (
+            {selectedCount === 0 ? (
+              <div className="note blue">
+                <Icon name="info" size="sm" />
+                <span className="small">
+                  Select at least 1 item to continue.
+                </span>
+              </div>
+            ) : cartStep === 1 ? (
               <button
                 type="button"
                 className="btn yellow block lg"

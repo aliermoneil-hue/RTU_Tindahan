@@ -5,8 +5,8 @@ import { LoginForm } from '../components/LoginForm'
 import { useAuth } from '../AuthContext'
 import { Icon } from '@/common/components/Icon'
 import logoImg from '@/assets/logo-removebg-preview.png'
-import img0 from '@/assets/SampleImages/0.jpg'
-import imgRtu from '@/assets/SampleImages/applying-to-rizal-technological-university.png'
+import img0 from '@/assets/SampleImages/0.webp'
+import imgRtu from '@/assets/SampleImages/applying-to-rizal-technological-university.webp'
 import imgBef from '@/assets/SampleImages/bef71f2e0c003d63.jpeg'
 import img3 from '@/assets/SampleImages/images (3).jpeg'
 import img4 from '@/assets/SampleImages/images (4).jpeg'
@@ -111,7 +111,7 @@ function LoginCarousel({ images }: { images: { src: string; alt: string }[] }) {
       <div className="login-carousel-track">
         {images.map(({ src, alt }) => (
           <div className="login-carousel-card" key={src}>
-            <img src={src} alt={alt} draggable={false} />
+            <img src={src} alt={alt} draggable={false} decoding="async" />
           </div>
         ))}
       </div>

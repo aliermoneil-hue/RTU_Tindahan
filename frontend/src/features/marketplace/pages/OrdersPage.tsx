@@ -16,7 +16,6 @@ import {
 } from '../baoHelpers'
 import { PLACES, TIMES, getSellerTimeWindows, peso, stamp } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
-import { PhotoUploader } from '../components/PhotoUploader'
 import { imgSrc, imgsOf } from '../imageStore'
 import type { OrderRecord, TransactionRecord } from '../types'
 import { StarPicker, StarsDisplay } from '../components/StarRating'
@@ -73,15 +72,13 @@ export function OrdersPage() {
     reviewOf,
     submitReview,
     openModal,
-    toast,
     apiOrders,
     actOnOrder,
     refreshOrders,
     openThreadWith,
   } = useTindahan()
 
-  const [openBox, setOpenBox] = useState<'' | 'msg' | 'edit' | 'cancel' | 'proof'>('')
-  const [proofIds, setProofIds] = useState<string[]>([])
+  const [openBox, setOpenBox] = useState<'' | 'msg' | 'edit' | 'cancel'>('')
   const [msgText, setMsgText] = useState('')
   const presetPlaces = PLACES.filter((pl) => pl !== 'Others')
   const [editPlace, setEditPlace] = useState(PLACES[0])
@@ -445,83 +442,65 @@ export function OrdersPage() {
                             </span>
                           </div>
 
-                          {/* Requirement #6: Meet on campus photo proof section */}
                           {isMeetStep && sel.tab === 'Active' && (
-                            <div
-                              className="card flat stack"
-                              style={{
-                                marginLeft: 30,
-                                background: 'var(--bg)',
-                                padding: 12,
-                                gap: 8,
-                              }}
-                            >
-                              <div className="row between wrap">
-                                <b className="small">
-                                  Meetup / {sel.fulfillment === 'delivery' ? 'Delivery' : 'Pickup'} Photo Proof
-                                </b>
-                                <span className="pill yellow">Required to confirm</span>
-                              </div>
-                              <p className="tiny muted" style={{ margin: 0 }}>
-                                Upload or take a photo during your campus meetup as proof for the
-                                seller before confirming {sel.fulfillment === 'delivery' ? 'delivery' : 'pickup'}.
-                              </p>
-                              <PhotoUploader
-                                ids={proofIds}
-                                max={1}
-                                label="Proof photo (1 photo)"
-                                onChange={(nextIds) => setProofIds(nextIds)}
-                              />
-                              {proofIds.length > 0 && imgSrc(proofIds[0]) && (
-                                <button
-                                  type="button"
-                                  className="btn sm"
-                                  style={{ alignSelf: 'flex-start' }}
-                                  onClick={() => {
-                                    confirmOrderPickup(sel.id, proofIds[0])
-                                    setProofIds([])
+                            <>
+                              {sel.proofPhoto && imgSrc(sel.proofPhoto) && (
+                                <div
+                                  className="card flat stack"
+                                  style={{
+                                    marginLeft: 30,
+                                    background: 'var(--bg)',
+                                    padding: 12,
+                                    gap: 6,
                                   }}
                                 >
-                                  <Icon name="check" size="sm" />
-                                  Submit proof & confirm {sel.fulfillment === 'delivery' ? 'delivery' : 'pickup'}
-                                </button>
+                                  <div className="row between wrap">
+                                    <b className="small">
+                                      Meetup / Pickup Photo Proof
+                                    </b>
+                                    <span className="pill green">Proof uploaded</span>
+                                  </div>
+                                  <img
+                                    src={imgSrc(sel.proofPhoto)}
+                                    alt="Meetup proof"
+                                    style={{
+                                      width: '100%',
+                                      maxWidth: 260,
+                                      maxHeight: 200,
+                                      objectFit: 'cover',
+                                      borderRadius: 10,
+                                      border: '1px solid var(--line)',
+                                    }}
+                                  />
+                                  <span className="tiny muted">
+                                    Uploaded by {sel.proofBy || 'Seller'}
+                                    {sel.proofAt ? ` · ${stamp(sel.proofAt)}` : ''}
+                                  </span>
+                                </div>
                               )}
-                            </div>
-                          )}
-
-                          {isMeetStep && sel.proofPhoto && imgSrc(sel.proofPhoto) && (
-                            <div
-                              className="card flat stack"
-                              style={{
-                                marginLeft: 30,
-                                background: 'var(--bg)',
-                                padding: 12,
-                                gap: 6,
-                              }}
-                            >
-                              <div className="row between wrap">
-                                <b className="small">
-                                  Confirmed {sel.fulfillment === 'delivery' ? 'Delivery' : 'Pickup'} Proof Photo
-                                </b>
-                                <span className="pill green">Verified proof</span>
-                              </div>
-                              <img
-                                src={imgSrc(sel.proofPhoto)}
-                                alt="Meetup proof"
-                                style={{
-                                  width: '100%',
-                                  maxWidth: 260,
-                                  maxHeight: 200,
-                                  objectFit: 'cover',
-                                  borderRadius: 10,
-                                  border: '1px solid var(--line)',
-                                }}
-                              />
-                              <span className="tiny muted">
-                                Uploaded by {sel.proofBy || 'Buyer'}
-                                {sel.proofAt ? ` · ${stamp(sel.proofAt)}` : ''}
-                              </span>
-                            </div>
+                              {!sel.proofPhoto && (
+                                <div
+                                  className="card flat stack"
+                                  style={{
+                                    marginLeft: 30,
+                                    background: 'var(--bg)',
+                                    padding: 12,
+                                    gap: 6,
+                                    border: '1px dashed var(--line)',
+                                  }}
+                                >
+                                  <div className="row between wrap">
+                                    <b className="small">
+                                      Meetup / Pickup Photo Proof
+                                    </b>
+                                  </div>
+                                  <span className="tiny muted">
+                                    Seller will upload a meetup handover photo when marking this
+                                    order as picked up.
+                                  </span>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       )
@@ -564,14 +543,7 @@ export function OrdersPage() {
                       <button
                         type="button"
                         className="btn sm"
-                        onClick={() => {
-                          if (!proofIds.length || !imgSrc(proofIds[0])) {
-                            toast('Please upload a meetup proof photo under Step 3 (Meet on campus) first.')
-                            return
-                          }
-                          confirmOrderPickup(sel.id, proofIds[0])
-                          setProofIds([])
-                        }}
+                        onClick={() => confirmOrderPickup(sel.id, sel.proofPhoto || null)}
                       >
                         <Icon name="check" size="sm" />
                         Confirm {sel.fulfillment === 'delivery' ? 'delivery' : 'pickup'}

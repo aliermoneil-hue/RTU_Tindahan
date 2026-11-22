@@ -84,6 +84,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # The API answers through a tunnel from a home connection: compress JSON
+    # before it leaves so a listing feed costs a fraction of the bytes.
+    "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

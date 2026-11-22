@@ -1,37 +1,42 @@
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { navigate, useRoute } from '@/common/router/router'
-import { LoginPage, VerifyPage, ForgotPasswordPage, useAuth } from '@/features/authentication'
+import { useAuth } from '@/features/authentication'
 import { useTindahan } from '../marketplace/context/TindahanContext'
-import { BrowsePage } from '@/features/marketplace/pages/BrowsePage'
-import { CartPage } from '@/features/marketplace/pages/CartPage'
-import { ConfirmPage } from '@/features/marketplace/pages/ConfirmPage'
-import { CreateListingPage } from '@/features/marketplace/pages/CreateListingPage'
-import { FavoritesPage } from '@/features/marketplace/pages/FavoritesPage'
-import { ForumPage } from '@/features/marketplace/pages/ForumPage'
-import { ForumPostPage } from '@/features/marketplace/pages/ForumPostPage'
-import { GuestSectionPage } from '@/features/marketplace/pages/GuestSectionPage'
-import { GuestStudentSellersPage } from '@/features/marketplace/pages/GuestStudentSellersPage'
-import { GuestOfficialStorePage } from '@/features/marketplace/pages/GuestOfficialStorePage'
-import { HelpCenterPage } from '@/features/marketplace/pages/HelpCenterPage'
-import { MarketplacePage } from '@/features/marketplace/pages/MarketplacePage'
-import { MessagesPage } from '@/features/marketplace/pages/MessagesPage'
-import { MyShopPage } from '@/features/marketplace/pages/MyShopPage'
-import { OfficialStorePage } from '@/features/marketplace/pages/OfficialStorePage'
-import { OrdersPage } from '@/features/marketplace/pages/OrdersPage'
-import { ProductPage } from '@/features/marketplace/pages/ProductPage'
-import { ProfilePage } from '@/features/marketplace/pages/ProfilePage'
-import { StudentSellersPage } from '@/features/marketplace/pages/StudentSellersPage'
-import { ForumReportsPage } from '@/features/marketplace/pages/admin/ForumReportsPage'
-import { ModerationPage } from '@/features/marketplace/pages/admin/ModerationPage'
-import { StaffToolsPage } from '@/features/marketplace/pages/admin/StaffToolsPage'
-import { StoreInventoryPage } from '@/features/marketplace/pages/admin/StoreInventoryPage'
-import { StoreOrdersPage } from '@/features/marketplace/pages/admin/StoreOrdersPage'
-import { TransactionsPage } from '@/features/marketplace/pages/admin/TransactionsPage'
-import { UsersAuditPage } from '@/features/marketplace/pages/admin/UsersAuditPage'
+import {
+  BrowsePage,
+  CartPage,
+  ConfirmPage,
+  CreateListingPage,
+  FavoritesPage,
+  ForumPage,
+  ForumPostPage,
+  ForumReportsPage,
+  ForgotPasswordPage,
+  GuestOfficialStorePage,
+  GuestSectionPage,
+  GuestStudentSellersPage,
+  HelpCenterPage,
+  LandingPage,
+  LoginPage,
+  MarketplacePage,
+  MessagesPage,
+  ModerationPage,
+  MyShopPage,
+  NotFoundPage,
+  OfficialStorePage,
+  OrdersPage,
+  ProductPage,
+  ProfilePage,
+  StaffToolsPage,
+  StoreInventoryPage,
+  StoreOrdersPage,
+  StudentSellersPage,
+  TransactionsPage,
+  UsersAuditPage,
+  VerifyPage,
+} from './lazyPages'
 import { AppLayout } from './layouts/AppLayout'
 import { PublicLayout } from './layouts/PublicLayout'
-import { LandingPage } from './pages/LandingPage'
-import { NotFoundPage } from './pages/NotFoundPage'
 import { BrandLoader } from '@/common/components/BrandLoader/BrandLoader'
 import { useAppReady } from '@/common/components/BrandLoader/useAppReady'
 
@@ -93,6 +98,20 @@ const PAGE_FAVICONS: Record<string, string> = {
   login: signInIco,
   register: signUpIco,
   'forgot-password': signInIco,
+}
+
+/** Held only while a page's chunk downloads; the layout above is already up. */
+function PageLoading() {
+  return (
+    <div className="page-loading" role="status" aria-live="polite">
+      <span className="page-loading-dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      <span className="sr-only">Loading</span>
+    </div>
+  )
 }
 
 function renderActiveRoute(path: string, user: { email: string; role: string } | null) {
@@ -281,12 +300,14 @@ export function AppRoutes() {
           {/* Signed-in pages use AppLayout; login/verify pages have their own layout */}
           {user ? (
             <AppLayout user={user} activePath={activePage}>
-              {renderActiveRoute(path, user)}
+              <Suspense fallback={<PageLoading />}>{renderActiveRoute(path, user)}</Suspense>
             </AppLayout>
           ) : path === 'login' || path === 'register' || path === 'verify' || path === 'forgot-password' ? (
-            renderActiveRoute(path, user)
+            <Suspense fallback={<PageLoading />}>{renderActiveRoute(path, user)}</Suspense>
           ) : (
-            <PublicLayout>{renderActiveRoute(path, user)}</PublicLayout>
+            <PublicLayout>
+              <Suspense fallback={<PageLoading />}>{renderActiveRoute(path, user)}</Suspense>
+            </PublicLayout>
           )}
         </>
       )}

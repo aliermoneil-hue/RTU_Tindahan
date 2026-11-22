@@ -2,6 +2,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path, re_path
+from django.views.decorators.cache import cache_control
 from django.views.static import serve as serve_media
 
 from config.views import api_root, health
@@ -29,7 +30,10 @@ else:
     urlpatterns += [
         re_path(
             r"^media/(?P<path>.*)$",
-            serve_media,
+            # Listing photos travel Vercel -> tunnel -> this process on every
+            # request. Letting the browser keep them for a week removes that
+            # round trip on every visit after the first.
+            cache_control(public=True, max_age=60 * 60 * 24 * 7)(serve_media),
             {"document_root": settings.MEDIA_ROOT},
         )
     ]

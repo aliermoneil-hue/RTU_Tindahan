@@ -665,6 +665,9 @@ interface TindahanContextValue {
   setCartAgree: (b: boolean) => void
   cartErr: string
   setCartErr: (s: string) => void
+  selectedCartItems: Set<number>
+  toggleCartSelect: (idx: number) => void
+  toggleCartSelectAll: () => void
   addToCart: (id: string, qty: number, vid?: string, fulfillment?: ChosenFulfillment) => boolean
   reserveNow: (id: string, qty: number, vid?: string, fulfillment?: ChosenFulfillment) => void
   updateCartQty: (idx: number, delta: number) => void
@@ -980,18 +983,21 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     const run = async () => {
       try {
-        if (!cancelled) {
-          await refreshListings()
-          await refreshPendingListings()
-          await refreshMyListings()
-          await refreshOrders()
-          await refreshConversations()
-        }
-      } catch {
-        /* backend offline or CORS blocked: keep the local catalogue */
+        // Concurrent, not one after another. Over the tunnel each round trip
+        // costs a few hundred milliseconds, and five in a row was most of the
+        // time the app spent before it could show anything.
+        await Promise.allSettled([
+          refreshListings(),
+          refreshPendingListings(),
+          refreshMyListings(),
+          refreshOrders(),
+          refreshConversations(),
+        ])
       } finally {
-        setListingsLoading(false)
-        setHasSettledInitialFetch(true)
+        if (!cancelled) {
+          setListingsLoading(false)
+          setHasSettledInitialFetch(true)
+        }
       }
     }
     void run()
@@ -1047,19 +1053,21 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   // should land on its own, not only after a reload.
   useEffect(() => {
     if (!getToken()) return
-    const tick = () => {
+    // Chat needs to feel live; a status change on a request does not. Polling
+    // them at different rates keeps the tunnel quiet between messages.
+    const chat = window.setInterval(() => void refreshConversations(), 10000)
+    const requests = window.setInterval(() => void refreshOrders(), 30000)
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
       void refreshConversations()
       void refreshOrders()
     }
-    const timer = window.setInterval(tick, 10000)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') tick()
-    }
-    window.addEventListener('focus', tick)
+    window.addEventListener('focus', onVisible)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
-      window.clearInterval(timer)
-      window.removeEventListener('focus', tick)
+      window.clearInterval(chat)
+      window.clearInterval(requests)
+      window.removeEventListener('focus', onVisible)
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [refreshConversations, refreshOrders])
@@ -1138,6 +1146,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   )
   const [cartAgree, setCartAgree] = useState(false)
   const [cartErr, setCartErr] = useState('')
+  const [selectedCartItems, setSelectedCartItems] = useState<Set<number>>(new Set())
   const [lastOrderId, setLastOrderId] = useState<string | null>(null)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
   const [orderTab, setOrderTab] = useState<'Active' | 'Completed' | 'Cancelled'>('Active')
@@ -1894,6 +1903,32 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     [currentAccount],
   )
 
+  const toggleCartSelect = useCallback(
+    (idx: number) => {
+      setSelectedCartItems((prev) => {
+        const next = new Set(prev)
+        if (next.has(idx)) next.delete(idx)
+        else next.add(idx)
+        return next
+      })
+    },
+    [],
+  )
+
+  const toggleCartSelectAll = useCallback(() => {
+    if (!currentAccount) return
+    const allSelected = currentAccount.cart.every((_, i) => selectedCartItems.has(i))
+    setSelectedCartItems((prev) => {
+      const next = new Set(prev)
+      if (allSelected) {
+        currentAccount.cart.forEach((_, i) => next.delete(i))
+      } else {
+        currentAccount.cart.forEach((_, i) => next.add(i))
+      }
+      return next
+    })
+  }, [currentAccount, selectedCartItems])
+
   const updateCartMeetup = useCallback(
     (
       idx: number,
@@ -1951,10 +1986,16 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       setCartErr('Please confirm that you understand how payment works.')
       return
     }
-    if (!currentAccount.cart.length) return
+    const selectedIdx = Array.from(selectedCartItems)
+    if (!selectedIdx.length) {
+      setCartErr('Select at least 1 item to continue.')
+      toast('Select at least 1 item to continue.')
+      return
+    }
+    const selectedCart = selectedIdx.map((i) => currentAccount.cart[i]).filter(Boolean)
 
-    // Validate cart items
-    for (const c of currentAccount.cart) {
+    // Validate selected cart items
+    for (const c of selectedCart) {
       const p = byId(c.id)
       if (!p || !allOnSale.some((x) => x.id === c.id)) {
         const msg = 'An item in your cart is no longer available. Remove it to continue.'
@@ -2034,7 +2075,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         String(now.getDate()).padStart(2, '0')
 
       const groups = new Map<string, { c: CartLine; p: PrototypeProduct }[]>()
-      buyer.cart.forEach((c) => {
+      selectedIdx.forEach((idx) => {
+        const c = buyer.cart[idx]
+        if (!c) return
         const p = findProductInNext(c.id)
         if (!p) return
         if (!groups.has(p.seller)) groups.set(p.seller, [])
@@ -2404,7 +2447,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         }
       })
 
-      buyer.cart = []
+      // Remove only selected items from cart; unselected items stay
+      const selectedSet = new Set(selectedIdx)
+      buyer.cart = buyer.cart.filter((_, i) => !selectedSet.has(i))
       firstOrder = madeOrders[0] || null
       orderCount = madeOrders.length
       return next
@@ -8123,11 +8168,14 @@ const value = useMemo<TindahanContextValue>(
       setCartAgree,
       cartErr,
       setCartErr,
+      selectedCartItems,
       addToCart,
       reserveNow,
       updateCartQty,
       removeCartLine,
       toggleCartEdit,
+      toggleCartSelect,
+      toggleCartSelectAll,
       updateCartMeetup,
       sendMeetupRequest,
       lastOrderId,
@@ -8292,6 +8340,8 @@ const value = useMemo<TindahanContextValue>(
       updateCartQty,
       removeCartLine,
       toggleCartEdit,
+      toggleCartSelect,
+      toggleCartSelectAll,
       updateCartMeetup,
       sendMeetupRequest,
       lastOrderId,
