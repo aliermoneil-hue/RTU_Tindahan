@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/api/:path*"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/admin/:path*"
+    },
+    {
+      "source": "/static/:path*",
+      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/static/:path*"
+    },
+    {
+      "source": "/media/:path*",
+      "destination": "https://concluded-boating-tahoe-lending.trycloudflare.com/media/:path*"
+    }
+  ]
+}
