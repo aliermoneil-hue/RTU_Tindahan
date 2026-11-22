@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rtu-tindahan",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-22",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "API_ORIGIN": "https://concluded-boating-tahoe-lending.trycloudflare.com"
+  }
+}
