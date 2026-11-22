@@ -54,6 +54,15 @@ import {
   type ApiListing,
   type ApiPage,
 } from '../api/listings'
+import {
+  STORE_ID_PREFIX,
+  fetchStock,
+  fetchStoreSettings,
+  fetchTickets,
+  mergeApiStore,
+  stockIn as postStockIn,
+  transitionTicket as postTicketTransition,
+} from '../api/store'
 import { navigate } from '@/common/router/router'
 import { useAuth } from '@/features/authentication'
 import type { User } from '@/common/types'
@@ -874,6 +883,41 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       cancelled = true
     }
   }, [refreshListings, refreshPendingListings])
+
+  // The Official Store's tickets and stock ledger live on the server too, but
+  // only staff accounts may read them. The merge replaces the prototype's demo
+  // tickets and ledger with the real rows; if the backend is unreachable the
+  // snapshot is left as it was.
+  const storeStaff = Boolean(
+    user &&
+      (user.role === 'moderator' ||
+        user.role === 'administrator' ||
+        user.role === 'office_staff'),
+  )
+  const refreshStore = useCallback(async () => {
+    if (!storeStaff) return
+    try {
+      const [tickets, stock, settings] = await Promise.all([
+        fetchTickets(),
+        fetchStock(),
+        fetchStoreSettings(),
+      ])
+      setDb((prev) =>
+        mergeApiStore(prev, {
+          tickets,
+          stock,
+          settings,
+          products: [...prev.official, ...prev.userListings.map((l) => l.product)],
+        }),
+      )
+    } catch {
+      /* backend offline or not staff: keep the local snapshot */
+    }
+  }, [storeStaff])
+
+  useEffect(() => {
+    void refreshStore()
+  }, [refreshStore])
 
   // UI overlays
   const [toastMsg, setToastMsg] = useState<string | null>(null)
@@ -2721,9 +2765,26 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         return next
       })
 
+      // The ticket may live on the server. The local snapshot has already
+      // moved (so the screen answers instantly); the server call is what makes
+      // it real, and a rejection reloads the server's truth.
+      if (outcome.ok && txnId.startsWith(STORE_ID_PREFIX)) {
+        const reference = txnId.slice(STORE_ID_PREFIX.length)
+        void postTicketTransition(reference, to, opt?.note || '')
+          .then(() => refreshStore())
+          .catch((err: unknown) => {
+            toast(
+              err instanceof ApiRequestError
+                ? err.message
+                : 'The server did not accept that change. Reloading.',
+            )
+            void refreshStore()
+          })
+      }
+
       return outcome
     },
-    [currentAccount, isStaffUser, db.txn, db.bao],
+    [currentAccount, isStaffUser, db.txn, db.bao, refreshStore, toast],
   )
 
 
@@ -6573,9 +6634,29 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         if (!r.ok) return prev
         return next
       })
+      // Stock In is the one movement the store API accepts directly; the other
+      // kinds are produced by tickets on the server. Variant ids carry the
+      // backend's primary key as `v<id>`, so a row without one stays local.
+      if (result.ok) {
+        items
+          .filter((item) => item.type === 'Stock In' && /^v\d+$/.test(item.vid || ''))
+          .forEach((item) => {
+            const variant = Number((item.vid || '').slice(1))
+            void postStockIn(variant, item.qty, item.reason)
+              .then(() => refreshStore())
+              .catch((err: unknown) => {
+                toast(
+                  err instanceof ApiRequestError
+                    ? err.message
+                    : 'The server did not accept that stock movement.',
+                )
+                void refreshStore()
+              })
+          })
+      }
       return result
     },
-    [currentAccount, isStaffUser],
+    [currentAccount, isStaffUser, refreshStore, toast],
   )
 
   const baoSaveItemSettings = useCallback(

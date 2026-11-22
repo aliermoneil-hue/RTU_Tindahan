@@ -177,6 +177,7 @@ export function toPrototypeProduct(dto: ApiListing): PrototypeProduct {
 
   return {
     id: API_ID_PREFIX + dto.slug,
+    apiListingId: dto.id,
     name: dto.title,
     price: Number(dto.price),
     cat,

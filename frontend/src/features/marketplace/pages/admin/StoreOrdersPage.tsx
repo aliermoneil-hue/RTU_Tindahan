@@ -23,6 +23,9 @@ import type { BaoStatus, TransactionRecord } from '../../types'
 import './StoreOrdersPage.css'
 
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString('en-CA')
+/** Tickets that came from the store API carry an `api:` id prefix; the
+ * permanent reference the office quotes is the part after it. */
+const ticketRef = (t: { id: string }) => t.id.replace(/^api:/, '')
 const todayIso = () => new Date().toLocaleDateString('en-CA')
 
 export function StoreOrdersPage() {
@@ -141,6 +144,7 @@ export function StoreOrdersPage() {
       if (q) {
         const hay = [
           t.id,
+          ticketRef(t),
           t.queue || '',
           t.orderId,
           t.buyerName,
@@ -178,7 +182,7 @@ export function StoreOrdersPage() {
       return
     }
     playSuccess()
-    toast(`Ticket ${t.id} is now ${nextSt}.`)
+    toast(`Ticket ${ticketRef(t)} is now ${nextSt}.`)
   }
 
   const exportTicketsCsv = () => {
@@ -202,7 +206,7 @@ export function StoreOrdersPage() {
       'Latest note',
     ]
     const body = filteredRows.map((t) => [
-      t.id,
+      ticketRef(t),
       t.queue || '',
       t.src || 'Online',
       stamp(t.created),
@@ -552,7 +556,7 @@ export function StoreOrdersPage() {
                       return (
                         <tr key={t.id}>
                           <td className="tnum">
-                            <b>{t.id}</b>
+                            <b>{ticketRef(t)}</b>
                             {t.queue && <div className="tiny muted">Queue {t.queue}</div>}
                           </td>
                           <td className="tnum" style={{ whiteSpace: 'nowrap' }}>
@@ -651,7 +655,7 @@ export function StoreOrdersPage() {
                   style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}
                 >
                   <div style={{ minWidth: 0 }}>
-                    <b className="small tnum">{t.id}</b>
+                    <b className="small tnum">{ticketRef(t)}</b>
                     {t.queue && <span className="tiny muted"> Queue {t.queue}</span>}
                     <div className="tiny muted" style={{ overflowWrap: 'anywhere' }}>
                       {t.buyerName} · {t.summary}

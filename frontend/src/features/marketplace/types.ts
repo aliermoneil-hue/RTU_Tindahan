@@ -59,6 +59,12 @@ export interface PrototypeProduct {
    * role-based guessing still applies.
    */
   off?: boolean
+  /**
+   * The backend listing id behind `id` (`api:<slug>`), set only for products
+   * that came from the catalogue API. Store endpoints take numeric ids, so a
+   * screen that posts a variant back needs this rather than the slug.
+   */
+  apiListingId?: number
 }
 
 export interface UserListingRecord {
