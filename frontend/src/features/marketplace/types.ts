@@ -53,6 +53,12 @@ export interface PrototypeProduct {
   onHand?: number
   soldCount?: number
   inv?: BaoProductInv
+  /**
+   * Set only on products that came from the catalogue API, and equal to the
+   * backend's `is_official`. Prototype lists leave it undefined so their older
+   * role-based guessing still applies.
+   */
+  off?: boolean
 }
 
 export interface UserListingRecord {

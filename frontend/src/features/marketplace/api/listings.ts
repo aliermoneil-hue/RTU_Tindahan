@@ -188,6 +188,7 @@ export function toPrototypeProduct(dto: ApiListing): PrototypeProduct {
     seller: dto.seller_name,
     // 'official' is the prototype's seller key for the RTU store.
     owner: official ? 'official' : dto.seller_email,
+    off: official,
     left,
     unit: 'pc',
     when: dto.meetup_place || timeAgo(dto.created_at),

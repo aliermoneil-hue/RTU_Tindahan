@@ -1151,6 +1151,11 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   const sellerKind = useCallback(
     (p?: PrototypeProduct | null): 'student' | 'school' => {
       if (!p) return 'student'
+      // Products from the API carry the backend's own answer. Guessing from the
+      // owner's role made every listing by office staff or a moderator look like
+      // an Official RTU Store item, which is wrong: officialness is a listing
+      // flag, not a property of the seller.
+      if (typeof p.off === 'boolean') return p.off ? 'school' : 'student'
       if (p.cat === 'Official') return 'school'
       const o = p.owner ? acctByEmail(p.owner) : undefined
       return o && o.role === 'moderator' ? 'school' : 'student'
