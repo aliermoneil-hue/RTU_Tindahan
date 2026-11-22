@@ -77,6 +77,7 @@ export function OrdersPage() {
     apiOrders,
     actOnOrder,
     refreshOrders,
+    openThreadWith,
   } = useTindahan()
 
   const [openBox, setOpenBox] = useState<'' | 'msg' | 'edit' | 'cancel' | 'proof'>('')
@@ -182,6 +183,18 @@ export function OrdersPage() {
                   >
                     {order.status_display}
                   </span>
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={() =>
+                      void openThreadWith({
+                        sellerEmail: order.seller_email,
+                        listingSlug: order.lines[0]?.listing_slug || null,
+                      })
+                    }
+                  >
+                    Message
+                  </button>
                   {order.is_open && (
                     <button
                       type="button"

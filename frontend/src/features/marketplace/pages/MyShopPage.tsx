@@ -58,6 +58,7 @@ export function MyShopPage() {
     apiOrders,
     refreshOrders,
     actOnOrder,
+    openThreadWith,
   } = useTindahan()
 
   // Quick inline edit state for Official RTU Store products in Admin | RTU Shop
@@ -764,6 +765,18 @@ export function MyShopPage() {
                   >
                     Decline
                   </button>
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={() =>
+                      void openThreadWith({
+                        buyerEmail: order.buyer_email,
+                        listingSlug: order.lines[0]?.listing_slug || null,
+                      })
+                    }
+                  >
+                    Message
+                  </button>
                 </div>
               ))}
             </div>
@@ -858,6 +871,18 @@ export function MyShopPage() {
                         Mark completed
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="btn ghost sm"
+                      onClick={() =>
+                        void openThreadWith({
+                          buyerEmail: order.buyer_email,
+                          listingSlug: order.lines[0]?.listing_slug || null,
+                        })
+                      }
+                    >
+                      Message
+                    </button>
                   </div>
                 ))}
               </div>

@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "apps.screening",
     "apps.store",
     "apps.orders",
+    "apps.messaging",
 ]
 
 MIDDLEWARE = [

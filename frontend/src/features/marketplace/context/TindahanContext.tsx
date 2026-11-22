@@ -56,6 +56,14 @@ import {
   type ApiPage,
 } from '../api/listings'
 import {
+  apiConversationId,
+  fetchConversations,
+  markConversationRead,
+  mergeApiConversations,
+  openConversation,
+  sendMessage as postChatMessage,
+} from '../api/messages'
+import {
   createOrder as createApiOrder,
   fetchOrders as fetchApiOrders,
   transitionOrder as transitionApiOrder,
@@ -585,6 +593,12 @@ interface TindahanContextValue {
   /** Server-side requests: what I bought and what I sold. */
   apiOrders: ApiOrder[]
   refreshOrders: () => Promise<void>
+  /** Open the server thread with another member and hop to Messages. */
+  openThreadWith: (input: {
+    sellerEmail?: string
+    buyerEmail?: string
+    listingSlug?: string | null
+  }) => Promise<boolean>
   /** Seller side: accept, decline or complete. Buyer side: cancel. */
   actOnOrder: (
     reference: string,
@@ -930,6 +944,17 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // Threads with other members live on the server, so a reply actually crosses.
+  const refreshConversations = useCallback(async () => {
+    if (!getToken()) return
+    try {
+      const list = await fetchConversations()
+      setDb((prev) => mergeApiConversations(prev, list, user?.email))
+    } catch {
+      /* backend offline: keep the local threads */
+    }
+  }, [user])
+
   // The moderation queue lives on the server; the mount effect fills it.
   const [pendingListings, setPendingListings] = useState<ApiListing[]>([])
   const refreshPendingListings = useCallback(async () => {
@@ -960,6 +985,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           await refreshPendingListings()
           await refreshMyListings()
           await refreshOrders()
+          await refreshConversations()
         }
       } catch {
         /* backend offline or CORS blocked: keep the local catalogue */
@@ -972,7 +998,15 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [refreshListings, refreshPendingListings, refreshMyListings, refreshOrders])
+  },
+    [
+      refreshListings,
+      refreshPendingListings,
+      refreshMyListings,
+      refreshOrders,
+      refreshConversations,
+    ],
+  )
 
   // The Official Store's tickets and stock ledger live on the server too, but
   // only staff accounts may read them. The merge replaces the prototype's demo
@@ -4381,6 +4415,15 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   const markConvRead = useCallback(
     (convId: string) => {
       if (!currentAccount) return
+      const apiConvId = apiConversationId(convId)
+      if (apiConvId !== null) {
+        void markConversationRead(apiConvId)
+          .then(() => refreshConversations())
+          .catch(() => {
+            /* offline: the unread badge simply stays */
+          })
+        return
+      }
       setDb((prev) => {
         const c = prev.conv.find((x) => x.id === convId)
         if (!c || unreadInConv(c) === 0) return prev
@@ -4424,6 +4467,30 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       if (isStaffUser && !p.owner) {
         toast('You manage this official product. Reply to buyers from Messages.')
         return false
+      }
+      // A catalogue seller is a real member: open the server thread so the
+      // message actually reaches them.
+      const owner = p.owner || ''
+      if (owner.includes('@') && p.apiListingId) {
+        void (async () => {
+          try {
+            const conversation = await openConversation({
+              sellerEmail: owner,
+              listingSlug: p.id.replace(/^api:/, ''),
+            })
+            if (cleanText) await postChatMessage(conversation.id, cleanText)
+            await refreshConversations()
+            setSelectedConvId(`api:cv-${conversation.id}`)
+            navigate('messages')
+          } catch (err) {
+            toast(
+              err instanceof ApiRequestError
+                ? err.message
+                : 'That message could not be sent.',
+            )
+          }
+        })()
+        return true
       }
       const type: 'product' | 'service' = isSvc(p) ? 'service' : 'product'
       let targetConvId = ''
@@ -4632,6 +4699,19 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       if (!c || !convCan(c, currentAccount)) {
         toast('You can only write in your own conversations.')
         return false
+      }
+      const apiConvId = apiConversationId(convId)
+      if (apiConvId !== null) {
+        void postChatMessage(apiConvId, cleanText)
+          .then(() => refreshConversations())
+          .catch((err: unknown) => {
+            toast(
+              err instanceof ApiRequestError
+                ? err.message
+                : 'The message could not be sent.',
+            )
+          })
+        return true
       }
       const now = new Date().toISOString()
       setDb((prev) => {
@@ -7853,7 +7933,32 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     return Math.max(1, Math.round(raw.length / 1024))
   }, [db])
 
-    // One call for both sides of an order: the seller accepts, declines or
+    // Open (or find) the server thread with another member and jump to it.
+  const openThreadWith = useCallback(
+    async (input: {
+      sellerEmail?: string
+      buyerEmail?: string
+      listingSlug?: string | null
+    }): Promise<boolean> => {
+      try {
+        const conversation = await openConversation(input)
+        await refreshConversations()
+        setSelectedConvId(`api:cv-${conversation.id}`)
+        navigate('messages')
+        return true
+      } catch (err) {
+        toast(
+          err instanceof ApiRequestError
+            ? err.message
+            : 'Could not open that conversation.',
+        )
+        return false
+      }
+    },
+    [refreshConversations, toast],
+  )
+
+  // One call for both sides of an order: the seller accepts, declines or
   // completes; the buyer cancels. The server decides which is allowed.
   const actOnOrder = useCallback(
     async (
@@ -7892,6 +7997,7 @@ const value = useMemo<TindahanContextValue>(
       apiOrders,
       refreshOrders,
       actOnOrder,
+      openThreadWith,
       moderateListing,
       hasSettledInitialFetch,
       toastMsg,
@@ -8057,6 +8163,7 @@ const value = useMemo<TindahanContextValue>(
       apiOrders,
       refreshOrders,
       actOnOrder,
+      openThreadWith,
       moderateListing,
       currentAccount,
       isStaffUser,
