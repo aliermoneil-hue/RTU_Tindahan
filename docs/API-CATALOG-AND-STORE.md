@@ -173,21 +173,45 @@ into the same snapshot the pages already read, so no page component changed:
 - If the backend is unreachable, the request fails silently and the local
   catalogue stands.
 
-Still local (localStorage): cart, orders, chat, forum, reviews, favourites,
-moderation. Still missing: the write path from the UI — posting a listing or
-placing a ticket needs the auth swap first, because the frontend has no real
-token yet.
+Still local (localStorage): forum, reviews, and the admin user/audit screens.
+Cart, orders, chat, moderation, the store screens and favourites are now
+server-backed; the bridges live in `frontend/src/features/marketplace/api/`.
 
 ## 6. What is still missing
 
-- The write path from the UI: posting a listing, approving from the moderation
-  screen, and placing official-store tickets still go to localStorage. The
-  token is real now (see `docs/AUTH-CODE-FLOW.md`), so these can call the API.
-- `src/features/core/routes.ts`: product, browse, store, create, and shop are
-  now marked `backend: 'available'`. Orders, cart, favourites, messages, forum,
-  and the admin pages stay `missing`.
-- The AI screening service (`screening` app) does not exist, so listings stay
-  `pending_screening` until a moderator approves them by hand. That is
-  intended for now.
-- No student-to-student orders, cart, chat, forum, reviews, or reports: those
-  have no models yet.
+- Forum posts, reports, reviews and the admin user/audit log have no models
+  yet. Everything else on the buy/sell path reads and writes the API.
+- The AI screening pass has never been reviewed against real listings: the
+  provider is wired (`apps/screening`), but the prompt and flag thresholds
+  are untuned, so a flagged listing still waits for a moderator.
+- "Small sellers" sort stays blocked on a product decision: nobody has defined
+  what "small" means (listing count or sales volume).
+
+---
+
+## 7. Favorites API (saved listings and sellers)
+
+Favourites used to live in the browser snapshot, so a heart on one device did
+not exist on another and the seller never saw it. They are now rows on the
+server, private to the member.
+
+| Method | Path | Who | Notes |
+| --- | --- | --- | --- |
+| GET | `/api/v1/favorites/` | verified members | The caller's rows only; unpaginated |
+| POST | `/api/v1/favorites/toggle/` | verified members | `{"listing": 13}` or `{"seller": "a@rtu.edu.ph"}`; returns `{"saved": true|false}` |
+| DELETE | `/api/v1/favorites/<id>/` | owner | Remove by row id |
+
+Rules enforced in the model and serializer:
+
+- exactly one target per row (`favorite_exactly_one_target`), with partial
+  unique constraints so a double click cannot write two rows;
+- a member cannot save their own listing or their own shop;
+- a listing must still be `approved` + `available` to be saved;
+- deleting a listing cascades its favourites away.
+
+`frontend/src/features/marketplace/api/favorites.ts` is the bridge: it turns
+`listing_slug` into the UI id `api:<slug>` and a saved seller into their email,
+then the provider merges both lists into `account.favs` / `account.sfavs`.
+`Official RTU Store` is a bucket with no user behind it, so that one heart
+stays local. The heart updates optimistically and rolls back with the server's
+message if the write is refused.
