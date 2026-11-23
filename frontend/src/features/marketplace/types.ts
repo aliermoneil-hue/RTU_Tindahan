@@ -52,6 +52,10 @@ export interface PrototypeProduct {
   fulfillment?: FulfillmentMethod
   onHand?: number
   soldCount?: number
+  /** Approved, available listings the seller has; set by the catalogue API. */
+  sellerListingCount?: number
+  /** True when that count is at most the small-seller cap (3 by default). */
+  smallSeller?: boolean
   inv?: BaoProductInv
   /**
    * Set only on products that came from the catalogue API, and equal to the

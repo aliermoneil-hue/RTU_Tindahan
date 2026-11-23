@@ -356,6 +356,10 @@ MEDIA_ROOT = BASE_DIR / "media"
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE
 
+# "Small sellers" sort: a verified student with at most this many approved,
+# available listings. One number, one place to change it.
+SMALL_SELLER_MAX_LISTINGS = int(os.getenv("SMALL_SELLER_MAX_LISTINGS", "3"))
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ---------------------------------------------------------------------------

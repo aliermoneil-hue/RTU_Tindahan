@@ -65,6 +65,8 @@ export interface ApiListing {
   fulfillment: 'pickup' | 'delivery' | 'both'
   view_count: number
   sold_count: number
+  seller_active_listings?: number
+  is_small_seller?: boolean
   created_at: string
   seller_name: string
   seller_email: string
@@ -203,6 +205,8 @@ export function toPrototypeProduct(dto: ApiListing): PrototypeProduct {
     kind: service ? 'service' : undefined,
     vars,
     soldCount: dto.sold_count,
+    sellerListingCount: dto.seller_active_listings,
+    smallSeller: dto.is_small_seller,
     hidden: false,
     fulfillment: dto.fulfillment ?? 'pickup',
   }

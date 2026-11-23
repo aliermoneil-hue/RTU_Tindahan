@@ -1776,6 +1776,17 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           (a, b) => g(a).units - g(b).units || g(b).orders - g(a).orders || byNewest(a, b),
         )
       }
+      if (mode === 'Small sellers first') {
+        // A "small seller" is a verified student whose live catalogue is at
+        // most three listings (the backend decides, and sends the flag). Rows
+        // that did not come from the API have no count, so they sort last.
+        const small = (p: PrototypeProduct) => (p.smallSeller ? 1 : 0)
+        const count = (p: PrototypeProduct) =>
+          p.sellerListingCount ?? Number.MAX_SAFE_INTEGER
+        return l.sort(
+          (a, b) => small(b) - small(a) || count(a) - count(b) || byNewest(a, b),
+        )
+      }
       if (mode === 'Top-Rated' || mode === 'Lowest-Rated') {
         const r = (p: PrototypeProduct) =>
           rateBasis === 'seller' ? ratingOf('seller', sellerKeyOf(p)) : ratingOf('item', p.id)

@@ -57,7 +57,7 @@ Query parameters on `GET /api/v1/listings/`:
 | `max_price` | `?max_price=300` | Inclusive upper bound on price; combining the two gives a range. A value that is not a number, a negative number, or a range where the maximum sits below the minimum returns `400` with the offending key |
 | `official` | `?official=true` | Official Store items only — this is what the Store page should call |
 | `seller` | `?seller=me` | Your own listings, any status (the "My shop" page) |
-| `ordering` | `?ordering=price` | `newest`, `oldest`, `price`, `-price`, `popular`, `best-selling`, `least-sold`. Sales ordering uses `sold_count`, which a ticket raises when staff mark it `claimed` |
+| `ordering` | `?ordering=small-sellers` | `newest`, `oldest`, `price`, `-price`, `popular`, `best-selling`, `least-sold`, `small-sellers`. Sales ordering uses `sold_count`, which a ticket raises when staff mark it `claimed` |
 | `page` | `?page=2` | Page size is 20 (global DRF setting) |
 
 ### Posting an item (multipart, up to 10 photos)
@@ -181,11 +181,17 @@ server-backed; the bridges live in `frontend/src/features/marketplace/api/`.
 
 - The staff backup/restore utility in Staff tools still works on the browser
   snapshot; every member-facing flow is server-backed.
-- The AI screening pass has never been reviewed against real listings: the
-  provider is wired (`apps/screening`), but the prompt and flag thresholds
-  are untuned, so a flagged listing still waits for a moderator.
-- "Small sellers" sort stays blocked on a product decision: nobody has defined
-  what "small" means (listing count or sales volume).
+- The AI screening pass follows `POSTING-AND-SELLING-GUIDELINE.md`; the
+  remaining work there is watching the moderator queue for false flags, not
+  writing rules.
+
+"Small sellers" now has a definition: a verified student (`member_type =
+student`) whose live catalogue — approved and available listings — is at most
+`SMALL_SELLER_MAX_LISTINGS` (3 by default; `SMALL_SELLER_MAX_LISTINGS` in
+`backend/.env` overrides it). Each listing carries `seller_active_listings`
+and `is_small_seller`, and `?ordering=small-sellers` puts those sellers first,
+then the smallest catalogues, then the newest. The Browse screen's "Small
+sellers first" sort uses the same fields.
 
 ---
 

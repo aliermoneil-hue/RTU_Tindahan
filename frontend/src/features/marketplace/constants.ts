@@ -565,6 +565,7 @@ export const BROWSE_CATS: readonly string[] = [...CATEGORIES, SERVICES_CAT]
 export const SORT_MODES: readonly string[] = [
   'Recommended',
   'Newest',
+  'Small sellers first',
   'Best-Selling',
   'Least-Sold',
   'Top-Rated',

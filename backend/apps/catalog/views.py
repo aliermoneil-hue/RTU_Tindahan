@@ -17,7 +17,9 @@ call, which keeps LS-05/AI-02 true even before the screening service exists.
 
 from decimal import Decimal, InvalidOperation
 
-from django.db.models import Avg, Count, F, Q
+from django.conf import settings
+from django.db.models import Avg, Case, Count, F, IntegerField, OuterRef, Q, Subquery, Value, When
+from django.db.models.functions import Coalesce
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -25,6 +27,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from apps.accounts.models import User
 from apps.accounts.permissions import IsModerator, IsVerifiedUser
 from apps.audit.services import record
 from apps.notifications.services import notify
@@ -49,6 +52,11 @@ ORDERING = {
     # BD-03/BD-07: done by the sales counter, which a claimed ticket raises.
     "best-selling": ("-sold_count", "-created_at"),
     "least-sold": ("sold_count", "-created_at"),
+    # The "small sellers" product decision: a verified student whose active
+    # catalogue is no bigger than SMALL_SELLER_MAX_LISTINGS comes first, then
+    # the smallest catalogues, then the newest. Both fields are annotated in
+    # get_queryset.
+    "small-sellers": ("-seller_is_small", "seller_active_listings", "-created_at"),
 }
 TRUE_VALUES = {"1", "true", "yes"}
 MODERATION_VALUES = {choice for choice, _ in Listing.ModerationStatus.choices}
@@ -102,6 +110,39 @@ class ListingViewSet(viewsets.ModelViewSet):
         queryset = queryset.annotate(
             rating_avg=Avg("reviews__stars"),
             rating_count=Count("reviews"),
+        )
+
+        # "Small sellers": the size of each seller's live catalogue, counted in
+        # a subquery so it cannot multiply the review join above. A student
+        # with at most SMALL_SELLER_MAX_LISTINGS approved, available listings
+        # is small; the flag and the count drive the small-sellers ordering.
+        active_catalogue = (
+            Listing.objects.filter(
+                seller=OuterRef("seller"),
+                moderation_status=Listing.ModerationStatus.APPROVED,
+                availability_status=Listing.AvailabilityStatus.AVAILABLE,
+                seller__status="active",
+            )
+            .order_by()
+            .values("seller")
+            .annotate(n=Count("pk"))
+            .values("n")
+        )
+        queryset = queryset.annotate(
+            seller_active_listings=Coalesce(
+                Subquery(active_catalogue, output_field=IntegerField()),
+                Value(0),
+            )
+        ).annotate(
+            seller_is_small=Case(
+                When(
+                    seller__member_type=User.MemberType.STUDENT,
+                    seller_active_listings__lte=settings.SMALL_SELLER_MAX_LISTINGS,
+                    then=Value(1),
+                ),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
         )
 
         # Visibility: staff see every status, a seller sees their own rows only

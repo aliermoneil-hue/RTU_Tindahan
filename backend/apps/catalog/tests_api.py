@@ -484,3 +484,92 @@ class ListingPhotoModelTests(APITestCase):
         ListingPhoto.objects.create(listing=listing, image="listings/a.jpg")
 
         self.assertEqual(listing.photos.count(), 1)
+
+
+@override_settings(SCREENING_PROVIDER="stub")
+class SmallSellerSortTests(APITestCase):
+    """The "small sellers" sort: a verified student with a tiny live catalogue.
+
+    The cutoff is a product decision (3 listings by default), so it lives in
+    settings and the test proves both the flag and the ordering.
+    """
+
+    def setUp(self):
+        self.category = Category.objects.create(name="School supplies")
+        self.small = make_user("2024-111111@rtu.edu.ph")
+        self.big = make_user("2024-222222@rtu.edu.ph")
+        self.staff = make_user("staff@rtu.edu.ph", role=User.Role.OFFICE_STAFF)
+        self.staff.member_type = User.MemberType.PERSONNEL
+        self.staff.year_level = None
+        self.staff.save(update_fields=["member_type", "year_level"])
+
+    def approved(self, seller, title):
+        return Listing.objects.create(
+            seller=seller,
+            category=self.category,
+            title=title,
+            description="Good condition, complete, pick up at the main gate.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price="300.00",
+            quantity=1,
+            meetup_place="Main gate",
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+        )
+
+    def test_a_student_with_few_listings_is_small_and_comes_first(self):
+        for index in range(2):
+            self.approved(self.small, f"Small seller item {index}")
+        for index in range(4):
+            self.approved(self.big, f"Big seller item {index}")
+        self.approved(self.staff, "Official store uniform")
+
+        response = self.client.get("/api/v1/listings/?ordering=small-sellers")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        rows = response.json()["results"]
+        self.assertEqual(len(rows), 7)
+        # Two small-seller rows first, then the one-listing staff seller, then
+        # the four-listing student.
+        self.assertEqual(
+            [row["seller_name"] for row in rows],
+            ["2024-111111", "2024-111111", "staff", "2024-222222", "2024-222222",
+             "2024-222222", "2024-222222"],
+        )
+        self.assertTrue(all(row["is_small_seller"] for row in rows[:2]))
+        self.assertFalse(any(row["is_small_seller"] for row in rows[2:]))
+        self.assertEqual(rows[0]["seller_active_listings"], 2)
+        self.assertEqual(rows[-1]["seller_active_listings"], 4)
+
+    @override_settings(SMALL_SELLER_MAX_LISTINGS=1)
+    def test_the_cutoff_is_configurable(self):
+        self.approved(self.small, "Small seller item one")
+        self.approved(self.small, "Small seller item two")
+
+        response = self.client.get("/api/v1/listings/?ordering=small-sellers")
+
+        rows = response.json()["results"]
+        self.assertFalse(any(row["is_small_seller"] for row in rows))
+        self.assertEqual({row["seller_active_listings"] for row in rows}, {2})
+
+    def test_unapproved_and_sold_listings_do_not_count(self):
+        self.approved(self.small, "Live item")
+        Listing.objects.create(
+            seller=self.small,
+            category=self.category,
+            title="Waiting for a moderator",
+            description="This one is not published yet, so it does not count.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price="300.00",
+            quantity=1,
+            meetup_place="Main gate",
+            moderation_status=Listing.ModerationStatus.NEEDS_REVIEW,
+        )
+
+        response = self.client.get("/api/v1/listings/?ordering=small-sellers")
+
+        row = next(r for r in response.json()["results"] if r["seller_name"] == "2024-111111")
+        self.assertEqual(row["seller_active_listings"], 1)
+        self.assertTrue(row["is_small_seller"])

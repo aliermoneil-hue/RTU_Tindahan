@@ -107,6 +107,8 @@ class ListingReadSerializer(serializers.ModelSerializer):
     # instance did not come through that queryset.
     rating_avg = serializers.SerializerMethodField()
     rating_count = serializers.SerializerMethodField()
+    seller_active_listings = serializers.SerializerMethodField()
+    is_small_seller = serializers.SerializerMethodField()
 
     class Meta:
         model = Listing
@@ -141,6 +143,8 @@ class ListingReadSerializer(serializers.ModelSerializer):
             "screening",
             "rating_avg",
             "rating_count",
+            "seller_active_listings",
+            "is_small_seller",
         )
         read_only_fields = fields
 
@@ -169,6 +173,15 @@ class ListingReadSerializer(serializers.ModelSerializer):
 
     def get_rating_count(self, obj: Listing):
         return int(getattr(obj, "rating_count", 0) or 0)
+
+    def get_seller_active_listings(self, obj: Listing):
+        """How many approved, available listings the seller has right now."""
+        value = getattr(obj, "seller_active_listings", None)
+        return int(value) if value is not None else None
+
+    def get_is_small_seller(self, obj: Listing):
+        """True for a verified student whose live catalogue is at most the cap."""
+        return bool(getattr(obj, "seller_is_small", 0))
 
 
 class ListingWriteSerializer(serializers.ModelSerializer):
