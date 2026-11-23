@@ -1,12 +1,16 @@
 """Tests for the Users and audit screen and its API."""
 
 import sqlite3
+import unittest
 import tempfile
 from decimal import Decimal
+from unittest.mock import patch
 
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase, APITransactionTestCase
+
+from django.db import connection
 
 from apps.accounts.models import User
 from apps.audit.models import AuditLog
@@ -270,6 +274,19 @@ class DatabaseBackupTests(APITransactionTestCase):
             response = self.client.get("/api/v1/admin/backup/")
             self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_a_postgresql_deployment_is_told_to_use_pg_dump(self):
+        self.client.force_authenticate(self.admin)
+
+        with patch("apps.accounts.admin_api.connection") as fake:
+            fake.vendor = "postgresql"
+            response = self.client.get("/api/v1/admin/backup/")
+
+        self.assertEqual(response.status_code, status.HTTP_501_NOT_IMPLEMENTED)
+        self.assertIn("pg_dump", response.json()["detail"])
+
+    @unittest.skipUnless(
+        connection.vendor == "sqlite", "the backup endpoint streams SQLite databases"
+    )
     def test_an_administrator_gets_a_valid_sqlite_copy(self):
         self.client.force_authenticate(self.admin)
 

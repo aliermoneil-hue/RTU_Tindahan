@@ -20,6 +20,8 @@ Suggested contents, copied from the CapStone folder:
   deterministic stub, and the moderator queue.
 - `POSTING-AND-SELLING-GUIDELINE.md` — the panel's posting and selling rules
   in Markdown, each one mapped to where the system enforces it.
+- `POSTGRES.md` — the approved database, the switch in settings, and the
+  proof that migrations and the full suite pass on PostgreSQL 16.
 - `INTEGRATION-SETUP.md` — connecting the React app to the Django API.
 
 Rules:
