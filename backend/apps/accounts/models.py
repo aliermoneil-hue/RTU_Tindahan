@@ -207,6 +207,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
     status_note = models.TextField(blank=True)
     status_changed_at = models.DateTimeField(null=True, blank=True)
+    status_changed_by = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="status_changes_made",
+        help_text="The administrator who last changed this account's status.",
+    )
 
     # AV-03: the account becomes verified only after the email link is used.
     verified_at = models.DateTimeField(null=True, blank=True)

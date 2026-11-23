@@ -1,5 +1,6 @@
 from django.urls import path
 
+from .admin_api import AdminUserViewSet
 from .views import (
     CollegeListView,
     LoginView,
@@ -48,4 +49,26 @@ urlpatterns = [
     path("auth/logout-all/", LogoutAllView.as_view(), name="logout-all"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     path("auth/me/", MeView.as_view(), name="me"),
+    # The Users and audit screen. Read is open to staff; the two writes are
+    # administrator-only and are enforced by the actions themselves.
+    path(
+        "admin/users/",
+        AdminUserViewSet.as_view({"get": "list"}),
+        name="admin-users",
+    ),
+    path(
+        "admin/users/<int:pk>/",
+        AdminUserViewSet.as_view({"get": "retrieve"}),
+        name="admin-user",
+    ),
+    path(
+        "admin/users/<int:pk>/status/",
+        AdminUserViewSet.as_view({"post": "status"}),
+        name="admin-user-status",
+    ),
+    path(
+        "admin/users/<int:pk>/role/",
+        AdminUserViewSet.as_view({"post": "role"}),
+        name="admin-user-role",
+    ),
 ]

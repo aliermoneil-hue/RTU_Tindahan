@@ -28,6 +28,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.permissions import IsVerifiedUser
+from apps.audit.services import record
 from apps.notifications.services import notify, notify_staff
 
 from .models import ForumComment, ForumPost, ForumReaction, ForumReport
@@ -171,6 +172,13 @@ class ForumPostViewSet(
         if post.author_id != request.user.id and not is_staff(request.user):
             raise PermissionDenied("You can only delete your own posts.")
         if is_staff(request.user) and post.author_id != request.user.id:
+            record(
+                request.user,
+                "delete forum post",
+                target_type="forum post",
+                target_id=post.pk,
+                target_name=post.title or post.body[:60],
+            )
             ForumReport.objects.filter(
                 status=ForumReport.Status.OPEN, post=post, comment__isnull=True
             ).update(
@@ -263,6 +271,7 @@ class ForumPostViewSet(
         payload.is_valid(raise_exception=True)
         act = payload.validated_data["action"]
 
+        target_name = post.title or post.body[:60] or f"Post {post.pk}"
         if act == "hide":
             hide_post(post, request.user)
         elif act == "restore":
@@ -275,7 +284,22 @@ class ForumPostViewSet(
             post.save(update_fields=["pinned"])
         elif act == "delete":
             post.delete()
+            record(
+                request.user,
+                "delete forum post",
+                target_type="forum post",
+                target_id=pk,
+                target_name=target_name,
+            )
             return Response(status=status.HTTP_204_NO_CONTENT)
+
+        record(
+            request.user,
+            f"{act} forum post",
+            target_type="forum post",
+            target_id=post.pk,
+            target_name=target_name,
+        )
 
         post.refresh_from_db()
         return Response(ForumPostSerializer(post, context=self.get_serializer_context()).data)
@@ -321,16 +345,31 @@ class ForumCommentViewSet(
         payload.is_valid(raise_exception=True)
         act = payload.validated_data["action"]
 
+        target_name = comment.text[:60] or f"Comment {comment.pk}"
         if act == "hide":
             hide_comment(comment, request.user)
         elif act == "restore":
             restore_comment(comment)
         elif act == "delete":
             delete_comment(comment)
+            record(
+                request.user,
+                "delete forum comment",
+                target_type="forum comment",
+                target_id=pk,
+                target_name=target_name,
+            )
             return Response(status=status.HTTP_204_NO_CONTENT)
         else:
             raise PermissionDenied("That action does not apply to a comment.")
 
+        record(
+            request.user,
+            f"{act} forum comment",
+            target_type="forum comment",
+            target_id=comment.pk,
+            target_name=target_name,
+        )
         comment.refresh_from_db()
         return Response(
             ForumCommentSerializer(comment, context=self.get_serializer_context()).data
@@ -432,6 +471,14 @@ class ForumReportViewSet(
         report.note = (data.get("note") or "").strip()
         report.save(
             update_fields=["status", "handled_by", "handled_at", "action", "note"]
+        )
+        record(
+            request.user,
+            "resolve forum report",
+            target_type="forum report",
+            target_id=report.pk,
+            target_name=report.reason,
+            note=f"{report.status}" + (f" / {act}" if act else ""),
         )
         if report.reporter_id != request.user.id:
             outcome = {

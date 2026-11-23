@@ -1466,6 +1466,9 @@ function AdminUserDialog(props: ModalContentProps & { email: string }) {
   const posts = props.db.feed.filter((f) => f.authorEmail === t.email).length
   const uListings = props.db.userListings.filter((l) => l.ownerEmail === t.email)
   const live = uListings.filter((l) => l.state === 'live' && !l.modHold).length
+  const listingTotal = t.adminListingCount ?? uListings.length
+  const orderTotal = t.adminOrderCount ?? t.orders.length
+  const postTotal = t.adminPostCount ?? posts
 
   const info: [string, string][] = [
     ['Email', t.email],
@@ -1482,9 +1485,9 @@ function AdminUserDialog(props: ModalContentProps & { email: string }) {
           })
         : 'Not set',
     ],
-    ['Listings', `${uListings.length} (${live} live)`],
-    ['Orders placed', String(t.orders.length)],
-    ['Forum posts', String(posts)],
+    ['Listings', `${listingTotal}${live ? ` (${live} live)` : ''}`],
+    ['Orders placed', String(orderTotal)],
+    ['Forum posts', String(postTotal)],
   ]
 
   const handleSetStatus = (to: 'active' | 'suspended' | 'banned') => {

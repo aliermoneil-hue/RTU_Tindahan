@@ -26,6 +26,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.accounts.permissions import IsModerator, IsVerifiedUser
+from apps.audit.services import record
 from apps.notifications.services import notify
 from apps.screening.services import run_screening
 
@@ -118,6 +119,10 @@ class ListingViewSet(viewsets.ModelViewSet):
         visible = Q(
             moderation_status=Listing.ModerationStatus.APPROVED,
             availability_status=Listing.AvailabilityStatus.AVAILABLE,
+            # AD-01: a suspended or banned seller's listings leave the
+            # marketplace without anyone having to delete them by hand.
+            seller__status="active",
+            seller__is_active=True,
         )
         own = Q(seller=user)
         asked_for_own = params.get("seller") == "me" or any(
@@ -284,6 +289,13 @@ class ListingViewSet(viewsets.ModelViewSet):
     def approve(self, request, slug=None):
         listing = self.get_object()
         listing.approve()
+        record(
+            request.user,
+            "approve listing",
+            target_type="listing",
+            target_id=listing.slug,
+            target_name=listing.title,
+        )
         notify(
             listing.seller,
             f"Your listing \u201c{listing.title}\u201d is now live.",
@@ -303,6 +315,14 @@ class ListingViewSet(viewsets.ModelViewSet):
             )
         listing = self.get_object()
         listing.reject(reason)
+        record(
+            request.user,
+            "reject listing",
+            target_type="listing",
+            target_id=listing.slug,
+            target_name=listing.title,
+            note=reason,
+        )
         notify(
             listing.seller,
             f"Your listing \u201c{listing.title}\u201d was not approved: {reason}",

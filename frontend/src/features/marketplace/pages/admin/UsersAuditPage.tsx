@@ -300,12 +300,10 @@ export function UsersAuditPage() {
                               : ''}
                           </td>
                           <td className="tnum">
-                            {
-                              db.userListings.filter((l) => l.ownerEmail === a.email)
-                                .length
-                            }
+                            {a.adminListingCount ??
+                              db.userListings.filter((l) => l.ownerEmail === a.email).length}
                           </td>
-                          <td className="tnum">{a.orders.length}</td>
+                          <td className="tnum">{a.adminOrderCount ?? a.orders.length}</td>
                           <td>
                             <button
                               type="button"

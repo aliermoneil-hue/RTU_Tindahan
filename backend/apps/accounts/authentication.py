@@ -38,6 +38,15 @@ class ExpiringTokenAuthentication(TokenAuthentication):
     def authenticate_credentials(self, key):
         user, token = super().authenticate_credentials(key)
 
+        # A suspended or banned account must not keep working with a token it
+        # already holds. The web token is deleted on suspension, but a copy
+        # taken earlier would otherwise stay valid until it expired.
+        if not user.can_sign_in:
+            raise AuthenticationFailed(
+                "This account is suspended or banned.",
+                code="account_inactive",
+            )
+
         lifetime = token_lifetime()
         if lifetime is not None:
             age = timezone.now() - token.created

@@ -179,8 +179,8 @@ server-backed; the bridges live in `frontend/src/features/marketplace/api/`.
 
 ## 6. What is still missing
 
-- The admin user/audit log has no endpoints yet. Notifications are now
-  server-backed (section 10); the announcement panel is still local.
+- The announcement panel is still local: a staff notice reaches the forum for
+  everyone, but the panel itself only shows on the browser that posted it.
 - The AI screening pass has never been reviewed against real listings: the
   provider is wired (`apps/screening`), but the prompt and flag thresholds
   are untuned, so a flagged listing still waits for a moderator.
@@ -325,3 +325,39 @@ posts, conversations and listings so `openNotification` can find the local row.
 at startup, every 20 seconds, on focus, after a write, and on Mark all read.
 A self-notification is never written; a missing recipient is skipped rather
 than failing the action that caused it.
+
+---
+
+## 11. Admin users and audit API
+
+| Method | Path | Who | Notes |
+| --- | --- | --- | --- |
+| GET | `/api/v1/admin/users/` | staff | Every account; `?q=`, `?role=`, `?status=`; counts included |
+| GET | `/api/v1/admin/users/<id>/` | staff | One account |
+| POST | `/api/v1/admin/users/<id>/status/` | administrators | `{"status": "active|suspended|banned", "note": "..."}` |
+| POST | `/api/v1/admin/users/<id>/role/` | administrators | `{"role": "user|office_staff|moderator|administrator"}` |
+| GET | `/api/v1/admin/audit/` | staff | Newest first; `?action=`, `?target_type=`, `?q=` |
+
+Rules:
+
+- staff = moderator or administrator; only an administrator may write;
+- a staff account, or your own account, cannot be suspended or banned here;
+- suspending or banning needs a reason of at least five characters;
+- the account's token is deleted immediately, and the token class also refuses
+  any copy of it (`can_sign_in` is checked on every authenticated request);
+- a suspended or banned seller's listings drop out of the public catalogue
+  without being deleted;
+- restoring access notifies the member;
+- the last administrator cannot be demoted, and nobody can change their own
+  role;
+- every status/role write, listing approve/reject and forum moderation action
+  appends an `AuditLog` row (actor, action, target, note). The log has no
+  update or delete endpoint.
+
+`frontend/src/features/marketplace/api/admin.ts` merges the account list into
+`db.accounts` by email — the server wins on role, status, verification, join
+date and the authoritative listing/order/post counts, while the local record
+keeps its cart, orders, notifications and listing rows. Accounts the browser
+has never seen are created through `mkAcct`. Audit rows are merged oldest-first
+so the screen's reverse view stays newest-first. `refreshAdminData` runs only
+for staff, at startup and after a status change.

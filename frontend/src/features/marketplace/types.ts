@@ -214,6 +214,12 @@ export interface PrototypeAccount {
   sfavs: string[]
   avatar: string | null
   draft?: string | null
+  /** Backend user id, set when the account came from the admin users API. */
+  apiUserId?: number
+  /** Authoritative counts from the admin users API (0 until staff load it). */
+  adminListingCount?: number
+  adminOrderCount?: number
+  adminPostCount?: number
 }
 
 export interface DraftVariationRow {

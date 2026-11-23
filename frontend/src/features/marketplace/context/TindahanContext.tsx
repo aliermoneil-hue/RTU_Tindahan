@@ -103,6 +103,13 @@ import {
   notificationFromApi,
 } from '../api/notifications'
 import {
+  accountFromAdminUser,
+  auditEntryFromApi,
+  fetchAdminUsers,
+  fetchAuditLog,
+  setUserStatus as setUserStatusApi,
+} from '../api/admin'
+import {
   createOrder as createApiOrder,
   fetchOrders as fetchApiOrders,
   orderRecordFromApi,
@@ -1102,6 +1109,56 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // Staff only: the users table and the audit log. The server wins on role,
+  // status and join date; the local record keeps its cart, orders and
+  // notifications. Accounts this browser has never seen are added.
+  const refreshAdminData = useCallback(async () => {
+    const role = user?.role
+    if (!getToken() || (role !== 'moderator' && role !== 'administrator')) return
+    try {
+      const [users, entries] = await Promise.all([fetchAdminUsers(), fetchAuditLog()])
+      setDb((prev) => {
+        const byEmail = new Map(users.map((u) => [u.email, u]))
+        const accounts = prev.accounts.map((account) => {
+          const row = byEmail.get(account.email)
+          if (!row) return account
+          const fresh = accountFromAdminUser(row)
+          return {
+            ...account,
+            role: fresh.role,
+            status: fresh.status,
+            statusNote: fresh.statusNote,
+            statusBy: fresh.statusBy,
+            statusAt: fresh.statusAt,
+            verified: fresh.verified,
+            since: fresh.since,
+            name: fresh.name,
+            first: fresh.first,
+            last: fresh.last,
+            sid: fresh.sid,
+            prog: row.college_name || account.prog,
+            apiUserId: fresh.apiUserId,
+            adminListingCount: fresh.adminListingCount,
+            adminOrderCount: fresh.adminOrderCount,
+            adminPostCount: fresh.adminPostCount,
+          }
+        })
+        const known = new Set(prev.accounts.map((a) => a.email))
+        for (const row of users) {
+          if (!known.has(row.email)) accounts.push(accountFromAdminUser(row))
+        }
+        const mappedAudit = entries.map(auditEntryFromApi)
+        const localAudit = prev.audit.filter((e) => !e.id.startsWith('api:'))
+        const audit = [...localAudit, ...mappedAudit].sort(
+          (a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime(),
+        )
+        return { ...prev, accounts, audit }
+      })
+    } catch {
+      /* backend offline: keep the local accounts and log */
+    }
+  }, [user])
+
   // The moderation queue lives on the server; the mount effect fills it.
   const [pendingListings, setPendingListings] = useState<ApiListing[]>([])
   const refreshPendingListings = useCallback(async () => {
@@ -1140,6 +1197,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           refreshReviews(),
           refreshForum(),
           refreshNotifications(),
+          refreshAdminData(),
         ])
       } finally {
         if (!cancelled) {
@@ -1163,6 +1221,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       refreshReviews,
       refreshForum,
       refreshNotifications,
+      refreshAdminData,
     ],
   )
 
@@ -6372,6 +6431,27 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         toast('Please write a short reason first.')
         return false
       }
+      const apiId = target.apiUserId
+      if (apiId !== undefined) {
+        void setUserStatusApi(apiId, to, cleanReason)
+          .then(async () => {
+            await refreshAdminData()
+            toast(
+              to === 'active'
+                ? `${target.name} can sign in again.`
+                : `${target.name} is ${to === 'banned' ? 'banned.' : 'suspended.'}`,
+            )
+          })
+          .catch((err) => {
+            void refreshAdminData()
+            toast(
+              err instanceof ApiRequestError
+                ? err.message
+                : 'That change could not be saved.',
+            )
+          })
+        return true
+      }
       const now = new Date().toISOString()
       setDb((prev) => {
         const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
@@ -6410,7 +6490,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       )
       return true
     },
-    [currentAccount, isStaffUser, acctByEmail, toast],
+    [currentAccount, isStaffUser, acctByEmail, refreshAdminData, toast],
   )
 
   const adminRemoveListing = useCallback(

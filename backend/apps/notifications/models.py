@@ -20,6 +20,7 @@ class Notification(models.Model):
         REPORT = "report", "Report"
         REVIEW = "review", "Review"
         LISTING = "listing", "Listing"
+        SYSTEM = "system", "System"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
