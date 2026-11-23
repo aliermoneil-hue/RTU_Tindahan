@@ -89,6 +89,27 @@ Two things worth knowing:
   needs `djangorestframework-simplejwt` and a client change, and is the next
   step if the panel asks for one.
 
+### Cleaning up dead tokens
+
+An aged token is refused but not removed, so the table would grow one dead row
+per rotation. `manage.py prune_tokens` deletes the rows past the limit; because
+they can never authenticate again, this changes no behaviour.
+
+    cd backend
+    .venv/bin/python manage.py prune_tokens --dry-run   # report only
+    .venv/bin/python manage.py prune_tokens             # delete
+
+`--days N` overrides the setting for one run. With `AUTH_TOKEN_TTL_DAYS=0`
+tokens never expire, so the command says so and deletes nothing.
+
+Run it daily from cron (the host already runs per-user units, so a timer works
+just as well):
+
+    10 3 * * * cd /home/kallisto/RTU_Tindahan/backend && .venv/bin/python manage.py prune_tokens >/dev/null 2>&1
+
+Four tests cover the age cutoff, `--dry-run`, the `--days` override, and the
+unlimited-lifetime case (`apps/accounts/tests/test_token_cleanup.py`).
+
 Set `AUTH_TOKEN_TTL_DAYS=0` on a teammate's machine if their long-lived
 development token keeps expiring mid-session.
 
