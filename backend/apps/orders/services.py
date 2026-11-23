@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.catalog.models import Listing
+from apps.notifications.services import notify
 
 from .models import Order, OrderLine
 
@@ -86,6 +87,15 @@ def place_order(
                 quantity=int(row["quantity"]),
                 unit_price=listing.price,
             )
+    first = order.lines.first()
+    notify(
+        order.seller,
+        f"{buyer.display_name} requested {first.title if first else 'an item'}. Open My shop to accept or decline.",
+        kind="order",
+        link_kind="shop",
+        link_id=order.reference,
+        actor=buyer,
+    )
     return order
 
 
@@ -129,4 +139,23 @@ def change_order_status(order, new_status, *, by):
         if new_status in {Order.Status.ACCEPTED, Order.Status.DECLINED, Order.Status.COMPLETED}:
             locked.decided_at = timezone.now()
         locked.save(update_fields=["status", "decided_at", "updated_at"])
+
+    if is_seller:
+        notify(
+            locked.buyer,
+            f"Your request {locked.reference} is now {locked.get_status_display().lower()}.",
+            kind="order",
+            link_kind="order",
+            link_id=locked.reference,
+            actor=by,
+        )
+    else:
+        notify(
+            locked.seller,
+            f"{by.display_name} cancelled request {locked.reference}.",
+            kind="order",
+            link_kind="shop",
+            link_id=locked.reference,
+            actor=by,
+        )
     return locked

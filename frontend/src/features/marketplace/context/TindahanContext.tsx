@@ -96,6 +96,13 @@ import {
   type ApiForumReport,
 } from '../api/forum'
 import {
+  apiNotificationId,
+  fetchNotifications,
+  markAllNotificationsRead,
+  markNotificationsRead,
+  notificationFromApi,
+} from '../api/notifications'
+import {
   createOrder as createApiOrder,
   fetchOrders as fetchApiOrders,
   orderRecordFromApi,
@@ -1075,6 +1082,26 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // The inbox is the server's: every event that used to write a local
+  // notification now emits a row both sides can see. The provider replaces the
+  // local list with it so a badge cannot count events the server never had.
+  const refreshNotifications = useCallback(async () => {
+    if (!getToken() || !user?.email) return
+    const email = user.email
+    try {
+      const list = await fetchNotifications()
+      const mapped = list.slice(0, 40).map(notificationFromApi)
+      setDb((prev) => ({
+        ...prev,
+        accounts: prev.accounts.map((a) =>
+          a.email === email ? { ...a, notifs: mapped } : a,
+        ),
+      }))
+    } catch {
+      /* backend offline: keep what is on screen */
+    }
+  }, [user])
+
   // The moderation queue lives on the server; the mount effect fills it.
   const [pendingListings, setPendingListings] = useState<ApiListing[]>([])
   const refreshPendingListings = useCallback(async () => {
@@ -1112,6 +1139,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           refreshFavorites(),
           refreshReviews(),
           refreshForum(),
+          refreshNotifications(),
         ])
       } finally {
         if (!cancelled) {
@@ -1134,6 +1162,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       refreshFavorites,
       refreshReviews,
       refreshForum,
+      refreshNotifications,
     ],
   )
 
@@ -1180,20 +1209,23 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     // them at different rates keeps the tunnel quiet between messages.
     const chat = window.setInterval(() => void refreshConversations(), 10000)
     const requests = window.setInterval(() => void refreshOrders(), 30000)
+    const inbox = window.setInterval(() => void refreshNotifications(), 20000)
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
       void refreshConversations()
       void refreshOrders()
+      void refreshNotifications()
     }
     window.addEventListener('focus', onVisible)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
       window.clearInterval(chat)
       window.clearInterval(requests)
+      window.clearInterval(inbox)
       window.removeEventListener('focus', onVisible)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [refreshConversations, refreshOrders])
+  }, [refreshConversations, refreshNotifications, refreshOrders])
 
   // UI overlays
   const [toastMsg, setToastMsg] = useState<string | null>(null)
@@ -4398,7 +4430,12 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           : a,
       ),
     }))
-  }, [currentAccount])
+    void markAllNotificationsRead()
+      .then(() => refreshNotifications())
+      .catch(() => {
+        /* offline: the local badge is already clear; the next poll corrects it */
+      })
+  }, [currentAccount, refreshNotifications])
 
   const openNotification = useCallback(
     (index: number) => {
@@ -4416,6 +4453,12 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
             : a,
         ),
       }))
+      const apiId = apiNotificationId(notif.id)
+      if (apiId !== null) {
+        void markNotificationsRead([apiId]).catch(() => {
+          /* offline: the next poll restores the unread dot */
+        })
+      }
       const L: NotificationLink | null | undefined = notif.link
       if (!L) return
       switch (L.k) {
@@ -4437,6 +4480,10 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         case 'baostock':
           if (!isStaffUser) return toast('That page is for RTU staff accounts only.')
           navigate('baostock')
+          return
+        case 'shop':
+          setShopTab('orders')
+          navigate('shop')
           return
         case 'baoorders':
         case 'txn':

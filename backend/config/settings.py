@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     "apps.favorites",
     "apps.reviews",
     "apps.forum",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [

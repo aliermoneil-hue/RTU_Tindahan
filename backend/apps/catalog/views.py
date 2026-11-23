@@ -26,6 +26,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.accounts.permissions import IsModerator, IsVerifiedUser
+from apps.notifications.services import notify
 from apps.screening.services import run_screening
 
 from .models import Category, Listing
@@ -283,6 +284,13 @@ class ListingViewSet(viewsets.ModelViewSet):
     def approve(self, request, slug=None):
         listing = self.get_object()
         listing.approve()
+        notify(
+            listing.seller,
+            f"Your listing \u201c{listing.title}\u201d is now live.",
+            kind="listing",
+            link_kind="shop",
+            actor=request.user,
+        )
         return Response(self.get_serializer(listing).data)
 
     @action(detail=True, methods=["post"], permission_classes=[IsModerator])
@@ -295,4 +303,11 @@ class ListingViewSet(viewsets.ModelViewSet):
             )
         listing = self.get_object()
         listing.reject(reason)
+        notify(
+            listing.seller,
+            f"Your listing \u201c{listing.title}\u201d was not approved: {reason}",
+            kind="listing",
+            link_kind="shop",
+            actor=request.user,
+        )
         return Response(self.get_serializer(listing).data)

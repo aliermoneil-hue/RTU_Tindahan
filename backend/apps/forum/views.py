@@ -28,6 +28,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.permissions import IsVerifiedUser
+from apps.notifications.services import notify, notify_staff
 
 from .models import ForumComment, ForumPost, ForumReaction, ForumReport
 from .serializers import (
@@ -202,6 +203,28 @@ class ForumPostViewSet(
             text=payload.validated_data["text"],
             parent=parent,
         )
+        if post.author_id and post.author_id != request.user.id:
+            notify(
+                post.author,
+                f"{request.user.display_name} commented on your forum post.",
+                kind="comment",
+                link_kind="post",
+                link_id=post.pk,
+                actor=request.user,
+            )
+        if (
+            parent is not None
+            and parent.author_id
+            and parent.author_id not in {request.user.id, post.author_id}
+        ):
+            notify(
+                parent.author,
+                f"{request.user.display_name} replied to your comment.",
+                kind="comment",
+                link_kind="post",
+                link_id=post.pk,
+                actor=request.user,
+            )
         return Response(
             ForumCommentSerializer(comment, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED,
@@ -355,6 +378,11 @@ class ForumReportViewSet(
             snapshot_title=data.get("snapshot_title", ""),
             snapshot_text=data.get("snapshot_text", ""),
         )
+        notify_staff(
+            f"A forum {report.type} was reported: {report.reason}.",
+            link_kind="freports",
+            actor=request.user,
+        )
         return Response(
             ForumReportSerializer(report, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED,
@@ -405,4 +433,11 @@ class ForumReportViewSet(
         report.save(
             update_fields=["status", "handled_by", "handled_at", "action", "note"]
         )
+        if report.reporter_id != request.user.id:
+            outcome = {
+                ForumReport.Status.DISMISSED: "Staff reviewed your report and did not find a problem.",
+                ForumReport.Status.ACTIONED: "Staff reviewed your report and took action.",
+                ForumReport.Status.REVIEWED: "Staff reviewed your report. Thank you.",
+            }.get(report.status, "Staff reviewed your report.")
+            notify(report.reporter, outcome, kind="report", actor=request.user)
         return Response(ForumReportSerializer(report, context=self.get_serializer_context()).data)

@@ -179,9 +179,8 @@ server-backed; the bridges live in `frontend/src/features/marketplace/api/`.
 
 ## 6. What is still missing
 
-- The admin user/audit log has no endpoints yet, and there is no notification
-  model: order, ticket, comment and report events are still told through the
-  local snapshot only.
+- The admin user/audit log has no endpoints yet. Notifications are now
+  server-backed (section 10); the announcement panel is still local.
 - The AI screening pass has never been reviewed against real listings: the
   provider is wired (`apps/screening`), but the prompt and flag thresholds
   are untuned, so a flagged listing still waits for a moderator.
@@ -293,3 +292,36 @@ reporter emails are not exposed, only `is_mine`, so the ownership checks read
 the caller's own rows. Reaction counts are rebuilt with synthetic keys because
 the UI's map is keyed by email, and the caller's own choice stays keyed by their
 email. `refreshForum` runs with the startup fetches and after every write.
+
+---
+
+## 10. Notifications API
+
+| Method | Path | Who | Notes |
+| --- | --- | --- | --- |
+| GET | `/api/v1/notifications/` | verified members | The caller's inbox, newest first, unpaginated; `?unread=1` |
+| POST | `/api/v1/notifications/read/` | verified members | `{"ids": [1, 2]}` or `{"all": true}` |
+| POST | `/api/v1/notifications/<id>/read/` | the recipient | Marks one row |
+
+Rows are written by the service that caused the event, never by the client:
+
+- an order is placed → the seller (`shop` link, order reference);
+- the seller accepts/declines/completes → the buyer (`order` link);
+- the buyer cancels → the seller (`shop` link);
+- a message is sent → the other participant (`message`, `cv-<id>`);
+- a comment or reply → the post author and the parent author (`post`, post id);
+- a report is filed → every moderator/admin (`freports`); resolving it →
+  the reporter;
+- a new rating → the seller (`reviews`); an edit does not re-notify;
+- a listing is approved or rejected → the seller (`shop`);
+- an Official Store request → office staff/admin (`baoorders`); a ticket status
+  change → the buyer (no link yet).
+
+`link_kind` uses the UI's own vocabulary (`order`, `shop`, `message`, `post`,
+`freports`, `reviews`, `baoorders`, …). The bridge
+(`frontend/src/features/marketplace/api/notifications.ts`) prefixes ids for
+posts, conversations and listings so `openNotification` can find the local row.
+`refreshNotifications` replaces the account's list with the server's and runs
+at startup, every 20 seconds, on focus, after a write, and on Mark all read.
+A self-notification is never written; a missing recipient is skipped rather
+than failing the action that caused it.

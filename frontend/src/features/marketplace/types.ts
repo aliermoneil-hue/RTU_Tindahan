@@ -166,10 +166,13 @@ export interface NotificationLink {
     | 'forum'
     | 'baostock'
     | 'baoorders'
+    | 'shop'
   id?: string
 }
 
 export interface NotificationItem {
+  /** Server id (`api:<n>`); absent on a prototype-only notification. */
+  id?: string
   t: string
   read: boolean
   ts: string

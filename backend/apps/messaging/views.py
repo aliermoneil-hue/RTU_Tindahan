@@ -5,6 +5,8 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.notifications.services import notify
+
 from .models import Conversation, Message
 from .serializers import (
     ConversationOpenSerializer,
@@ -63,6 +65,19 @@ class ConversationViewSet(
             body=serializer.validated_data["body"],
         )
         touch(conversation)
+        recipient = (
+            conversation.seller
+            if request.user.pk == conversation.buyer_id
+            else conversation.buyer
+        )
+        notify(
+            recipient,
+            f"New message from {request.user.display_name}.",
+            kind="message",
+            link_kind="message",
+            link_id=f"cv-{conversation.pk}",
+            actor=request.user,
+        )
         return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])

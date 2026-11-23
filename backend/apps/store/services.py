@@ -4,6 +4,7 @@ from django.db.models import F, Sum
 from django.utils import timezone
 
 from apps.catalog.models import Listing, ListingVariant
+from apps.notifications.services import notify
 
 from .models import (
     DailyCount,
@@ -228,6 +229,21 @@ def place_official_order(
             note="Ticket created",
         )
 
+    # Office staff work the counter queue; the request has to reach them even
+    # when it was placed from a student's phone.
+    from apps.accounts.models import User
+
+    for staff in User.objects.filter(
+        role__in=[User.Role.OFFICE_STAFF, User.Role.ADMINISTRATOR], is_active=True
+    ):
+        notify(
+            staff,
+            f"{buyer.display_name} requested {ticket.reference} from the Official Store.",
+            kind="ticket",
+            link_kind="baoorders",
+            link_id=ticket.reference,
+            actor=buyer,
+        )
     return ticket
 
 
@@ -301,6 +317,13 @@ def change_ticket_status(ticket, new_status, *, by=None, note=""):
             ]
         )
 
+    if by is None or by.pk != ticket.buyer_id:
+        notify(
+            ticket.buyer,
+            f"Store request {ticket.reference} is now {ticket.get_status_display().lower()}.",
+            kind="ticket",
+            actor=by,
+        )
     return ticket
 
 

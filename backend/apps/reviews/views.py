@@ -17,6 +17,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.permissions import IsVerifiedUser
+from apps.notifications.services import notify
 
 from .models import Review
 from .serializers import ReviewSerializer, ReviewWriteSerializer
@@ -84,6 +85,14 @@ class ReviewViewSet(
                     update_fields=["buyer", "seller", "stars", "text", "edited_at", "updated_at"]
                 )
                 created = False
+        if created:
+            notify(
+                review.seller,
+                f"{review.buyer.display_name} rated you {review.stars} of 5 stars for order {order.reference}.",
+                kind="review",
+                link_kind="reviews",
+                actor=review.buyer,
+            )
         return Response(
             ReviewSerializer(review, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
