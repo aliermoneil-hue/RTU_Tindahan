@@ -8,13 +8,11 @@ import './StaffToolsPage.css'
 export function StaffToolsPage() {
   const {
     db,
+    isAdminUser,
     isStaffUser,
-    storageOk,
-    storageKb,
     postStaffAnnouncement,
     deleteStaffAnnouncement,
     exportDatabaseBackup,
-    importDatabaseBackup,
     openModal,
     setDraft,
     setListStep,
@@ -211,37 +209,24 @@ export function StaffToolsPage() {
 
           <div className="card stack">
             <div>
-              <b>Backup and storage</b>
+              <b>Database backup</b>
               <p className="small muted">
-                {storageOk
-                  ? 'Saved in this browser (localStorage). No server needed.'
-                  : 'Browser storage is blocked, so data lives in memory only.'}{' '}
-                Current size: <span className="tnum">{storageKb} KB</span>. Open the app in two
-                tabs and changes show up in both.
+                Downloads a consistent copy of the live database, taken by SQLite while the
+                site keeps serving. It holds every account row, so only an administrator may
+                request it. To restore: stop the service on the host, swap{' '}
+                <code>db.sqlite3</code>, start it again.
               </p>
             </div>
             <div className="row wrap">
-              <button
-                type="button"
-                className="btn"
-                onClick={exportDatabaseBackup}
-              >
-                Download backup
-              </button>
-              <label className="btn ghost" style={{ cursor: 'pointer' }}>
-                Import backup
-                <input
-                  type="file"
-                  id="imp-file"
-                  accept="application/json,.json"
-                  hidden
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    e.target.value = ''
-                    if (file) importDatabaseBackup(file)
-                  }}
-                />
-              </label>
+              {isAdminUser ? (
+                <button type="button" className="btn" onClick={exportDatabaseBackup}>
+                  Download database backup
+                </button>
+              ) : (
+                <span className="small muted">
+                  Ask an administrator to download a backup.
+                </span>
+              )}
             </div>
           </div>
 

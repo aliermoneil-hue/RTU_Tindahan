@@ -118,6 +118,40 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   return parse<T>(response)
 }
 
+/** GET a binary response, such as a database backup. Errors share the JSON path. */
+export async function apiDownload(path: string): Promise<{ blob: Blob; filename: string }> {
+  const headers: Record<string, string> = {}
+  const token = getToken()
+  if (token) headers.Authorization = `Token ${token}`
+
+  let response: Response
+  try {
+    response = await fetch(`${BASE_URL}${path}`, { headers })
+  } catch {
+    throw new ApiRequestError('Cannot reach the server. Check your connection and try again.', 0)
+  }
+
+  if (!response.ok) {
+    let data: unknown = null
+    try {
+      data = await response.json()
+    } catch {
+      /* not JSON */
+    }
+    throw new ApiRequestError(
+      messageFrom(data, 'That download could not be prepared.'),
+      response.status,
+    )
+  }
+
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const named = /filename="([^"]+)"/.exec(disposition)
+  return {
+    blob: await response.blob(),
+    filename: named?.[1] ?? 'rtu-tindahan-backup.sqlite3',
+  }
+}
+
 /**
  * POST multipart/form-data — used for anything carrying a file, such as a
  * listing with photos. The browser sets the Content-Type (with its boundary),

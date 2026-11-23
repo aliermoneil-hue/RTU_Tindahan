@@ -4,6 +4,7 @@
     GET  /api/v1/admin/users/<id>/           staff only
     POST /api/v1/admin/users/<id>/status/    administrators only
     POST /api/v1/admin/users/<id>/role/      administrators only
+    GET  /api/v1/admin/backup/               administrators only; SQLite copy
 
 Suspending or banning deletes the account's token, so the session ends now
 rather than at the next request, and their listings stop appearing in the
@@ -11,12 +12,19 @@ catalogue (the catalogue filters inactive sellers). Restoring access notifies
 the member. Every write lands in the audit log.
 """
 
+import os
+import sqlite3
+import tempfile
+
+from django.db import connection
 from django.db.models import Count, Q
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.audit.services import record
 from apps.notifications.services import notify
@@ -211,3 +219,71 @@ class AdminUserViewSet(viewsets.ReadOnlyModelViewSet):
                 self.get_queryset().get(pk=target.pk), context=self.get_serializer_context()
             ).data
         )
+
+
+class DatabaseBackupView(APIView):
+    """GET /api/v1/admin/backup/ — a consistent copy of the live database.
+
+    The site runs on SQLite, and the only honest backup of a SQLite database is
+    the copy sqlite3 makes itself: the backup API takes a consistent snapshot
+    while the site is serving, where a plain file copy can catch a half-written
+    transaction. The file is streamed, never stored on disk, and only an
+    administrator may ask for it because it contains every account row and its
+    password hash.
+
+    Restore is deliberately not an endpoint. Replacing a live database from
+    inside the running process is how a demo loses its data; the host procedure
+    is stop, swap the file, start, and it lives in docs/API-CATALOG-AND-STORE.md.
+    """
+
+    permission_classes = [IsAdministrator]
+
+    def get(self, request):
+        if connection.vendor != "sqlite":
+            return Response(
+                {
+                    "detail": (
+                        "Backups are implemented for the SQLite deployment. "
+                        "On PostgreSQL, use pg_dump on the host."
+                    )
+                },
+                status=status.HTTP_501_NOT_IMPLEMENTED,
+            )
+
+        source_path = str(connection.settings_dict["NAME"])
+        stamp = timezone.localtime().strftime("%Y%m%d-%H%M%S")
+        handle, temp_path = tempfile.mkstemp(suffix=".sqlite3")
+        os.close(handle)
+        try:
+            # Copy through the connection Django is already using. Opening the
+            # file path would copy an empty database when the deployment (or a
+            # test) uses an in-memory SQLite database.
+            connection.ensure_connection()
+            target = sqlite3.connect(temp_path)
+            try:
+                connection.connection.backup(target)
+            finally:
+                target.close()
+            with open(temp_path, "rb") as snapshot:
+                payload = snapshot.read()
+        finally:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
+        record(
+            request.user,
+            "backup_download",
+            target_type="database",
+            target_id="sqlite",
+            target_name=os.path.basename(source_path),
+            note=f"{len(payload)} bytes",
+        )
+
+        response = HttpResponse(payload, content_type="application/vnd.sqlite3")
+        response["Content-Disposition"] = (
+            f'attachment; filename="rtu-tindahan-{stamp}.sqlite3"'
+        )
+        response["X-Backup-Bytes"] = str(len(payload))
+        return response

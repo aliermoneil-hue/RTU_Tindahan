@@ -12,7 +12,7 @@
  * account and not only the ones that sold something in this browser.
  */
 
-import { apiFetch } from '@/common/api/client'
+import { apiDownload, apiFetch } from '@/common/api/client'
 import { mkAcct } from '../constants'
 import type { AuditLogEntry, PrototypeAccount } from '../types'
 
@@ -128,4 +128,17 @@ export function auditEntryFromApi(row: ApiAuditEntry): AuditLogEntry {
     targetName: row.target_name,
     note: row.note,
   }
+}
+
+/**
+ * A consistent copy of the live SQLite database, for an administrator.
+ *
+ * This is the database itself, not a browser snapshot: the server streams a
+ * copy taken through sqlite3's backup API, so it is safe while the site is
+ * serving. Restore is a host procedure (stop, swap the file, start), never an
+ * upload — replacing a live database from inside the running process is how a
+ * demo loses its data.
+ */
+export function downloadDatabaseBackup() {
+  return apiDownload('/admin/backup/')
 }

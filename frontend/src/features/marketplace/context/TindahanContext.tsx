@@ -107,6 +107,7 @@ import {
 import {
   accountFromAdminUser,
   auditEntryFromApi,
+  downloadDatabaseBackup,
   fetchAdminUsers,
   fetchAuditLog,
   setUserStatus as setUserStatusApi,
@@ -186,12 +187,10 @@ import {
   IMGK,
   IMG_RULES,
   clearAllImgs,
-  getAllImgs,
   imgSrc,
   imgsOf,
   loadImgs,
   removeImg,
-  replaceAllImgs,
   type StoredImage,
 } from '../imageStore'
 import type {
@@ -625,6 +624,8 @@ interface TindahanContextValue {
   db: DatabaseSnapshot
   currentAccount: PrototypeAccount | null
   isStaffUser: boolean
+  /** Only an administrator may download the database backup. */
+  isAdminUser: boolean
   /**
    * Listing approval belongs to moderators and administrators, per the role
    * split in the SRS. Office Staff run the Official Store instead, so they see
@@ -818,7 +819,6 @@ interface TindahanContextValue {
   postStaffAnnouncement: (title: string, body: string) => boolean
   deleteStaffAnnouncement: (idx: number) => void
   exportDatabaseBackup: () => void
-  importDatabaseBackup: (file: File) => void
   resetEverything: () => void
   imgVersion: number
   bumpImgVersion: () => void
@@ -1641,6 +1641,8 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       return true
     return currentAccount?.role === 'moderator'
   }, [user, currentAccount])
+
+  const isAdminUser = useMemo(() => user?.role === 'administrator', [user])
 
   const acctByEmail = useCallback(
     (email?: string | null) => {
@@ -7407,59 +7409,28 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       toast('Only RTU staff can do that.')
       return
     }
-    const payload = {
-      ...db,
-      images: getAllImgs(),
-    }
-    const raw = JSON.stringify(payload)
-    const u = URL.createObjectURL(new Blob([raw], { type: 'application/json' }))
-    const a = document.createElement('a')
-    a.href = u
-    a.download = `rtu-tindahan-backup-${new Date().toISOString().slice(0, 10)}.json`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    window.setTimeout(() => URL.revokeObjectURL(u), 1000)
-    toast('Backup downloaded.')
-  }, [isStaffUser, db, toast])
-
-  const importDatabaseBackup = useCallback(
-    (file: File) => {
-      if (!isStaffUser) {
-        toast('Only RTU staff can import a backup.')
-        return
-      }
-      const fr = new FileReader()
-      fr.onload = () => {
-        try {
-          const txt = String(fr.result)
-          const parsed = JSON.parse(txt, reviveJson) as Partial<DatabaseSnapshot>
-          if (!parsed || (parsed.v !== 2 && parsed.v !== 3) || !Array.isArray(parsed.accounts)) {
-            throw new Error('invalid')
-          }
-          if (parsed.images && typeof parsed.images === 'object' && !Array.isArray(parsed.images)) {
-            replaceAllImgs(parsed.images)
-          }
-          const plain = JSON.parse(txt) as Record<string, unknown>
-          delete plain.images
-          const plainStr = JSON.stringify(plain)
-          lastSavedRef.current = plainStr
-          try {
-            localStorage.setItem(DBK, plainStr)
-          } catch {
-            /* ignore */
-          }
-          setDb(normalizeLoadedDb(plainStr))
-          bumpImgVersion()
-          toast('Backup imported.')
-        } catch {
-          toast('That file is not a valid Tindahan backup.')
-        }
-      }
-      fr.readAsText(file)
-    },
-    [isStaffUser, bumpImgVersion, toast],
-  )
+    // The old "backup" exported this browser's snapshot, which had nothing to
+    // do with the server's data. This downloads the database itself.
+    void downloadDatabaseBackup()
+      .then(({ blob, filename }) => {
+        const u = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = u
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        window.setTimeout(() => URL.revokeObjectURL(u), 1000)
+        toast('Database backup downloaded.')
+      })
+      .catch((err) =>
+        toast(
+          err instanceof ApiRequestError
+            ? err.message
+            : 'The backup could not be downloaded.',
+        ),
+      )
+  }, [isStaffUser, toast])
 
   const baoSaveOrderSettings = useCallback(
     (nextSettings: Partial<BaoSettings>) => {
@@ -8567,6 +8538,7 @@ const value = useMemo<TindahanContextValue>(
       db,
       currentAccount,
       isStaffUser,
+      isAdminUser,
       canModerate,
       storageOk,
       storageKb,
@@ -8711,7 +8683,6 @@ const value = useMemo<TindahanContextValue>(
       postStaffAnnouncement,
       deleteStaffAnnouncement,
       exportDatabaseBackup,
-      importDatabaseBackup,
       resetEverything,
       imgVersion,
       bumpImgVersion,
@@ -8868,7 +8839,6 @@ const value = useMemo<TindahanContextValue>(
       postStaffAnnouncement,
       deleteStaffAnnouncement,
       exportDatabaseBackup,
-      importDatabaseBackup,
       resetEverything,
       imgVersion,
       bumpImgVersion,

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .admin_api import AdminUserViewSet
+from .admin_api import AdminUserViewSet, DatabaseBackupView
 from .views import (
     CollegeListView,
     LoginView,
@@ -70,5 +70,11 @@ urlpatterns = [
         "admin/users/<int:pk>/role/",
         AdminUserViewSet.as_view({"post": "role"}),
         name="admin-user-role",
+    ),
+    # A consistent copy of the live database, administrator only.
+    path(
+        "admin/backup/",
+        DatabaseBackupView.as_view(),
+        name="admin-backup",
     ),
 ]

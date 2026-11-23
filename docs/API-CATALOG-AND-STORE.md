@@ -179,8 +179,8 @@ server-backed; the bridges live in `frontend/src/features/marketplace/api/`.
 
 ## 6. What is still missing
 
-- The staff backup/restore utility in Staff tools still works on the browser
-  snapshot; every member-facing flow is server-backed.
+- The staff backup is server-side now (`GET /api/v1/admin/backup/`, administrator
+  only); restore is the host file-swap procedure in §11, not an upload.
 - The AI screening pass follows `POSTING-AND-SELLING-GUIDELINE.md`; the
   remaining work there is watching the moderator queue for false flags, not
   writing rules.
@@ -350,6 +350,7 @@ than failing the action that caused it.
 | POST | `/api/v1/admin/users/<id>/status/` | administrators | `{"status": "active|suspended|banned", "note": "..."}` |
 | POST | `/api/v1/admin/users/<id>/role/` | administrators | `{"role": "user|office_staff|moderator|administrator"}` |
 | GET | `/api/v1/admin/audit/` | staff | Newest first; `?action=`, `?target_type=`, `?q=` |
+| GET | `/api/v1/admin/backup/` | administrators | A consistent copy of the live SQLite database, as a download; recorded in the audit log |
 
 Rules:
 
@@ -374,3 +375,25 @@ keeps its cart, orders, notifications and listing rows. Accounts the browser
 has never seen are created through `mkAcct`. Audit rows are merged oldest-first
 so the screen's reverse view stays newest-first. `refreshAdminData` runs only
 for staff, at startup and after a status change.
+
+### Backups
+
+`GET /api/v1/admin/backup/` streams the database itself, not the browser
+snapshot: the view asks sqlite3's backup API for a consistent copy through the
+connection Django is already using, so the copy is valid while the site keeps
+serving. It is administrator-only because the file contains every account row
+and password hash, and each download appends a `backup_download` row to the
+audit log. On a PostgreSQL deployment the endpoint answers `501` and points at
+`pg_dump` instead of pretending.
+
+**Restore is deliberately not an endpoint.** Replacing a live database from
+inside the running process is how a demo loses its data. The host procedure:
+
+    1. systemctl --user stop rtu-tindahan
+    2. cp db.sqlite3 db.sqlite3.before-restore
+    3. cp rtu-tindahan-YYYYMMDD-HHMMSS.sqlite3 db.sqlite3
+    4. systemctl --user start rtu-tindahan
+    5. curl -s 127.0.0.1:8000/health/   # {"status":"ok","database":"ok",...}
+
+The old Staff tools file import looked like a restore but only replaced the
+browser's snapshot, so it was removed.

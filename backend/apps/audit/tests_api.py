@@ -1,10 +1,12 @@
 """Tests for the Users and audit screen and its API."""
 
+import sqlite3
+import tempfile
 from decimal import Decimal
 
 from rest_framework import status
 from rest_framework.authtoken.models import Token
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase, APITransactionTestCase
 
 from apps.accounts.models import User
 from apps.audit.models import AuditLog
@@ -251,4 +253,41 @@ class AdminUsersApiTests(APITestCase):
         self.assertEqual(
             self.client.get("/api/v1/admin/audit/").status_code,
             status.HTTP_403_FORBIDDEN,
+        )
+
+
+class DatabaseBackupTests(APITransactionTestCase):
+    """The staff backup must be the real database, not the browser snapshot."""
+
+    def setUp(self):
+        self.admin = make_user("admin@rtu.edu.ph", role=User.Role.ADMINISTRATOR)
+        self.staff = make_user("2024-000002@rtu.edu.ph", role=User.Role.OFFICE_STAFF)
+        self.moderator = make_user("2024-000003@rtu.edu.ph", role=User.Role.MODERATOR)
+
+    def test_read_only_roles_cannot_download_the_database(self):
+        for user in (self.staff, self.moderator):
+            self.client.force_authenticate(user)
+            response = self.client.get("/api/v1/admin/backup/")
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_an_administrator_gets_a_valid_sqlite_copy(self):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get("/api/v1/admin/backup/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/vnd.sqlite3")
+        self.assertIn("attachment;", response["Content-Disposition"])
+        self.assertTrue(response.content.startswith(b"SQLite format 3"))
+
+        with tempfile.NamedTemporaryFile(suffix=".sqlite3") as handle:
+            handle.write(response.content)
+            handle.flush()
+            database = sqlite3.connect(handle.name)
+            emails = [row[0] for row in database.execute("select email from accounts_user")]
+            database.close()
+
+        self.assertIn("admin@rtu.edu.ph", emails)
+        self.assertTrue(
+            AuditLog.objects.filter(action="backup_download", actor=self.admin).exists()
         )
