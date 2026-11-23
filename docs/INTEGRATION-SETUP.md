@@ -173,18 +173,19 @@ request, so a red PR is a real failure, not a slow machine.
 
 ## 8. What is connected, and what is not
 
-**Connected (reads the database):**
+**Connected (reads and writes the database):**
 
 - sign up with a 6-digit emailed code, sign in, sign out, session restore
 - profile fields via `/auth/me/`
 - browse, product page, official store listing, category display
+- posting an item (`POST /listings/`, multipart photos), editing and deleting
+- cart and orders, chat, forum, reviews, moderation, the store screens,
+  favourites, notifications, the users table and the audit log
 
-**Still local (`localStorage`):**
+The browser snapshot is kept as a cache and for the prototype's demo rows; the
+server wins wherever it has a row. The bridges are in
+`frontend/src/features/marketplace/api/`, one file per feature.
 
-- posting an item ("Sell an item" saves locally instead of `POST /listings/`)
-- cart, orders, chat, forum, reviews, moderation screens
-- photos on cards (seeded listings have none, so cards use the category icon)
-
-Those are the next slices. The API for posting a listing, approving it, and
-placing an official-store ticket already exists and is tested — only the screen
-wiring is missing.
+The screens have been wired since this guide was first written; the API and the
+bridges are the source of truth. See `API-CATALOG-AND-STORE.md` for the
+endpoint-by-endpoint rules.

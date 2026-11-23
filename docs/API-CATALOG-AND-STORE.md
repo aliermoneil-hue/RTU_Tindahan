@@ -177,10 +177,16 @@ into the same snapshot the pages already read, so no page component changed:
 - Photos keep their absolute URLs; `imgSrc()` already passes those through.
 - If the backend is unreachable, the request fails silently and the local
   catalogue stands.
+- The catalogue, the seller's own rows and the moderation queue are re-read on
+  a timer (20–30 s) and on focus, so an approval or a new listing lands without
+  a reload. Store tickets poll too: a buyer's own every 30 s, the staff queue
+  and ledger every 60 s.
 
-Still local (localStorage): forum, reviews, and the admin user/audit screens.
-Cart, orders, chat, moderation, the store screens and favourites are now
-server-backed; the bridges live in `frontend/src/features/marketplace/api/`.
+Every member-facing list is server-backed now: listings, orders, chat, store,
+moderation, favourites, reviews, forum, notifications, users, audit and
+announcements. The bridges live in `frontend/src/features/marketplace/api/`;
+what remains in the browser snapshot is the staff backup tooling's residue and
+demo-only content.
 
 ## 6. What is still missing
 

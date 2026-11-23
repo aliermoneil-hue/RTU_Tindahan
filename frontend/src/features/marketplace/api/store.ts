@@ -441,6 +441,31 @@ export interface StorePayload {
  * them now, and a prototype ticket left behind would look like a real request.
  * Student orders (`type: 'student'`) stay, because nothing else creates them.
  */
+/**
+ * Replace only the Official Store tickets in a snapshot.
+ *
+ * A student may read their own tickets but not the stock ledger, so this is
+ * the buyer's half of `mergeApiStore`. Tickets are replaced wholesale because
+ * the server owns them; student-to-student rows are left alone.
+ */
+export function mergeApiTickets<T extends { txn: TransactionRecord[] }>(
+  prev: T,
+  payload: { tickets: ApiTicket[]; products: PrototypeProduct[] },
+): T {
+  const byListing = new Map<number, PrototypeProduct>()
+  payload.products.forEach((product) => {
+    if (product.apiListingId) byListing.set(product.apiListingId, product)
+  })
+
+  const tickets = payload.tickets.map((dto) =>
+    toTransactionRecord(dto, (listingId) => byListing.get(listingId)),
+  )
+  const studentTxns = prev.txn.filter(
+    (txn) => !(txn.type === 'official' && !txn.sellerEmail),
+  )
+  return { ...prev, txn: [...tickets, ...studentTxns] }
+}
+
 export function mergeApiStore<T extends StoreShape>(prev: T, payload: StorePayload): T {
   const byListing = new Map<number, PrototypeProduct>()
   const byVariant = new Map<number, PrototypeProduct>()

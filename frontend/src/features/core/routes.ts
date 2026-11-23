@@ -43,6 +43,7 @@ export const APP_PAGES: PageInfo[] = [
     about: 'Your listings and the requests you received.' },
   { path: 'forum', title: 'Forum', icon: 'mega', section: 'COMMUNITY', backend: 'available',
     about: 'Campus discussion board.' },
+  // Static page: 'missing' means it needs no API, not that it is unfinished.
   { path: 'help', title: 'Help Center', icon: 'info', section: 'COMMUNITY', backend: 'missing',
     about: 'Website user manual, pickup/delivery rules, policies, and frequently asked questions.' },
   { path: 'moderation', title: 'Listing approval', icon: 'shield', section: 'ADMIN', backend: 'available',

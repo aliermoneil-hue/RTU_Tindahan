@@ -127,6 +127,7 @@ import {
   fetchStoreSettings,
   fetchTickets,
   mergeApiStore,
+  mergeApiTickets,
   patchStoreSettings,
   recordDailyCount,
   stockIn as postStockIn,
@@ -1279,6 +1280,28 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     void refreshStore()
   }, [refreshStore])
 
+  // A student may read their own tickets but not the stock ledger. Without
+  // this, a staff confirmation never reached the buyer's My orders without a
+  // reload.
+  const refreshMyTickets = useCallback(async () => {
+    if (!user || storeStaff) return
+    try {
+      const tickets = await fetchTickets()
+      setDb((prev) =>
+        mergeApiTickets(prev, {
+          tickets,
+          products: [...prev.official, ...prev.userListings.map((l) => l.product)],
+        }),
+      )
+    } catch {
+      /* backend offline: keep the snapshot */
+    }
+  }, [storeStaff, user])
+
+  useEffect(() => {
+    void refreshMyTickets()
+  }, [refreshMyTickets])
+
   // Keep the shared lists fresh: a reply, a new post, a newly approved listing
   // or a status change should land on its own, not only after a reload.
   //
@@ -1319,6 +1342,22 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     }, 30000)
     timers.push(forum, catalogue)
 
+    // Store tickets: a buyer's own at 30 s, the staff queue and ledger at 60 s
+    // (the ledger is the heavier read and only staff may ask for it).
+    const myTickets = window.setInterval(() => {
+      if (document.visibilityState !== 'visible' || !signedIn || staff) return
+      void refreshMyTickets()
+    }, 30000)
+    timers.push(myTickets)
+    if (staff) {
+      timers.push(
+        window.setInterval(() => {
+          if (document.visibilityState !== 'visible') return
+          void refreshStore()
+        }, 60000),
+      )
+    }
+
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
       void refreshForum()
@@ -1329,7 +1368,11 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       void refreshOrders()
       void refreshNotifications()
       void refreshMyListings()
-      if (staff) void refreshPendingListings()
+      void refreshMyTickets()
+      if (staff) {
+        void refreshPendingListings()
+        void refreshStore()
+      }
     }
     window.addEventListener('focus', onVisible)
     document.addEventListener('visibilitychange', onVisible)
@@ -1347,6 +1390,8 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     refreshNotifications,
     refreshOrders,
     refreshPendingListings,
+    refreshMyTickets,
+    refreshStore,
     user,
   ])
 
