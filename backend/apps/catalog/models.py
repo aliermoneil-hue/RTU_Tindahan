@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+from PIL import Image
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator, MinValueValidator
@@ -8,10 +10,31 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 
+MIN_PHOTO_SIDE = 100
+
+
 def validate_image_size(image):
-    """SE-06: photos are limited to 5 MB."""
+    """SE-06 plus the posting guideline: 5 MB, and at least 100 x 100 pixels.
+
+    The size cap alone would accept a 3-pixel thumbnail that tells a buyer
+    nothing; the guideline asks for a photo that actually shows the item.
+    """
     if image.size > 5 * 1024 * 1024:
         raise ValidationError("The photo must be 5 MB or smaller.")
+
+    try:
+        image.seek(0)
+        with Image.open(image) as probe:
+            width, height = probe.size
+    except Exception as exc:  # noqa: BLE001 - any unreadable file lands here
+        raise ValidationError("That photo could not be read.") from exc
+    finally:
+        image.seek(0)
+
+    if width < MIN_PHOTO_SIDE or height < MIN_PHOTO_SIDE:
+        raise ValidationError(
+            f"The photo must be at least {MIN_PHOTO_SIDE} x {MIN_PHOTO_SIDE} pixels."
+        )
 
 
 class Category(models.Model):

@@ -1,5 +1,9 @@
 """API tests for the catalogue: visibility, ownership, and moderation."""
 
+import io
+
+from PIL import Image
+
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework import status
@@ -7,6 +11,13 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
 from apps.catalog.models import Category, Listing, ListingPhoto
+
+
+def png_bytes(width=100, height=100):
+    """A real PNG of the given size, so Pillow can read its dimensions."""
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height), "white").save(buffer, "PNG")
+    return buffer.getvalue()
 
 
 def make_user(email, role=User.Role.USER, **extra):
@@ -378,13 +389,10 @@ class ListingApiTests(APITestCase):
 
     def test_photos_are_uploaded_as_multipart(self):
         self.client.force_authenticate(self.seller)
-        # Smallest valid PNG: DRF verifies it with Pillow.
-        png = (
-            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-            b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01"
-            b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+        # 100 x 100 is the guideline's minimum, so this is a valid photo.
+        image = SimpleUploadedFile(
+            "photo.png", png_bytes(), content_type="image/png"
         )
-        image = SimpleUploadedFile("photo.png", png, content_type="image/png")
 
         response = self.client.post(
             "/api/v1/listings/",
@@ -395,6 +403,21 @@ class ListingApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         listing = Listing.objects.get(slug=response.json()["slug"])
         self.assertEqual(listing.photos.count(), 1)
+
+    def test_a_thumbnail_smaller_than_100_pixels_is_refused(self):
+        self.client.force_authenticate(self.seller)
+        image = SimpleUploadedFile(
+            "thumb.png", png_bytes(99, 99), content_type="image/png"
+        )
+
+        response = self.client.post(
+            "/api/v1/listings/",
+            {**self.payload(), "upload_photos": [image]},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("upload_photos", response.json())
 
     # -- moderation --------------------------------------------------------
 

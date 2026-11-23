@@ -66,6 +66,79 @@ class StubProviderTests(TestCase):
 
         self.assertEqual(verdict.verdict, "flagged")
 
+    def test_vapes_are_flagged_even_though_they_are_not_a_scam(self):
+        listing = make_listing(
+            title="Vape starter kit",
+            description="Barely used vape with charger and two pods.",
+        )
+
+        verdict = StubProvider().screen(listing)
+
+        self.assertEqual(verdict.verdict, "flagged")
+        self.assertTrue(any("prohibited item" in reason for reason in verdict.reasons))
+
+    def test_a_pay_first_off_app_pattern_is_flagged(self):
+        listing = make_listing(
+            description="Pay first via GCash number 09171234567, no meetup needed.",
+        )
+
+        verdict = StubProvider().screen(listing)
+
+        self.assertEqual(verdict.verdict, "flagged")
+        self.assertGreaterEqual(verdict.score, 50)
+        self.assertTrue(any("off-app" in reason for reason in verdict.reasons))
+
+    def test_a_short_description_is_flagged(self):
+        listing = make_listing(description="Calculator.")
+
+        verdict = StubProvider().screen(listing)
+
+        self.assertEqual(verdict.verdict, "flagged")
+        self.assertTrue(any("too short" in reason for reason in verdict.reasons))
+
+    def test_a_price_above_fifty_thousand_is_flagged(self):
+        listing = make_listing(
+            description="Well kept laptop, complete with charger and bag.",
+            price="50001.00",
+        )
+
+        verdict = StubProvider().screen(listing)
+
+        self.assertEqual(verdict.verdict, "flagged")
+
+    def test_fifty_thousand_exactly_is_not_flagged_for_price(self):
+        listing = make_listing(
+            description="Well kept laptop, complete with charger and bag.",
+            price="50000.00",
+        )
+
+        verdict = StubProvider().screen(listing)
+
+        self.assertEqual(verdict.verdict, "clean")
+
+    def test_an_all_caps_title_alone_stays_below_the_threshold(self):
+        listing = make_listing(
+            title="SECOND HAND SCIENTIFIC CALCULATOR",
+            description="Casio fx-991, working, complete with case.",
+        )
+
+        verdict = StubProvider().screen(listing)
+
+        self.assertEqual(verdict.verdict, "clean")
+        self.assertLess(verdict.score, 50)
+        self.assertTrue(any("all capitals" in reason for reason in verdict.reasons))
+
+    def test_a_word_inside_another_word_is_not_a_hit(self):
+        listing = make_listing(
+            title="Twine ball",
+            description="One roll of cotton twine, unused, from a crafts class.",
+        )
+
+        verdict = StubProvider().screen(listing)
+
+        # "wine" must not fire inside "twine".
+        self.assertEqual(verdict.verdict, "clean")
+
     def test_the_stub_is_deterministic(self):
         listing = make_listing()
 

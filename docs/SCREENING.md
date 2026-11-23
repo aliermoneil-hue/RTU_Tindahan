@@ -69,14 +69,21 @@ It reads the same fields a model would read, and scores each rule it trips:
 
 | Rule | Score | Why |
 | --- | --- | --- |
-| A term from `PROHIBITED_TERMS` appears | 90 | Counterfeit goods, pirated copies, exam answers, weapons, drugs, gambling |
+| A term from `PROHIBITED_TERMS` appears | 90 | The guideline's "cannot sell" list: counterfeit, exam answers, weapons, drugs, vapes, tobacco, alcohol, medicines, gambling, stolen goods, IDs, sexual content |
+| A `SCAM_PATTERNS` hit, or a Philippine mobile number | 85 | Pay-first, no meetup, contact or payment outside the app |
+| The text contains a link | 60 | Listings must not carry external links |
 | Description shorter than 20 characters | 55 | Not enough text to judge |
 | Price above 50,000 | 55 | Far outside a campus resale |
-| Title is all capitals, longer than 12 characters | 40 | Common spam shape |
-| The text contains a link | 60 | Listings must not carry external links |
+| Title is all capitals, longer than 12 characters | 40 | Common spam shape; alone it stays below the threshold |
 
 A score of 50 or more (`FLAG_THRESHOLD`) is flagged; below that is clean. The
 reasons are stored, so a moderator reads *why* rather than a bare verdict.
+
+The rules follow `RTU_Tindahan_Posting_and_Selling_Guideline.pdf`, summarised
+in `POSTING-AND-SELLING-GUIDELINE.md`. Single words are matched from their left
+boundary, so "vape" catches "vapes" without "wine" firing inside "twine".
+Photos are capped separately: 1–10 per listing, JPG/PNG/WebP, 5 MB, and at
+least 100 × 100 pixels (`validate_image_size` in `apps/catalog/models.py`).
 
 The stub is a placeholder for the real thing, and it is honest about that: it
 cannot read intent, and it will not catch anything written to dodge a keyword

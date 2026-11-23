@@ -22,6 +22,7 @@ Two providers ship:
 """
 
 import json
+import re
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from urllib.error import URLError
@@ -30,31 +31,105 @@ from urllib.request import Request, urlopen
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-# Terms that a campus marketplace must never publish (AI-02). Deliberately
-# short and specific: a long list of vague words produces false flags, and a
+# The "Cannot sell" list from RTU_Tindahan_Posting_and_Selling_Guideline.pdf
+# (Section 1), as words a listing might actually contain. Deliberately short
+# and specific: a long list of vague words produces false flags, and a
 # moderator who learns to ignore the queue is worse than no queue.
 PROHIBITED_TERMS = (
+    # Counterfeit or pirated goods, including fake official RTU merchandise.
     "counterfeit",
-    "fake id",
     "replica",
     "pirated",
+    "fake id",
+    "fake rtu",
     "cracked copy",
+    # Exam answers, answer keys, and help that is academic cheating.
     "answer key",
     "exam answers",
+    "quiz answers",
     "leaked exam",
+    "thesis for hire",
+    "do my homework",
+    "do my assignment",
+    "take my exam",
+    # Weapons and ammunition.
+    "firearm",
+    "ammunition",
+    "handgun",
+    "rifle",
+    "pistol",
+    "unlicensed firearm",
+    # Illegal drugs.
     "shabu",
     "marijuana",
     "cocaine",
+    "ecstasy",
+    "illegal drugs",
+    # Vapes, e-cigarettes and tobacco.
     "vape",
     "ecig",
-    "unlicensed firearm",
-    "ammunition",
+    "e-cigarette",
+    "tobacco",
+    "nicotine",
+    # Alcohol.
+    "liquor",
+    "vodka",
+    "whiskey",
+    "beer",
+    "wine",
+    # Medicines, prescription or not.
+    "prescription medicine",
+    "prescription drug",
+    "antibiotic",
+    # Gambling.
     "betting",
+    "gambling",
+    "casino",
     "jueteng",
+    "sabong",
+    # Stolen goods and another person's ID or personal details.
+    "stolen",
+    "fake student id",
+    "someone else's id",
+    "another person's id",
+    # Sexual content and harassment.
+    "porn",
+    "nude photos",
+    "nude pics",
+    "sexual content",
 )
 
-# Scores at or above this go to a human (AI-03). Below it, the listing still
-# waits for approval — screening never publishes anything by itself (LS-05).
+# The guideline's scam pattern (Section 3): pay-first, no meetup, contact or
+# pay outside the app. These flag even when the item itself is ordinary.
+SCAM_PATTERNS = (
+    "pay first",
+    "payment first",
+    "pay before",
+    "send payment",
+    "send gcash",
+    "gcash first",
+    "gcash number",
+    "deposit first",
+    "downpayment first",
+    "no meetup",
+    "no meet-up",
+    "no meet up",
+    "contact me at",
+    "contact only",
+    "dm me",
+    "message me on facebook",
+    "text me at",
+    "telegram",
+    "whatsapp",
+    "viber",
+)
+
+# A Philippine mobile number in the text is the same off-app contact signal.
+PHONE_RE = re.compile(r"(?:\+63|0)9\d{9}")
+
+# Scores at or above this go to a human (AI-03, guideline Section 3). Below
+# it, the listing still waits for approval — screening never publishes
+# anything by itself (LS-05).
 FLAG_THRESHOLD = 50
 
 MIN_DESCRIPTION = 20
@@ -68,12 +143,19 @@ GEMINI_ENDPOINT = (
 # The instruction and the schema do the real work of keeping a model's answer
 # usable: a verdict, a score, and at most three short reasons. No free-form
 # prose is accepted, so a chatty answer cannot slip past the parser.
-GEMINI_INSTRUCTION = """You screen listings for a university campus marketplace in the Philippines.
-Decide whether a listing may be published. Flag anything that is: counterfeit or pirated goods,
-leaked or for-sale exam answers and answer keys, weapons or ammunition, illegal drugs, vapes or
-e-cigarettes, gambling or betting, alcohol, stolen goods, another person's ID or personal data,
-sexual content, harassment, academic dishonesty such as doing another student's coursework, or a
-scam pattern (pay-first, no meetup, contact-only).
+GEMINI_INSTRUCTION = """You screen listings for RTU Tindahan, a university campus marketplace in the Philippines.
+Decide whether a listing may be published. Flag anything that is:
+- counterfeit, fake, replica or pirated goods, including fake official RTU merchandise;
+- exam answers, answer keys, leaked exams, or help that is academic cheating such as doing another student's coursework;
+- weapons or ammunition; illegal drugs;
+- vapes, e-cigarettes, tobacco, or alcohol;
+- medicines, prescription or not;
+- gambling or betting items; stolen goods; another person's ID or personal details; resold event tickets without permission;
+- sexual or offensive content, or harassment;
+- a scam pattern: pay-first, no meetup, contact only, or payment and contact outside the app.
+Also raise the score for these guideline signals: a banned word ("replica", "answer key", "vape",
+"counterfeit"), a description under 20 characters, a price over 50,000 pesos, a web link in the
+text, or an all-capitals title. An all-capitals title alone is a spam shape, not a violation.
 Ordinary second-hand goods, food, uniforms, school supplies and services are clean.
 Score 0-100: 0 certainly harmless, 100 certainly prohibited. 50 or above means flagged.
 Give at most three short reasons, each one sentence, written for a moderator."""
@@ -101,6 +183,18 @@ class Verdict:
     raw: dict = field(default_factory=dict)
 
 
+def _mentions(text: str, term: str) -> bool:
+    """Match a term the way a person reading the listing would.
+
+    Phrases are matched as they are written. A single word is matched from its
+    left boundary only, so "vape" catches "vapes" and "beer" catches "beers"
+    while "wine" does not fire inside "twine".
+    """
+    if " " in term or "-" in term or "'" in term:
+        return term in text
+    return re.search(rf"\b{re.escape(term)}", text) is not None
+
+
 class StubProvider:
     """Deterministic stand-in for a real model (AI-04).
 
@@ -124,7 +218,7 @@ class StubProvider:
         except (InvalidOperation, ValueError):
             price = None
 
-        hits = [term for term in PROHIBITED_TERMS if term in text]
+        hits = [term for term in PROHIBITED_TERMS if _mentions(text, term)]
         if hits:
             reasons.append("Mentions a prohibited item: " + ", ".join(sorted(hits)) + ".")
             score = max(score, 90)
@@ -141,12 +235,25 @@ class StubProvider:
 
         title = listing.title or ""
         if title.isupper() and len(title) > 12:
+            # A spam shape, not a violation: on its own this stays below the
+            # flag threshold, as the guideline says.
             reasons.append("The title is all capitals, a common spam pattern.")
             score = max(score, 40)
 
-        if text.count("http") or text.count("www."):
+        if "http://" in text or "https://" in text or "www." in text:
             reasons.append("The text contains a link, which listings must not have.")
             score = max(score, 60)
+
+        scams = [term for term in SCAM_PATTERNS if _mentions(text, term)]
+        if PHONE_RE.search(text):
+            scams.append("a phone number")
+        if scams:
+            reasons.append(
+                "Looks like a pay-first or off-app contact pattern: "
+                + ", ".join(sorted(set(scams)))
+                + "."
+            )
+            score = max(score, 85)
 
         return Verdict(
             verdict="flagged" if score >= FLAG_THRESHOLD else "clean",

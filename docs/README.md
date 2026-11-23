@@ -18,6 +18,8 @@ Suggested contents, copied from the CapStone folder:
   sessions, with the migration path for each.
 - `SCREENING.md` — the content-screening boundary: provider rules, the
   deterministic stub, and the moderator queue.
+- `POSTING-AND-SELLING-GUIDELINE.md` — the panel's posting and selling rules
+  in Markdown, each one mapped to where the system enforces it.
 - `INTEGRATION-SETUP.md` — connecting the React app to the Django API.
 
 Rules:

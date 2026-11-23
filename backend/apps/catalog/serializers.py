@@ -11,9 +11,10 @@ Two rules hold everywhere in this file:
 from pathlib import Path
 
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import Category, Listing, ListingPhoto, ListingVariant
+from .models import Category, Listing, ListingPhoto, ListingVariant, validate_image_size
 
 PHOTO_TYPES = {"jpg", "jpeg", "png", "webp"}
 
@@ -33,6 +34,12 @@ class PhotoListField(serializers.ListField):
                 raise serializers.ValidationError(
                     "Photos must be JPG, PNG, or WebP."
                 )
+            try:
+                # The guideline's 100 x 100 minimum lives on the model, so
+                # admin uploads and API uploads cannot disagree.
+                validate_image_size(image)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError(exc.messages) from exc
         return images
 
 
