@@ -179,8 +179,9 @@ server-backed; the bridges live in `frontend/src/features/marketplace/api/`.
 
 ## 6. What is still missing
 
-- Forum posts, reports and the admin user/audit log have no models yet.
-  Everything else on the buy/sell path reads and writes the API.
+- The admin user/audit log has no endpoints yet, and there is no notification
+  model: order, ticket, comment and report events are still told through the
+  local snapshot only.
 - The AI screening pass has never been reviewed against real listings: the
   provider is wired (`apps/screening`), but the prompt and flag thresholds
   are untuned, so a flagged listing still waits for a moderator.
@@ -252,3 +253,43 @@ Server orders are also merged into the buyer's My Orders snapshot
 (`orderRecordFromApi` in `api/orders.ts`), which is what makes the Completed
 tab, the rating panel and the "requests you sent" summary agree. Order lines
 carry the backend listing id, so an item stays rateable after it sells out.
+
+---
+
+## 9. Forum API (posts, comments, reactions, reports)
+
+| Method | Path | Who | Notes |
+| --- | --- | --- | --- |
+| GET | `/api/v1/forum/posts/` | public | Hidden posts are excluded; `?topic=`, `?kind=`, `?author=me` |
+| POST | `/api/v1/forum/posts/` | verified members | `{kind, topic, title, body, images}`; `kind=notice` is staff-only |
+| GET | `/api/v1/forum/posts/<id>/` | public | Includes comments, react counts and the caller's own reaction |
+| PATCH | `/api/v1/forum/posts/<id>/` | the author | Blocked while staff have the post hidden |
+| DELETE | `/api/v1/forum/posts/<id>/` | author or moderator | Staff deletion closes open reports on it |
+| POST | `/api/v1/forum/posts/<id>/comments/` | verified members | `{text, parent}`; a reply must belong to the same post |
+| PATCH | `/api/v1/forum/comments/<id>/` | the author | |
+| DELETE | `/api/v1/forum/comments/<id>/` | author or moderator | A comment with replies is soft-deleted into a tombstone |
+| POST | `/api/v1/forum/posts/<id>/react/` | verified members | `{key}` from like/love/haha/wow/sad; same key removes |
+| POST | `/api/v1/forum/posts/<id>/moderate/` | moderators | `hide`, `restore`, `pin`, `unpin`, `delete` |
+| POST | `/api/v1/forum/comments/<id>/moderate/` | moderators | `hide`, `restore`, `delete` |
+| POST | `/api/v1/forum/reports/` | verified members | `{type: post|comment|order, post, comment, order, reason, details}` |
+| GET | `/api/v1/forum/reports/` | staff see all; a member sees their own | `?status=`, `?type=` |
+| POST | `/api/v1/forum/reports/<id>/resolve/` | moderators | `{status, action, note}`; `hide`/`restore`/`delete` change the content, `warn` does not |
+
+Rules:
+
+- one reaction per member per post; a different emoji replaces the old one;
+- a member cannot report their own content, and the same member cannot file the
+  same open report twice;
+- an order report may only be filed by that order's buyer or seller;
+- hiding is reversible (a timestamp, not a delete), which is what lets a
+  moderator take a second look; deleting is final;
+- post photos arrive as browser data URLs, are decoded to media files under
+  `media/forum/`, and are returned as absolute URLs. JPEG, PNG and WebP only,
+  2 MB each, 4 per post.
+
+`frontend/src/features/marketplace/api/forum.ts` maps server rows back into
+`db.feed` and `db.freports`. Server ids carry the `api:` prefix; author and
+reporter emails are not exposed, only `is_mine`, so the ownership checks read
+the caller's own rows. Reaction counts are rebuilt with synthetic keys because
+the UI's map is keyed by email, and the caller's own choice stays keyed by their
+email. `refreshForum` runs with the startup fetches and after every write.

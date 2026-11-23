@@ -76,6 +76,26 @@ import {
   submitReview as postReview,
 } from '../api/reviews'
 import {
+  FORUM_PREFIX,
+  apiForumId,
+  createForumPost as createForumPostApi,
+  deleteForumComment as deleteForumCommentApi,
+  deleteForumPost as deleteForumPostApi,
+  fetchForumPosts,
+  fetchForumReports,
+  forumPostFromApi,
+  forumReportFromApi,
+  moderateForumComment,
+  moderateForumPost,
+  postForumComment,
+  reactForumPost,
+  resolveForumReportApi,
+  submitForumReportApi,
+  updateForumComment as updateForumCommentApi,
+  updateForumPost as updateForumPostApi,
+  type ApiForumReport,
+} from '../api/forum'
+import {
   createOrder as createApiOrder,
   fetchOrders as fetchApiOrders,
   orderRecordFromApi,
@@ -1027,6 +1047,34 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // Forum posts and reports live on the server so another member's post, a
+  // comment, or a moderation decision actually reaches everyone. Server rows
+  // replace the previous server rows; prototype-only posts stay.
+  const refreshForum = useCallback(async () => {
+    try {
+      const [posts, reports] = await Promise.all([
+        fetchForumPosts(),
+        getToken() ? fetchForumReports() : Promise.resolve([] as ApiForumReport[]),
+      ])
+      const mine = user?.email ?? ''
+      const mappedPosts = posts.map((p) => forumPostFromApi(p, mine))
+      const mappedReports = reports.map((r) => forumReportFromApi(r, mine))
+      setDb((prev) => ({
+        ...prev,
+        feed: [
+          ...mappedPosts,
+          ...prev.feed.filter((p) => !p.id.startsWith(FORUM_PREFIX)),
+        ],
+        freports: [
+          ...mappedReports,
+          ...prev.freports.filter((r) => !r.id.startsWith(FORUM_PREFIX)),
+        ],
+      }))
+    } catch {
+      /* backend offline: keep the local feed */
+    }
+  }, [user])
+
   // The moderation queue lives on the server; the mount effect fills it.
   const [pendingListings, setPendingListings] = useState<ApiListing[]>([])
   const refreshPendingListings = useCallback(async () => {
@@ -1063,6 +1111,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           refreshConversations(),
           refreshFavorites(),
           refreshReviews(),
+          refreshForum(),
         ])
       } finally {
         if (!cancelled) {
@@ -1084,6 +1133,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       refreshConversations,
       refreshFavorites,
       refreshReviews,
+      refreshForum,
     ],
   )
 
@@ -5120,78 +5170,49 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         toast('Write something or add a photo first.')
         return false
       }
-      const now = new Date().toISOString()
+      const kind = isStaffUser && asNotice ? 'notice' : 'post'
+      // The composer stores photos as data URLs; the backend turns them into
+      // media files. Anything that is not a data URL cannot be uploaded.
+      const images = validImgs
+        .map((id) => imgSrc(id))
+        .filter((src) => src.startsWith('data:image/'))
+        .slice(0, 4)
 
-      setDb((prev) => {
-        const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
-        if (isStaffUser && asNotice) {
-          const noticeTitle = cleanTitle || cleanBody.slice(0, 60) || 'Notice'
-          const noticeBody = cleanBody || noticeTitle
-          const an: AnnouncementItem = {
-            id: '',
-            t: noticeTitle,
-            b: noticeBody,
-            d: dShort(),
-          }
-          annId(an)
-          next.ann.unshift(an)
-          const postId = 'f' + ++next.seq.fd
-          next.feed.unshift({
-            id: postId,
-            kind: 'notice',
-            title: noticeTitle,
-            body: noticeBody,
-            by: 'Office of Student Affairs',
-            authorEmail: currentAccount.email,
-            aid: an.id,
-            imgs: validImgs,
-            ts: now,
-            reacts: {},
-            comments: [],
-          })
-          next.accounts
-            .filter((a) => a.role !== 'moderator')
-            .forEach((a) => {
-              a.notifs.unshift({
-                t: 'New announcement: ' + noticeTitle,
-                read: false,
-                ts: nowT(),
-                at: now,
-                link: { k: 'post', id: postId },
-              })
-            })
-          next.audit.push({
-            id: 'au' + uid(),
-            ts: now,
-            by: currentAccount.email,
-            byName: currentAccount.name,
-            action: 'post announcement',
-            targetType: 'announcement',
-            targetId: an.id,
-            targetName: an.t,
-            note: '',
-          })
-        } else {
-          next.feed.unshift({
-            id: 'f' + ++next.seq.fd,
-            kind: 'post',
-            topic: topic || 'General',
-            title: cleanTitle,
-            body: cleanBody,
-            by: currentAccount.name,
-            authorEmail: currentAccount.email,
-            imgs: validImgs,
-            ts: now,
-            reacts: {},
-            comments: [],
-          })
-        }
-        return next
+      void createForumPostApi({
+        kind,
+        topic: topic || 'General',
+        title: cleanTitle,
+        body: cleanBody,
+        images,
       })
-      toast(isStaffUser && asNotice ? 'Notice posted. Every member was alerted.' : 'Posted to the forum.')
+        .then(async (created) => {
+          await refreshForum()
+          if (kind === 'notice') {
+            // The announcements panel reads the local list; other members see
+            // the notice on the forum itself.
+            setDb((prev) => {
+              const an: AnnouncementItem = {
+                id: '',
+                t: created.title || 'Notice',
+                b: created.body || created.title || 'Notice',
+                d: dShort(),
+              }
+              annId(an)
+              return { ...prev, ann: [an, ...prev.ann] }
+            })
+          }
+          toast(
+            kind === 'notice'
+              ? 'Notice posted. It is pinned on the forum.'
+              : 'Posted to the forum.',
+          )
+        })
+        .catch((err) =>
+          toast(err instanceof ApiRequestError ? err.message : 'That post could not be saved.'),
+        )
       return true
     },
-    [currentAccount, isStaffUser, toast],
+    [currentAccount, isStaffUser, refreshForum, toast],
   )
 
   const editForumPost = useCallback(
@@ -5211,6 +5232,18 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       if (!cleanTitle && !cleanBody && !(f.imgs || []).length) {
         return false
       }
+      const apiId = apiForumId(postId)
+      if (apiId !== null) {
+        void updateForumPostApi(apiId, { title: cleanTitle, body: cleanBody })
+          .then(async () => {
+            await refreshForum()
+            toast('Post updated.')
+          })
+          .catch((err) =>
+            toast(err instanceof ApiRequestError ? err.message : 'That post could not be saved.'),
+          )
+        return true
+      }
       const changed = cleanTitle !== (f.title || '') || cleanBody !== (f.body || '')
       if (changed) {
         setDb((prev) => ({
@@ -5225,7 +5258,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       toast(changed ? 'Post updated.' : 'No changes to save.')
       return true
     },
-    [currentAccount, db.feed, toast],
+    [currentAccount, db.feed, refreshForum, toast],
   )
 
   const deleteForumPost = useCallback(
@@ -5250,6 +5283,26 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         no: 'Keep it',
         danger: true,
         run: () => {
+          const apiId = apiForumId(postId)
+          if (apiId !== null) {
+            void deleteForumPostApi(apiId)
+              .then(async () => {
+                await refreshForum()
+                // The post page has nothing left to render once its row is
+                // gone, so leave it even if the page never set selectedPostId.
+                navigate('forum')
+                toast('Post deleted.')
+              })
+              .catch((err) => {
+                void refreshForum()
+                toast(
+                  err instanceof ApiRequestError
+                    ? err.message
+                    : 'That post could not be deleted.',
+                )
+              })
+            return
+          }
           const now = new Date().toISOString()
           setDb((prev) => {
             const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
@@ -5332,8 +5385,17 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           return { ...f, reacts: nextReacts }
         }),
       }))
+      const apiId = apiForumId(postId)
+      if (apiId !== null) {
+        void reactForumPost(apiId, react)
+          .then(() => refreshForum())
+          .catch(() => {
+            void refreshForum()
+            toast('That reaction could not be saved.')
+          })
+      }
     },
-    [currentAccount],
+    [currentAccount, refreshForum, toast],
   )
 
   const togglePinPost = useCallback(
@@ -5345,6 +5407,18 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       const f = db.feed.find((x) => x.id === postId)
       if (!f) return
       const nextPinned = !f.pinned
+      const apiId = apiForumId(postId)
+      if (apiId !== null) {
+        void moderateForumPost(apiId, nextPinned ? 'pin' : 'unpin')
+          .then(async () => {
+            await refreshForum()
+            toast(nextPinned ? 'Pinned to the top.' : 'Unpinned.')
+          })
+          .catch((err) =>
+            toast(err instanceof ApiRequestError ? err.message : 'That pin could not be saved.'),
+          )
+        return
+      }
       const now = new Date().toISOString()
       setDb((prev) => ({
         ...prev,
@@ -5366,7 +5440,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       }))
       toast(nextPinned ? 'Pinned to the top.' : 'Unpinned.')
     },
-    [currentAccount, isStaffUser, db.feed, toast],
+    [currentAccount, db.feed, isStaffUser, refreshForum, toast],
   )
 
   const applyModTargetInternal = useCallback(
@@ -5515,6 +5589,18 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       const f = db.feed.find((x) => x.id === postId)
       if (!f) return
       const act = f.hidden ? 'restore' : 'hide'
+      const apiId = apiForumId(postId)
+      if (apiId !== null) {
+        void moderateForumPost(apiId, act)
+          .then(async () => {
+            await refreshForum()
+            toast(act === 'hide' ? 'Post hidden from members.' : 'Post restored.')
+          })
+          .catch((err) =>
+            toast(err instanceof ApiRequestError ? err.message : 'That decision could not be saved.'),
+          )
+        return
+      }
       setDb((prev) => {
         const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
         applyModTargetInternal(next, 'post', postId, null, act, '', null)
@@ -5522,7 +5608,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       })
       toast(act === 'hide' ? 'Post hidden from members.' : 'Post restored.')
     },
-    [currentAccount, isStaffUser, db.feed, applyModTargetInternal, toast],
+    [currentAccount, db.feed, isStaffUser, applyModTargetInternal, refreshForum, toast],
   )
 
   const addForumComment = useCallback(
@@ -5532,6 +5618,15 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       if (!cleanText) {
         toast('Write a comment first.')
         return false
+      }
+      const apiId = apiForumId(postId)
+      if (apiId !== null) {
+        void postForumComment(apiId, cleanText, parentId ? apiForumId(parentId) : null)
+          .then(() => refreshForum())
+          .catch((err) =>
+            toast(err instanceof ApiRequestError ? err.message : 'That comment could not be saved.'),
+          )
+        return true
       }
       const now = new Date().toISOString()
       setDb((prev) => {
@@ -5585,7 +5680,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       })
       return true
     },
-    [currentAccount, toast],
+    [currentAccount, refreshForum, toast],
   )
 
   const editForumComment = useCallback(
@@ -5593,6 +5688,18 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       if (!currentAccount) return false
       const cleanText = text.trim().slice(0, 500)
       if (!cleanText) return false
+      const apiId = apiForumId(commentId)
+      if (apiId !== null) {
+        void updateForumCommentApi(apiId, cleanText)
+          .then(async () => {
+            await refreshForum()
+            toast('Comment updated.')
+          })
+          .catch((err) =>
+            toast(err instanceof ApiRequestError ? err.message : 'That comment could not be saved.'),
+          )
+        return true
+      }
       let changed = false
       setDb((prev) => {
         const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
@@ -5609,7 +5716,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       toast(changed ? 'Comment updated.' : 'No changes to save.')
       return true
     },
-    [currentAccount, toast],
+    [currentAccount, refreshForum, toast],
   )
 
   const deleteForumComment = useCallback(
@@ -5632,6 +5739,23 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         no: 'Keep it',
         danger: true,
         run: () => {
+          const apiId = apiForumId(commentId)
+          if (apiId !== null) {
+            void deleteForumCommentApi(apiId)
+              .then(async () => {
+                await refreshForum()
+                toast('Comment deleted.')
+              })
+              .catch((err) => {
+                void refreshForum()
+                toast(
+                  err instanceof ApiRequestError
+                    ? err.message
+                    : 'That comment could not be deleted.',
+                )
+              })
+            return
+          }
           setDb((prev) => {
             const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
             const tf = next.feed.find((x) => x.id === postId)
@@ -5678,6 +5802,18 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       const c = f?.comments.find((x) => x.id === commentId)
       if (!f || !c) return
       const act = c.hidden ? 'restore' : 'hide'
+      const apiId = apiForumId(commentId)
+      if (apiId !== null) {
+        void moderateForumComment(apiId, act)
+          .then(async () => {
+            await refreshForum()
+            toast(act === 'hide' ? 'Comment hidden from members.' : 'Comment restored.')
+          })
+          .catch((err) =>
+            toast(err instanceof ApiRequestError ? err.message : 'That decision could not be saved.'),
+          )
+        return
+      }
       setDb((prev) => {
         const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
         applyModTargetInternal(next, 'comment', postId, commentId, act, '', null)
@@ -5685,7 +5821,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       })
       toast(act === 'hide' ? 'Comment hidden from members.' : 'Comment restored.')
     },
-    [currentAccount, isStaffUser, db.feed, applyModTargetInternal, toast],
+    [currentAccount, db.feed, isStaffUser, applyModTargetInternal, refreshForum, toast],
   )
 
   const submitForumReport = useCallback(
@@ -5716,6 +5852,26 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         toast('You already reported this.')
         return true
       }
+      const apiPost = apiForumId(f.id)
+      const apiComment = commentId ? apiForumId(commentId) : null
+      if (apiPost !== null) {
+        void submitForumReportApi({
+          type: apiComment !== null ? 'comment' : 'post',
+          post: apiPost,
+          comment: apiComment,
+          reason,
+          details: String(details || '').slice(0, 400),
+        })
+          .then(async () => {
+            await refreshForum()
+            toast('Thanks. Staff will take a look.')
+          })
+          .catch((err) =>
+            toast(err instanceof ApiRequestError ? err.message : 'That report could not be sent.'),
+          )
+        return true
+      }
+
       const now = new Date().toISOString()
       const postTitle =
         String(f.title || '').trim() ||
@@ -5766,9 +5922,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     (
       orderId: string,
       role: 'buyer' | 'seller',
-      targetEmail: string | null,
-      targetName: string,
-      itemTitle: string,
+      _targetEmail: string | null,
+      _targetName: string,
+      _itemTitle: string,
       reason: string,
       details: string,
     ): boolean => {
@@ -5781,64 +5937,40 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         toast('Please write a short description of what happened (at least 5 characters).')
         return false
       }
-      const now = new Date().toISOString()
-      setDb((prev) => {
-        const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
-        next.freports.unshift({
-          id: 'rep-' + uid(),
-          type: 'order',
-          postId: orderId,
-          commentId: null,
-          orderId,
-          reporterRole: role,
-          reason: cleanReason,
-          details: cleanDetails,
-          reporterEmail: currentAccount.email,
-          reporterName: `${currentAccount.name} (${role === 'seller' ? 'Seller' : 'Buyer'})`,
-          targetEmail: targetEmail || null,
-          targetName: targetName || 'Member',
-          snap: {
-            title: `Order ${orderId} · ${itemTitle}`,
-            text: `${role === 'seller' ? 'Seller reported buyer' : 'Buyer reported seller'}: ${cleanReason} — ${cleanDetails}`,
-            imgs: 0,
-          },
-          ts: now,
-          status: 'open',
-        })
-        next.accounts
-          .filter((a) => a.role === 'moderator')
-          .forEach((a) => {
-            a.notifs.unshift({
-              t: `Transaction report on Order ${orderId}: ${currentAccount.name} (${role}) reported ${targetName} (${cleanReason}).`,
-              read: false,
-              ts: nowT(),
-              at: now,
-              link: { k: 'freports' },
-            })
-          })
-        next.audit.push({
-          id: 'au' + uid(),
-          ts: now,
-          by: currentAccount.email,
-          byName: currentAccount.name,
-          action: 'report transaction issue',
-          targetType: 'order',
-          targetId: orderId,
-          targetName: `${targetName} (${itemTitle})`,
-          note: `${cleanReason}: ${cleanDetails}`,
-        })
-        return next
+      void submitForumReportApi({
+        type: 'order',
+        order: orderId,
+        reason: cleanReason,
+        details: cleanDetails,
       })
-      toast('Report submitted to RTU administrators. Thank you.')
+        .then(async () => {
+          await refreshForum()
+          toast('Report submitted to RTU administrators. Thank you.')
+        })
+        .catch((err) =>
+          toast(err instanceof ApiRequestError ? err.message : 'That report could not be sent.'),
+        )
       return true
     },
-    [currentAccount, toast],
+    [currentAccount, refreshForum, toast],
   )
 
   const setForumReportStatus = useCallback(
     (reportId: string, st: 'open' | 'reviewed' | 'dismissed') => {
       if (!currentAccount || !isStaffUser) {
         toast('Only RTU staff can do that.')
+        return
+      }
+      const apiId = apiForumId(reportId)
+      if (apiId !== null) {
+        void resolveForumReportApi(apiId, { status: st })
+          .then(async () => {
+            await refreshForum()
+            toast('Report ' + (st === 'open' ? 'reopened' : 'marked ' + st) + '.')
+          })
+          .catch((err) =>
+            toast(err instanceof ApiRequestError ? err.message : 'That decision could not be saved.'),
+          )
         return
       }
       const now = new Date().toISOString()
@@ -5916,6 +6048,22 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       const r = db.freports.find((x) => x.id === reportId)
       if (!r || r.type === 'order') return false
       const targetKind: 'post' | 'comment' = r.type
+      const apiId = apiForumId(reportId)
+      if (apiId !== null) {
+        void resolveForumReportApi(apiId, {
+          status: 'actioned',
+          action: act,
+          note: note.trim().slice(0, 300),
+        })
+          .then(async () => {
+            await refreshForum()
+            toast('Done: ' + FR_ACTIONS[act][1] + '.')
+          })
+          .catch((err) =>
+            toast(err instanceof ApiRequestError ? err.message : 'That decision could not be saved.'),
+          )
+        return true
+      }
       setDb((prev) => {
         const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
         applyModTargetInternal(next, targetKind, r.postId, r.commentId, act, note.trim().slice(0, 300), r.id)

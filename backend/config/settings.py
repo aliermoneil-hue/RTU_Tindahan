@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     "apps.messaging",
     "apps.favorites",
     "apps.reviews",
+    "apps.forum",
 ]
 
 MIDDLEWARE = [
