@@ -924,9 +924,13 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
 
   /** Re-read the published catalogue and fold it into the snapshot. */
   const refreshListings = useCallback(async () => {
-    const listings = await fetchListings()
-    if (listings.length === 0) return
-    setDb((prev) => mergeApiCatalogue(prev, listings))
+    try {
+      const listings = await fetchListings()
+      if (listings.length === 0) return
+      setDb((prev) => mergeApiCatalogue(prev, listings))
+    } catch {
+      /* backend offline: keep the snapshot that is already on screen */
+    }
   }, [])
 
   // The seller's own rows, including the ones still waiting for approval. The
@@ -1275,37 +1279,62 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     void refreshStore()
   }, [refreshStore])
 
-  // Keep the shared lists fresh: a reply, a new request or a status change
-  // should land on its own, not only after a reload.
+  // Keep the shared lists fresh: a reply, a new post, a newly approved listing
+  // or a status change should land on its own, not only after a reload.
+  //
+  // Two tiers, because they cost different things. Chat feels live at 10s. The
+  // forum and the catalogue are watched, not chatted in, so 20-30s is enough.
+  // The public lists poll for visitors too; the account-only ones need a token.
   useEffect(() => {
-    if (!getToken()) return
-    // Chat needs to feel live; a status change on a request does not. Polling
-    // them at different rates keeps the tunnel quiet between messages.
-    const chat = window.setInterval(() => void refreshConversations(), 10000)
-    const requests = window.setInterval(() => void refreshOrders(), 30000)
-    const inbox = window.setInterval(() => void refreshNotifications(), 20000)
-    // The forum is the one list people sit and watch: a post written on
-    // another account must arrive on its own, like a chat reply does.
-    const posts = window.setInterval(() => {
+    const signedIn = Boolean(getToken())
+    // Declared here rather than using isStaffUser: that memo is defined below
+    // this effect, and a moderator or administrator always has the role.
+    const staff = Boolean(
+      user &&
+        (user.role === 'moderator' ||
+          user.role === 'administrator' ||
+          user.role === 'office_staff'),
+    )
+    const timers: number[] = []
+
+    if (signedIn) {
+      timers.push(window.setInterval(() => void refreshConversations(), 10000))
+      timers.push(window.setInterval(() => void refreshOrders(), 30000))
+      timers.push(window.setInterval(() => void refreshNotifications(), 20000))
+    }
+
+    // A post written on another account, or a listing a moderator just
+    // approved, has to appear without a reload. Both endpoints are public.
+    const forum = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return
       void refreshForum()
       void refreshAnnouncements()
     }, 20000)
+    const catalogue = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void refreshListings()
+      if (!signedIn) return
+      void refreshMyListings()
+      if (staff) void refreshPendingListings()
+    }, 30000)
+    timers.push(forum, catalogue)
+
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
+      void refreshForum()
+      void refreshAnnouncements()
+      void refreshListings()
+      if (!signedIn) return
       void refreshConversations()
       void refreshOrders()
       void refreshNotifications()
-      void refreshForum()
-      void refreshAnnouncements()
+      void refreshMyListings()
+      if (staff) void refreshPendingListings()
     }
     window.addEventListener('focus', onVisible)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
-      window.clearInterval(chat)
-      window.clearInterval(requests)
-      window.clearInterval(inbox)
-      window.clearInterval(posts)
+      timers.forEach((timer) => window.clearInterval(timer))
       window.removeEventListener('focus', onVisible)
       document.removeEventListener('visibilitychange', onVisible)
     }
@@ -1313,8 +1342,12 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     refreshAnnouncements,
     refreshConversations,
     refreshForum,
+    refreshListings,
+    refreshMyListings,
     refreshNotifications,
     refreshOrders,
+    refreshPendingListings,
+    user,
   ])
 
   // UI overlays
