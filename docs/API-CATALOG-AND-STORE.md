@@ -57,13 +57,13 @@ Query parameters on `GET /api/v1/listings/`:
 | `max_price` | `?max_price=300` | Inclusive upper bound on price; combining the two gives a range. A value that is not a number, a negative number, or a range where the maximum sits below the minimum returns `400` with the offending key |
 | `official` | `?official=true` | Official Store items only — this is what the Store page should call |
 | `seller` | `?seller=me` | Your own listings, any status (the "My shop" page) |
+| `ordering` | `?ordering=small-sellers` | `newest`, `oldest`, `price`, `-price`, `popular`, `best-selling`, `least-sold`, `small-sellers`. Sales ordering uses `sold_count`, which a ticket raises when staff mark it `claimed` |
+| `page` | `?page=2` | Page size is 20 (global DRF setting) |
 
 The bare list is the marketplace: approved and available only. A detail route —
 `GET`, `PATCH` or `DELETE /listings/<slug>/` — also accepts the listing's own
 seller for any status, so a pending item can be edited or withdrawn without a
 moderator approving it first. Anyone else gets a 404 for an unpublished row.
-| `ordering` | `?ordering=small-sellers` | `newest`, `oldest`, `price`, `-price`, `popular`, `best-selling`, `least-sold`, `small-sellers`. Sales ordering uses `sold_count`, which a ticket raises when staff mark it `claimed` |
-| `page` | `?page=2` | Page size is 20 (global DRF setting) |
 
 ### Posting an item (multipart, up to 10 photos)
 
