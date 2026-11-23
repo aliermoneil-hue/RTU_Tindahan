@@ -114,6 +114,8 @@ export interface OrderLine {
   price: number
   name?: string
   kind?: ListingKind
+  /** Backend listing id, needed to post a review even after the item sells out. */
+  apiListingId?: number
 }
 
 export interface OrderRecord {

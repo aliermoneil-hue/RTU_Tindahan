@@ -179,8 +179,8 @@ server-backed; the bridges live in `frontend/src/features/marketplace/api/`.
 
 ## 6. What is still missing
 
-- Forum posts, reports, reviews and the admin user/audit log have no models
-  yet. Everything else on the buy/sell path reads and writes the API.
+- Forum posts, reports and the admin user/audit log have no models yet.
+  Everything else on the buy/sell path reads and writes the API.
 - The AI screening pass has never been reviewed against real listings: the
   provider is wired (`apps/screening`), but the prompt and flag thresholds
   are untuned, so a flagged listing still waits for a moderator.
@@ -215,3 +215,40 @@ then the provider merges both lists into `account.favs` / `account.sfavs`.
 `Official RTU Store` is a bucket with no user behind it, so that one heart
 stays local. The heart updates optimistically and rolls back with the server's
 message if the write is refused.
+
+---
+
+## 8. Reviews API (verified ratings)
+
+A rating is written against the order it came from, so "Verified pickup" on the
+product page means the server checked a completed order, not that the client
+said so.
+
+| Method | Path | Who | Notes |
+| --- | --- | --- | --- |
+| GET | `/api/v1/reviews/` | public | `?listing=<id>`, `?listing_slug=`, `?seller=<email>`, `?order=<reference>`, `?mine=1`; paginated |
+| POST | `/api/v1/reviews/` | the order's buyer | `{"order": "ORD-…", "listing": 5, "stars": 1-5, "text": "…"}`; omit/null `listing` for a seller review |
+| DELETE | `/api/v1/reviews/<id>/` | buyer, or a moderator | |
+
+Rules enforced in the model and serializer:
+
+- only a `completed` order can be rated, and only by its buyer;
+- an item review must name a listing that was on that order;
+- one seller review per order and one item review per order per listing
+  (partial unique constraints); POST is create-or-update;
+- stars are 1–5, text up to 500 characters;
+- the buyer's email is never exposed. The row carries `is_mine` instead, which
+  is what the Edit/Delete checks read;
+- listing reads carry `rating_avg` and `rating_count` for item reviews.
+
+`frontend/src/features/marketplace/api/reviews.ts` is the bridge. It maps
+`order.reference` + `listing_slug` back to the UI's review keys
+(`seller:<ref>`, `item:<ref>:api:<slug>`), and `refreshReviews` merges the rows
+into `db.reviews` with the server winning for the same key. `submitReview`
+writes optimistically and rolls back with the server's message if the write is
+refused; the product page's Delete goes through `confirmDeleteReview`.
+
+Server orders are also merged into the buyer's My Orders snapshot
+(`orderRecordFromApi` in `api/orders.ts`), which is what makes the Completed
+tab, the rating panel and the "requests you sent" summary agree. Order lines
+carry the backend listing id, so an item stays rateable after it sells out.

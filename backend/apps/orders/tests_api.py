@@ -171,6 +171,28 @@ class OrderApiTests(APITestCase):
         self.assertEqual(self.listing.quantity, 1)
         self.assertEqual(self.listing.sold_count, 2)
 
+    def test_completing_an_order_for_the_last_unit_succeeds(self):
+        # The quantity column briefly required >= 1, so the last sale set it to
+        # 0 inside the transaction and the database rejected the whole
+        # completion with a 500. Zero must be a legal, sold-out stock level.
+        self.listing.quantity = 1
+        self.listing.save(update_fields=["quantity"])
+        reference = self.request_order(1).json()["reference"]
+        self.client.force_authenticate(self.seller)
+        self.client.post(
+            f"/api/v1/orders/{reference}/transition/", {"status": "accepted"}, format="json"
+        )
+
+        done = self.client.post(
+            f"/api/v1/orders/{reference}/transition/", {"status": "completed"}, format="json"
+        )
+
+        self.assertEqual(done.status_code, status.HTTP_200_OK)
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.quantity, 0)
+        self.assertEqual(self.listing.availability_status, Listing.AvailabilityStatus.SOLD)
+        self.assertEqual(self.listing.sold_count, 1)
+
     def test_the_buyer_can_cancel_but_not_after_completion(self):
         reference = self.request_order().json()["reference"]
         self.client.force_authenticate(self.buyer)

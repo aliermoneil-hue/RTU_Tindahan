@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     "apps.orders",
     "apps.messaging",
     "apps.favorites",
+    "apps.reviews",
 ]
 
 MIDDLEWARE = [

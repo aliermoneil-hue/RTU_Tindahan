@@ -96,6 +96,10 @@ class ListingReadSerializer(serializers.ModelSerializer):
     # AI-03: the moderator queue needs to know why a listing was flagged.
     # Everyone else gets null, so a seller never sees the scoring rules.
     screening = serializers.SerializerMethodField()
+    # Annotated by the view; methods keep create/retrieve from erroring when the
+    # instance did not come through that queryset.
+    rating_avg = serializers.SerializerMethodField()
+    rating_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Listing
@@ -128,6 +132,8 @@ class ListingReadSerializer(serializers.ModelSerializer):
             "variants",
             "is_published",
             "screening",
+            "rating_avg",
+            "rating_count",
         )
         read_only_fields = fields
 
@@ -149,6 +155,13 @@ class ListingReadSerializer(serializers.ModelSerializer):
             "model": latest.model_name,
             "at": latest.created_at,
         }
+
+    def get_rating_avg(self, obj: Listing):
+        value = getattr(obj, "rating_avg", None)
+        return round(float(value), 2) if value is not None else None
+
+    def get_rating_count(self, obj: Listing):
+        return int(getattr(obj, "rating_count", 0) or 0)
 
 
 class ListingWriteSerializer(serializers.ModelSerializer):

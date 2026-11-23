@@ -70,8 +70,16 @@ import {
   toggleSellerFavorite,
 } from '../api/favorites'
 import {
+  deleteReview as deleteApiReview,
+  fetchReviews,
+  reviewRecordFromApi,
+  submitReview as postReview,
+} from '../api/reviews'
+import {
   createOrder as createApiOrder,
   fetchOrders as fetchApiOrders,
+  orderRecordFromApi,
+  orderStatusFromApi,
   transitionOrder as transitionApiOrder,
   type ApiOrder,
 } from '../api/orders'
@@ -918,27 +926,36 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           const me = prev.accounts.find((a) => a.email === email)
           if (!me) return prev
           let changed = false
-          const orders = me.orders.map((order) => {
+          let orders = me.orders.map((order) => {
             const remote = list.find((row) => row.reference === order.id)
             if (!remote) return order
-            const status: OrderRecord['status'] =
-              remote.status === 'accepted'
-                ? 'Meetup set'
-                : remote.status === 'completed'
-                  ? 'Completed'
-                  : remote.status === 'requested'
-                    ? 'Awaiting seller'
-                    : 'Cancelled'
-            const tab: 'Active' | 'Completed' | 'Cancelled' =
-              remote.status === 'completed'
-                ? 'Completed'
-                : remote.status === 'cancelled' || remote.status === 'declined'
-                  ? 'Cancelled'
-                  : 'Active'
-            if (order.status === status && order.tab === tab) return order
+            const { status, tab } = orderStatusFromApi(remote)
+            // Local checkout lines carry the UI id only. Copy the backend
+            // listing id across so a sold-out item can still be rated from the
+            // completed order.
+            const mapped = orderRecordFromApi(remote)
+            const lines = (order.lines || []).map((line) => {
+              if (line.apiListingId) return line
+              const match = mapped.lines.find((m) => m.pid === line.pid)
+              return match?.apiListingId ? { ...line, apiListingId: match.apiListingId } : line
+            })
+            const linesChanged = lines.some((line, i) => line !== (order.lines || [])[i])
+            if (order.status === status && order.tab === tab && !linesChanged) return order
             changed = true
-            return { ...order, status, tab }
+            return { ...order, status, tab, lines }
           })
+          // Orders the server knows about but this browser never created (a
+          // request sent from another device, or one that predates the local
+          // snapshot) still belong in My Orders; without this the "sent"
+          // summary shows an order that the tabs below it count as zero.
+          const known = new Set(orders.map((order) => order.id))
+          const additions = list
+            .filter((row) => row.buyer_email === email && !known.has(row.reference))
+            .map((row) => orderRecordFromApi(row))
+          if (additions.length) {
+            orders = [...additions, ...orders]
+            changed = true
+          }
           if (!changed) return prev
           return {
             ...prev,
@@ -992,6 +1009,24 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // A rating is only written after a completed order, so the server is the
+  // truth once it has the row. Server rows replace local rows with the same
+  // key; prototype-only reviews stay.
+  const refreshReviews = useCallback(async () => {
+    try {
+      const rows = await fetchReviews()
+      const mine = user?.email ?? ''
+      const mapped = rows.map((row) => reviewRecordFromApi(row, mine))
+      const keys = new Set(mapped.map((r) => r.key))
+      setDb((prev) => ({
+        ...prev,
+        reviews: [...mapped, ...prev.reviews.filter((r) => !keys.has(r.key))],
+      }))
+    } catch {
+      /* backend offline: keep the local reviews */
+    }
+  }, [user])
+
   // The moderation queue lives on the server; the mount effect fills it.
   const [pendingListings, setPendingListings] = useState<ApiListing[]>([])
   const refreshPendingListings = useCallback(async () => {
@@ -1027,6 +1062,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           refreshOrders(),
           refreshConversations(),
           refreshFavorites(),
+          refreshReviews(),
         ])
       } finally {
         if (!cancelled) {
@@ -1047,6 +1083,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       refreshOrders,
       refreshConversations,
       refreshFavorites,
+      refreshReviews,
     ],
   )
 
@@ -4421,10 +4458,16 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       if (!currentAccount || !o || o.buyerEmail !== currentAccount.email) return false
       if (o.status !== 'Completed' || o.tab !== 'Completed') return false
       if (o.sellerEmail && o.sellerEmail === currentAccount.email) return false
+      // A server order's status came from the seller's own transition, so it is
+      // already proof of a completed pickup. A prototype-only order still needs
+      // its local transaction to say Completed.
+      const onServer =
+        apiOrders.some((row) => row.reference === o.id) || /^ORD-\d{6}-\d{3}$/.test(o.id)
+      if (onServer) return true
       const t = db.txn.find((x) => x.orderId === o.id)
       return !!t && t.status === 'Completed'
     },
-    [currentAccount, db.txn],
+    [apiOrders, currentAccount, db.txn],
   )
 
   const reviewOf = useCallback(
@@ -4444,7 +4487,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         toast('You can rate an order after the pickup is completed.')
         return false
       }
-      if (kind === 'item' && !(o.lines || []).some((l) => l.pid === pid && byId(pid))) {
+      if (kind === 'item' && !(o.lines || []).some((l) => l.pid === pid)) {
         toast('That item is not part of this order.')
         return false
       }
@@ -4455,7 +4498,10 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       const key = kind === 'seller' ? `seller:${orderId}` : `item:${orderId}:${pid}`
       const cleanText = String(text || '').trim().slice(0, 500)
       const sellerKey = o.sellerEmail || 'official'
-      let isUpdate = false
+      const previous = db.reviews.find(
+        (r) => r.key === key && r.buyerEmail === currentAccount.email,
+      )
+      const isUpdate = Boolean(previous)
 
       setDb((prev) => {
         const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
@@ -4463,7 +4509,6 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           (r) => r.key === key && r.buyerEmail === currentAccount.email,
         )
         if (existing) {
-          isUpdate = true
           existing.stars = stars
           existing.text = cleanText
           existing.edited = Date.now()
@@ -4499,9 +4544,41 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         return next
       })
       toast(isUpdate ? 'Rating updated.' : 'Thanks! Your rating was saved.')
+
+      // Server orders have a row to write; a prototype-only order cannot leave
+      // the browser, so it keeps its local review.
+      const listingId =
+        kind === 'item'
+          ? (byId(pid)?.apiListingId ??
+            o.lines?.find((l) => l.pid === pid)?.apiListingId ??
+            null)
+          : null
+      const onServer =
+        apiOrders.some((row) => row.reference === orderId) ||
+        /^ORD-\d{6}-\d{3}$/.test(orderId)
+      if (onServer && (kind === 'seller' || listingId !== null)) {
+        void postReview(orderId, listingId, stars, cleanText)
+          .then(() => refreshReviews())
+          .catch((err) => {
+            // Drop the optimistic row; the next fetch restores whatever the
+            // server still has (the previous rating, if this was an edit).
+            setDb((prev) => ({
+              ...prev,
+              reviews: prev.reviews.filter(
+                (r) => !(r.key === key && r.buyerEmail === currentAccount.email),
+              ),
+            }))
+            void refreshReviews()
+            toast(
+              err instanceof ApiRequestError
+                ? err.message
+                : 'That rating could not be saved.',
+            )
+          })
+      }
       return true
     },
-    [currentAccount, orderRateable, byId, toast],
+    [apiOrders, byId, currentAccount, db.reviews, orderRateable, refreshReviews, toast],
   )
 
   const confirmDeleteReview = useCallback(
@@ -4543,10 +4620,25 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
             return next
           })
           toast('Review removed.')
+
+          // Server rows have numeric ids; a prototype-only review starts 'r'.
+          if (/^\d+$/.test(String(rev.id))) {
+            void deleteApiReview(Number(rev.id))
+              .then(() => refreshReviews())
+              .catch((err) => {
+                // The removal was optimistic: re-read so a refusal is visible.
+                void refreshReviews()
+                toast(
+                  err instanceof ApiRequestError
+                    ? err.message
+                    : 'That review could not be removed.',
+                )
+              })
+          }
         },
       })
     },
-    [currentAccount, db.reviews, isStaffUser, confirmDlg, toast],
+    [confirmDlg, currentAccount, db.reviews, isStaffUser, refreshReviews, toast],
   )
 
   // Messages

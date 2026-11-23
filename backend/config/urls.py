@@ -19,6 +19,7 @@ urlpatterns = [
     path("api/v1/", include("apps.orders.urls")),
     path("api/v1/", include("apps.messaging.urls")),
     path("api/v1/", include("apps.favorites.urls")),
+    path("api/v1/", include("apps.reviews.urls")),
 ]
 
 if settings.DEBUG:

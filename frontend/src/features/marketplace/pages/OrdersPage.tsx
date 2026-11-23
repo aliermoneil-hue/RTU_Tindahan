@@ -813,7 +813,7 @@ function OrderReviewSection({
 
   const seenPids = new Set<string>()
   const lines = (order.lines || []).filter(
-    (l) => l.pid && byId(l.pid) && !seenPids.has(l.pid) && seenPids.add(l.pid),
+    (l) => l.pid && !seenPids.has(l.pid) && seenPids.add(l.pid),
   )
 
   const renderBox = (
@@ -952,11 +952,10 @@ function OrderReviewSection({
       )}
       {lines.map((l) => {
         const p = byId(l.pid)
-        if (!p) return null
         return renderBox(
           'item',
-          p.id,
-          `Rate item: ${p.name}`,
+          l.pid,
+          `Rate item: ${p?.name || l.name || 'this item'}`,
           'Was it in the condition described?',
         )
       })}

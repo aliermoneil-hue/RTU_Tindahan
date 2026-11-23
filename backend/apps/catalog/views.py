@@ -17,7 +17,7 @@ call, which keeps LS-05/AI-02 true even before the screening service exists.
 
 from decimal import Decimal, InvalidOperation
 
-from django.db.models import F, Q
+from django.db.models import Avg, Count, F, Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -94,6 +94,12 @@ class ListingViewSet(viewsets.ModelViewSet):
         params = self.request.query_params
         queryset = Listing.objects.select_related("seller", "category").prefetch_related(
             "photos", "variants", "screening_results"
+        )
+        # Item ratings come from verified completed orders. Seller reviews have
+        # no listing, so this join only ever counts item reviews.
+        queryset = queryset.annotate(
+            rating_avg=Avg("reviews__stars"),
+            rating_count=Count("reviews"),
         )
 
         # Visibility: staff see every status, a seller sees their own rows only

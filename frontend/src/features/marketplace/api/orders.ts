@@ -9,6 +9,9 @@
 
 import { apiFetch } from '@/common/api/client'
 
+import type { OrderLine, OrderRecord } from '../types'
+import { API_ID_PREFIX } from './listings'
+
 export interface ApiOrderLine {
   id: number
   listing: number
@@ -101,4 +104,67 @@ export async function transitionOrder(
     method: 'POST',
     body: { status },
   })
+}
+
+/** The server's status, in the two vocabularies the order screens render. */
+export function orderStatusFromApi(row: ApiOrder): {
+  status: OrderRecord['status']
+  tab: OrderRecord['tab']
+} {
+  const status: OrderRecord['status'] =
+    row.status === 'accepted'
+      ? 'Meetup set'
+      : row.status === 'completed'
+        ? 'Completed'
+        : row.status === 'requested'
+          ? 'Awaiting seller'
+          : 'Cancelled'
+  const tab: OrderRecord['tab'] =
+    row.status === 'completed'
+      ? 'Completed'
+      : row.status === 'cancelled' || row.status === 'declined'
+        ? 'Cancelled'
+        : 'Active'
+  return { status, tab }
+}
+
+/**
+ * Server order -> the record My Orders renders.
+ *
+ * The buyer's snapshot used to receive this object only from the checkout that
+ * created it in the same browser; a request placed on another device, or an
+ * order the server knew about first, left the Completed tab empty even though
+ * the request line above it showed the same order. Merging this shape fixes
+ * that, and it is what makes the rating panel reachable.
+ */
+export function orderRecordFromApi(row: ApiOrder): OrderRecord {
+  const lines: OrderLine[] = row.lines.map((line) => ({
+    pid: API_ID_PREFIX + line.listing_slug,
+    qty: line.quantity,
+    price: Number(line.unit_price),
+    name: line.title,
+    kind: 'product',
+    apiListingId: line.listing,
+  }))
+  const method = row.fulfillment === 'delivery' ? 'Delivery' : 'Pickup'
+  const place = row.meetup_place || 'Campus meetup'
+  const when = `${method} · ${place}${row.meetup_time ? `, ${row.meetup_time}` : ''}`
+  const first = lines[0]?.name ?? 'Order'
+  const title = lines.length > 1 ? `${first} + ${lines.length - 1} more` : first
+
+  return {
+    id: row.reference,
+    title,
+    total: Number(row.total_amount),
+    ...orderStatusFromApi(row),
+    seller: row.seller_name,
+    when,
+    stage: row.status === 'completed' ? 3 : row.status === 'accepted' ? 2 : 1,
+    tone: 'yellow',
+    icon: 'bag',
+    buyerEmail: row.buyer_email,
+    sellerEmail: row.seller_email,
+    lines,
+    fulfillment: row.fulfillment === 'both' ? 'pickup' : row.fulfillment,
+  }
 }

@@ -152,8 +152,11 @@ class Listing(models.Model):
                 name="catalog_listing_price_positive",
             ),
             models.CheckConstraint(
-                condition=models.Q(quantity__gte=1),
-                name="catalog_listing_quantity_at_least_1",
+                # 0 is a legitimate state: the last unit was sold and
+                # availability_status moves to "sold". The old >= 1 rule made
+                # completing an order for the final unit fail with a 500.
+                condition=models.Q(quantity__gte=0),
+                name="catalog_listing_quantity_not_negative",
             ),
             # A rejected listing cannot be on sale; the two fields must agree
             # on that one combination.
