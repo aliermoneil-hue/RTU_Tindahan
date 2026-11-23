@@ -81,8 +81,10 @@ import {
   createForumPost as createForumPostApi,
   deleteForumComment as deleteForumCommentApi,
   deleteForumPost as deleteForumPostApi,
+  announcementFromApi,
   fetchForumPosts,
   fetchForumReports,
+  fetchNotices,
   forumPostFromApi,
   forumReportFromApi,
   moderateForumComment,
@@ -155,7 +157,6 @@ import {
   VAR_LIMITS,
   blankDraft,
   cleanDays,
-  dShort,
   findVar,
   hash,
   hasVars,
@@ -1089,6 +1090,18 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // Announcements are notice posts, so the panel and the forum's Notices tab
+  // read the same server rows. The local list is replaced: it was per browser.
+  const refreshAnnouncements = useCallback(async () => {
+    try {
+      const rows = await fetchNotices()
+      const mapped = rows.map(announcementFromApi)
+      setDb((prev) => ({ ...prev, ann: mapped }))
+    } catch {
+      /* backend offline: keep what is on screen */
+    }
+  }, [])
+
   // The inbox is the server's: every event that used to write a local
   // notification now emits a row both sides can see. The provider replaces the
   // local list with it so a badge cannot count events the server never had.
@@ -1196,6 +1209,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           refreshFavorites(),
           refreshReviews(),
           refreshForum(),
+          refreshAnnouncements(),
           refreshNotifications(),
           refreshAdminData(),
         ])
@@ -1220,6 +1234,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       refreshFavorites,
       refreshReviews,
       refreshForum,
+      refreshAnnouncements,
       refreshNotifications,
       refreshAdminData,
     ],
@@ -5291,25 +5306,14 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         body: cleanBody,
         images,
       })
-        .then(async (created) => {
-          await refreshForum()
-          if (kind === 'notice') {
-            // The announcements panel reads the local list; other members see
-            // the notice on the forum itself.
-            setDb((prev) => {
-              const an: AnnouncementItem = {
-                id: '',
-                t: created.title || 'Notice',
-                b: created.body || created.title || 'Notice',
-                d: dShort(),
-              }
-              annId(an)
-              return { ...prev, ann: [an, ...prev.ann] }
-            })
-          }
+        .then(async () => {
+          await Promise.all([
+            refreshForum(),
+            kind === 'notice' ? refreshAnnouncements() : Promise.resolve(),
+          ])
           toast(
             kind === 'notice'
-              ? 'Notice posted. It is pinned on the forum.'
+              ? 'Notice posted. It appears in Announcements and every member was notified.'
               : 'Posted to the forum.',
           )
         })
@@ -7309,53 +7313,23 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         toast('Add a title and a message.')
         return false
       }
-      const now = new Date().toISOString()
-      setDb((prev) => {
-        const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
-        const an: AnnouncementItem = { id: '', t, b, d: dShort() }
-        annId(an)
-        next.ann.unshift(an)
-        const fpId = 'f' + ++next.seq.fd
-        next.feed.unshift({
-          id: fpId,
-          kind: 'notice',
-          title: t,
-          body: b,
-          by: 'Office of Student Affairs',
-          authorEmail: currentAccount.email,
-          aid: an.id,
-          ts: now,
-          reacts: {},
-          comments: [],
+      // A staff announcement is a notice post: one model, one moderation
+      // path, and every verified member is notified by the server.
+      void createForumPostApi({ kind: 'notice', topic: 'General', title: t, body: b })
+        .then(async () => {
+          await Promise.all([refreshForum(), refreshAnnouncements()])
+          toast('Announcement posted. Every member was notified.')
         })
-        next.accounts
-          .filter((a) => a.role !== 'moderator')
-          .forEach((a) => {
-            a.notifs.unshift({
-              t: 'New announcement: ' + t,
-              read: false,
-              ts: nowT(),
-              at: now,
-              link: { k: 'post', id: fpId },
-            })
-          })
-        next.audit.push({
-          id: 'au' + uid(),
-          ts: now,
-          by: currentAccount.email,
-          byName: currentAccount.name,
-          action: 'post announcement',
-          targetType: 'announcement',
-          targetId: an.id,
-          targetName: an.t,
-          note: '',
-        })
-        return next
-      })
-      toast('Announcement posted.')
+        .catch((err) =>
+          toast(
+            err instanceof ApiRequestError
+              ? err.message
+              : 'That announcement could not be posted.',
+          ),
+        )
       return true
     },
-    [currentAccount, isStaffUser, toast],
+    [currentAccount, isStaffUser, refreshAnnouncements, refreshForum, toast],
   )
 
   const deleteStaffAnnouncement = useCallback(
@@ -7373,6 +7347,23 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         no: 'Cancel',
         danger: true,
         run: () => {
+          const apiId = apiForumId(a.id)
+          if (apiId !== null) {
+            void deleteForumPostApi(apiId)
+              .then(async () => {
+                await Promise.all([refreshForum(), refreshAnnouncements()])
+                toast('Announcement deleted.')
+              })
+              .catch((err) => {
+                void refreshAnnouncements()
+                toast(
+                  err instanceof ApiRequestError
+                    ? err.message
+                    : 'That announcement could not be deleted.',
+                )
+              })
+            return
+          }
           const now = new Date().toISOString()
           setDb((prev) => ({
             ...prev,
@@ -7397,7 +7388,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         },
       })
     },
-    [currentAccount, isStaffUser, db.ann, confirmDlg, toast],
+    [currentAccount, isStaffUser, db.ann, confirmDlg, refreshAnnouncements, refreshForum, toast],
   )
 
   const exportDatabaseBackup = useCallback(() => {

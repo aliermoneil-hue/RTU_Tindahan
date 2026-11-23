@@ -19,7 +19,13 @@
 
 import { apiFetch } from '@/common/api/client'
 
-import type { ForumComment, ForumPost, ForumReport, ReactionKey } from '../types'
+import type {
+  AnnouncementItem,
+  ForumComment,
+  ForumPost,
+  ForumReport,
+  ReactionKey,
+} from '../types'
 
 export const FORUM_PREFIX = 'api:'
 
@@ -104,6 +110,27 @@ async function collect<T>(path: string, maxPages = 20): Promise<T[]> {
 
 export function fetchForumPosts(): Promise<ApiForumPost[]> {
   return collect<ApiForumPost>('/forum/posts/')
+}
+
+/**
+ * Announcements are notice posts. One model, one moderation path: a notice can
+ * be edited or deleted like any other post, and the public feed's Notices tab
+ * and the announcements panel read the same rows.
+ */
+export function fetchNotices(): Promise<ApiForumPost[]> {
+  return collect<ApiForumPost>('/forum/posts/?kind=notice')
+}
+
+export function announcementFromApi(row: ApiForumPost): AnnouncementItem {
+  return {
+    id: FORUM_PREFIX + row.id,
+    t: row.title || row.body.slice(0, 60) || 'Announcement',
+    b: row.body || row.title,
+    d: new Date(row.created_at).toLocaleDateString('en-PH', {
+      month: 'short',
+      day: 'numeric',
+    }),
+  }
 }
 
 /** Staff get every report; a member gets only their own. */

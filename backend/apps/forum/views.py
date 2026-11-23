@@ -144,6 +144,25 @@ class ForumPostViewSet(
             author=request.user,
             images=save_images(data.get("images"), request),
         )
+        if kind == ForumPost.Kind.NOTICE:
+            # A notice is an announcement: every verified member hears it once.
+            from apps.accounts.models import User
+
+            members = User.objects.filter(
+                role=User.Role.USER,
+                is_active=True,
+                status=User.Status.ACTIVE,
+                verified_at__isnull=False,
+            ).exclude(pk=request.user.pk)
+            for member in members:
+                notify(
+                    member,
+                    f"New announcement: {post.title or post.body[:60]}",
+                    kind="announcement",
+                    link_kind="post",
+                    link_id=post.pk,
+                    actor=request.user,
+                )
         return Response(
             ForumPostSerializer(post, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED,

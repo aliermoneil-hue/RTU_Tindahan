@@ -475,3 +475,26 @@ class ForumApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("data URL", error_text(response))
+
+    def test_a_notice_notifies_members_and_lists_as_a_notice(self):
+        self.client.force_authenticate(self.moderator)
+        created = self.client.post(
+            "/api/v1/forum/posts/",
+            {"kind": "notice", "title": "Enrollment", "body": "Opens Monday."},
+            format="json",
+        )
+
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+
+        notices = self.client.get("/api/v1/forum/posts/?kind=notice")
+        self.assertEqual(len(rows(notices)), 1)
+        self.assertEqual(rows(notices)[0]["kind"], "notice")
+
+        from apps.notifications.models import Notification
+
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.other, kind="announcement", link_kind="post"
+            ).exists()
+        )
+        self.assertFalse(Notification.objects.filter(user=self.moderator).exists())

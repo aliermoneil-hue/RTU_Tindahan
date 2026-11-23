@@ -179,8 +179,8 @@ server-backed; the bridges live in `frontend/src/features/marketplace/api/`.
 
 ## 6. What is still missing
 
-- The announcement panel is still local: a staff notice reaches the forum for
-  everyone, but the panel itself only shows on the browser that posted it.
+- The staff backup/restore utility in Staff tools still works on the browser
+  snapshot; every member-facing flow is server-backed.
 - The AI screening pass has never been reviewed against real listings: the
   provider is wired (`apps/screening`), but the prompt and flag thresholds
   are untuned, so a flagged listing still waits for a moderator.
@@ -293,6 +293,11 @@ the caller's own rows. Reaction counts are rebuilt with synthetic keys because
 the UI's map is keyed by email, and the caller's own choice stays keyed by their
 email. `refreshForum` runs with the startup fetches and after every write.
 
+Announcements are notice posts: `kind=notice`. The Staff tools composer posts
+one, the profile card and its archive read `/forum/posts/?kind=notice`, and
+deleting an announcement deletes that post. Posting a notice notifies every
+active verified member (the author and staff are skipped).
+
 ---
 
 ## 10. Notifications API
@@ -313,6 +318,8 @@ Rows are written by the service that caused the event, never by the client:
 - a report is filed → every moderator/admin (`freports`); resolving it →
   the reporter;
 - a new rating → the seller (`reviews`); an edit does not re-notify;
+- a staff notice → every active verified member (`post` link); the author and
+  staff are skipped;
 - a listing is approved or rejected → the seller (`shop`);
 - an Official Store request → office staff/admin (`baoorders`); a ticket status
   change → the buyer (no link yet).

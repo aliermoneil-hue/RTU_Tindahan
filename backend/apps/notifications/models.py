@@ -21,6 +21,7 @@ class Notification(models.Model):
         REVIEW = "review", "Review"
         LISTING = "listing", "Listing"
         SYSTEM = "system", "System"
+        ANNOUNCEMENT = "announcement", "Announcement"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -34,7 +35,7 @@ class Notification(models.Model):
         on_delete=models.SET_NULL,
         related_name="notifications_sent",
     )
-    kind = models.CharField(max_length=10, choices=Kind.choices)
+    kind = models.CharField(max_length=16, choices=Kind.choices)
     text = models.CharField(max_length=240)
     # UI link vocabulary: order, request, shop, message, post, freports,
     # reviews, listing, txn, baoorders, baoStock, approval.
