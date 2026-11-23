@@ -179,7 +179,12 @@ class ListingViewSet(viewsets.ModelViewSet):
         if user.is_authenticated and user.is_moderator:
             pass
         elif user.is_authenticated:
-            if self.action == "retrieve" or asked_for_own:
+            # Detail routes are for the owner as much as the marketplace.
+            # Without this, a seller could not edit or delete a listing that
+            # was still waiting for approval: the row simply was not in the
+            # queryset, so the delete answered 404.
+            owner_actions = {"retrieve", "update", "partial_update", "destroy"}
+            if self.action in owner_actions or asked_for_own:
                 queryset = queryset.filter(visible | own)
             else:
                 queryset = queryset.filter(visible)

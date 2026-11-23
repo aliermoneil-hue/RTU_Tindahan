@@ -573,3 +573,69 @@ class SmallSellerSortTests(APITestCase):
         row = next(r for r in response.json()["results"] if r["seller_name"] == "2024-111111")
         self.assertEqual(row["seller_active_listings"], 1)
         self.assertTrue(row["is_small_seller"])
+
+
+class OwnerDetailRouteTests(APITestCase):
+    """A listing waiting for approval must still be editable by its seller.
+
+    The detail queryset used to be owner-permissive only for GET, so PATCH and
+    DELETE on a pending listing answered 404 even to the person who posted it.
+    """
+
+    def setUp(self):
+        self.category = Category.objects.create(name="Snacks")
+        self.seller = make_user("2024-333333@rtu.edu.ph")
+        self.other = make_user("2024-444444@rtu.edu.ph")
+
+    def pending(self):
+        return Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Waiting for approval",
+            description="A real listing that no moderator has looked at yet.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price="100.00",
+            quantity=1,
+            meetup_place="Main gate",
+            moderation_status=Listing.ModerationStatus.PENDING_SCREENING,
+        )
+
+    def test_the_seller_can_edit_a_pending_listing(self):
+        listing = self.pending()
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.patch(
+            f"/api/v1/listings/{listing.slug}/", {"price": "125.00"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        listing.refresh_from_db()
+        self.assertEqual(str(listing.price), "125.00")
+
+    def test_the_seller_can_delete_a_pending_listing(self):
+        listing = self.pending()
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.delete(f"/api/v1/listings/{listing.slug}/")
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Listing.objects.filter(pk=listing.pk).exists())
+
+    def test_a_stranger_still_cannot_touch_it(self):
+        listing = self.pending()
+        self.client.force_authenticate(self.other)
+
+        response = self.client.delete(f"/api/v1/listings/{listing.slug}/")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(Listing.objects.filter(pk=listing.pk).exists())
+
+    def test_your_own_pending_listing_stays_out_of_the_marketplace(self):
+        listing = self.pending()
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.get("/api/v1/listings/")
+
+        slugs = [row["slug"] for row in response.json()["results"]]
+        self.assertNotIn(listing.slug, slugs)
