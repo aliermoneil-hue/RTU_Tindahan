@@ -18,6 +18,7 @@ urlpatterns = [
     path("api/v1/", include("apps.store.urls")),
     path("api/v1/", include("apps.orders.urls")),
     path("api/v1/", include("apps.messaging.urls")),
+    path("api/v1/", include("apps.favorites.urls")),
 ]
 
 if settings.DEBUG:

@@ -64,6 +64,12 @@ import {
   sendMessage as postChatMessage,
 } from '../api/messages'
 import {
+  favoriteKeys,
+  fetchFavorites,
+  toggleListingFavorite,
+  toggleSellerFavorite,
+} from '../api/favorites'
+import {
   createOrder as createApiOrder,
   fetchOrders as fetchApiOrders,
   transitionOrder as transitionApiOrder,
@@ -958,6 +964,34 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // Saved products and sellers belong to the member, not to this browser. The
+  // server is the truth for anything it can hold; prototype-only ids and the
+  // "official" bucket have no user behind them, so they stay local.
+  const refreshFavorites = useCallback(async () => {
+    if (!getToken() || !user?.email) return
+    const email = user.email
+    try {
+      const { favs, sfavs } = favoriteKeys(await fetchFavorites())
+      setDb((prev) => {
+        const me = prev.accounts.find((a) => a.email === email)
+        if (!me) return prev
+        const localFavs = me.favs.filter((id) => !id.startsWith(API_ID_PREFIX))
+        const localSfavs = me.sfavs.filter((key) => key === 'official')
+        const merged = {
+          ...me,
+          favs: [...new Set([...favs, ...localFavs])],
+          sfavs: [...new Set([...sfavs, ...localSfavs])],
+        }
+        return {
+          ...prev,
+          accounts: prev.accounts.map((a) => (a.email === email ? merged : a)),
+        }
+      })
+    } catch {
+      /* backend offline: keep the local hearts */
+    }
+  }, [user])
+
   // The moderation queue lives on the server; the mount effect fills it.
   const [pendingListings, setPendingListings] = useState<ApiListing[]>([])
   const refreshPendingListings = useCallback(async () => {
@@ -992,6 +1026,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           refreshMyListings(),
           refreshOrders(),
           refreshConversations(),
+          refreshFavorites(),
         ])
       } finally {
         if (!cancelled) {
@@ -1011,6 +1046,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       refreshMyListings,
       refreshOrders,
       refreshConversations,
+      refreshFavorites,
     ],
   )
 
@@ -1637,47 +1673,100 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Favorites
+  const setFavorite = useCallback(
+    (productId: string, saved: boolean) => {
+      if (!currentAccount) return
+      setDb((prev) => ({
+        ...prev,
+        accounts: prev.accounts.map((a) => {
+          if (a.email !== currentAccount.email) return a
+          const has = a.favs.includes(productId)
+          if (saved === has) return a
+          return {
+            ...a,
+            favs: saved ? [...a.favs, productId] : a.favs.filter((x) => x !== productId),
+          }
+        }),
+      }))
+    },
+    [currentAccount],
+  )
+
   const toggleFav = useCallback(
-    (productId: string) => {
+    async (productId: string) => {
       if (!currentAccount) {
         setActiveModal({ kind: 'gate', route: 'browse', why: 'save items to your favorites' })
         return
       }
       const had = currentAccount.favs.includes(productId)
+      // A prototype-only product has no server row to hold the heart.
+      const apiListingId = byId(productId)?.apiListingId
       if (!had) playHeart()
-      setDb((prev) => ({
-        ...prev,
-        accounts: prev.accounts.map((a) => {
-          if (a.email !== currentAccount.email) return a
-          const nextFavs = had
-            ? a.favs.filter((x) => x !== productId)
-            : [...a.favs, productId]
-          return { ...a, favs: nextFavs }
-        }),
-      }))
-      toast(had ? 'Removed from favorites.' : 'Saved to your favorites.')
+      setFavorite(productId, !had)
+
+      if (!apiListingId) {
+        toast(had ? 'Removed from favorites.' : 'Saved to your favorites.')
+        return
+      }
+
+      try {
+        const result = await toggleListingFavorite(apiListingId)
+        // The server owns the answer: a local heart left over from the
+        // prototype must not make the click look saved when it is not.
+        if (result.saved !== !had) setFavorite(productId, result.saved)
+        toast(result.saved ? 'Saved to your favorites.' : 'Removed from favorites.')
+      } catch (err) {
+        setFavorite(productId, had)
+        toast(err instanceof ApiRequestError ? err.message : 'That favorite could not be saved.')
+      }
     },
-    [currentAccount, toast],
+    [byId, currentAccount, setFavorite, toast],
   )
 
   const toggleSellerFav = useCallback(
-    (sellerKey: string) => {
+    async (sellerKey: string) => {
       if (!currentAccount || !sellerKey || sellerKey === currentAccount.email) return
       const had = currentAccount.sfavs.includes(sellerKey)
       if (!had) playHeart()
-      setDb((prev) => ({
-        ...prev,
-        accounts: prev.accounts.map((a) => {
-          if (a.email !== currentAccount.email) return a
-          const nextSfavs = had
-            ? a.sfavs.filter((x) => x !== sellerKey)
-            : [...a.sfavs, sellerKey]
-          return { ...a, sfavs: nextSfavs }
-        }),
-      }))
-      toast(had ? 'Seller removed from your favorites.' : 'Seller added to your favorites.')
+      const apply = (saved: boolean) =>
+        setDb((prev) => ({
+          ...prev,
+          accounts: prev.accounts.map((a) => {
+            if (a.email !== currentAccount.email) return a
+            const has = a.sfavs.includes(sellerKey)
+            if (saved === has) return a
+            return {
+              ...a,
+              sfavs: saved ? [...a.sfavs, sellerKey] : a.sfavs.filter((x) => x !== sellerKey),
+            }
+          }),
+        }))
+      apply(!had)
+
+      // "Official RTU Store" is a bucket, not an account. A seller whose
+      // listings all came from the prototype has no row on the server either.
+      const onServer =
+        sellerKey !== 'official' &&
+        allOnSale.some((p) => p.owner === sellerKey && p.apiListingId)
+      if (!onServer) {
+        toast(had ? 'Seller removed from your favorites.' : 'Seller added to your favorites.')
+        return
+      }
+
+      try {
+        const result = await toggleSellerFavorite(sellerKey)
+        if (result.saved !== !had) apply(result.saved)
+        toast(
+          result.saved
+            ? 'Seller added to your favorites.'
+            : 'Seller removed from your favorites.',
+        )
+      } catch (err) {
+        apply(had)
+        toast(err instanceof ApiRequestError ? err.message : 'That favorite could not be saved.')
+      }
     },
-    [currentAccount, toast],
+    [allOnSale, currentAccount, toast],
   )
 
   // Cart calculations & actions

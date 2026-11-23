@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     "apps.store",
     "apps.orders",
     "apps.messaging",
+    "apps.favorites",
 ]
 
 MIDDLEWARE = [
