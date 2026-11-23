@@ -1284,11 +1284,20 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     const chat = window.setInterval(() => void refreshConversations(), 10000)
     const requests = window.setInterval(() => void refreshOrders(), 30000)
     const inbox = window.setInterval(() => void refreshNotifications(), 20000)
+    // The forum is the one list people sit and watch: a post written on
+    // another account must arrive on its own, like a chat reply does.
+    const posts = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void refreshForum()
+      void refreshAnnouncements()
+    }, 20000)
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
       void refreshConversations()
       void refreshOrders()
       void refreshNotifications()
+      void refreshForum()
+      void refreshAnnouncements()
     }
     window.addEventListener('focus', onVisible)
     document.addEventListener('visibilitychange', onVisible)
@@ -1296,10 +1305,17 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       window.clearInterval(chat)
       window.clearInterval(requests)
       window.clearInterval(inbox)
+      window.clearInterval(posts)
       window.removeEventListener('focus', onVisible)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [refreshConversations, refreshNotifications, refreshOrders])
+  }, [
+    refreshAnnouncements,
+    refreshConversations,
+    refreshForum,
+    refreshNotifications,
+    refreshOrders,
+  ])
 
   // UI overlays
   const [toastMsg, setToastMsg] = useState<string | null>(null)
