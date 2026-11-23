@@ -422,6 +422,20 @@ export function StoreInventoryPage() {
                                     kind: 'bao-move',
                                     pid: u.p.id,
                                     vid: u.vid,
+                                    type: 'Sold',
+                                  })
+                                }
+                              >
+                                Record sale
+                              </button>
+                              <button
+                                type="button"
+                                className="rowbtn"
+                                onClick={() =>
+                                  openModal({
+                                    kind: 'bao-move',
+                                    pid: u.p.id,
+                                    vid: u.vid,
                                     type: 'Adjustment',
                                   })
                                 }

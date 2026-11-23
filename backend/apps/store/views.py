@@ -9,6 +9,7 @@ the HTTP layer only checks who is allowed to call what and converts errors.
     POST   /api/v1/store/tickets/<reference>/transition/   staff; students may cancel
     GET    /api/v1/store/stock/                   Office Staff only
     POST   /api/v1/store/stock-in/                Office Staff only
+    POST   /api/v1/store/sales/                   Office Staff only (walk-in)
     GET    /api/v1/store/daily-counts/            Office Staff only
     POST   /api/v1/store/daily-counts/            Office Staff only
     GET    /api/v1/store/settings/                public
@@ -35,10 +36,16 @@ from .serializers import (
     StockInSerializer,
     StockMovementSerializer,
     StoreSettingSerializer,
+    WalkInSaleSerializer,
     TicketTransitionSerializer,
     details,
 )
-from .services import change_ticket_status, record_daily_count, record_stock_in
+from .services import (
+    change_ticket_status,
+    record_daily_count,
+    record_stock_in,
+    record_walk_in_sale,
+)
 
 
 class OfficialTicketViewSet(
@@ -154,6 +161,41 @@ class StockInView(APIView):
             {
                 "movement": StockMovementSerializer(movement).data,
                 "variant": ListingVariantSerializer(variant).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class WalkInSaleView(APIView):
+    """POST /store/sales/ — a face-to-face sale at the store window.
+
+    No student account is needed: the buyer pays at the window, the cashier
+    records the units, and the ledger carries the sale. On-hand and available
+    both drop, and the listing's sold counter moves, so "best-selling" stays
+    honest. A failure anywhere rolls the whole sale back.
+    """
+
+    permission_classes = [IsOfficeStaff]
+
+    def post(self, request):
+        serializer = WalkInSaleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            movements = record_walk_in_sale(
+                [(item["variant"], item["quantity"]) for item in data["items"]],
+                by=request.user,
+                reason=data["reason"] or "Walk-in sale",
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(details(exc))
+
+        variants = [movement.variant for movement in movements]
+        return Response(
+            {
+                "movements": StockMovementSerializer(movements, many=True).data,
+                "variants": ListingVariantSerializer(variants, many=True).data,
             },
             status=status.HTTP_201_CREATED,
         )

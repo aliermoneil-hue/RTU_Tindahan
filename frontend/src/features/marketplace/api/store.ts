@@ -238,6 +238,21 @@ export async function stockIn(
   })
 }
 
+/** Staff: record a face-to-face sale at the window (no ticket). */
+export async function sellStock(
+  variant: number,
+  quantity: number,
+  reason = '',
+): Promise<void> {
+  await apiFetch('/store/sales/', {
+    method: 'POST',
+    body: {
+      items: [{ variant, quantity }],
+      ...(reason ? { reason } : {}),
+    },
+  })
+}
+
 /** Staff: record a physical count for one variant. */
 export async function recordDailyCount(
   variant: number,

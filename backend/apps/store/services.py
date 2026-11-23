@@ -369,3 +369,41 @@ def prepare_email(*, ticket=None, kind, event, recipients, subject, body, note="
         body=body,
         note=note,
     )
+
+
+def record_walk_in_sale(lines, *, by=None, reason="Walk-in sale"):
+    """Sell units at the window: one SOLD ledger row per line, no ticket.
+
+    A walk-in buyer may not have an account, so there is no ticket to carry the
+    sale. The ledger row and `sold_count` are the record: on-hand and available
+    both drop by the quantity, which is exactly what the "Sold" movement means.
+    Each line is applied to a locked variant, and a failure rolls the whole sale
+    back, so a cashier cannot end up with half a sale.
+    """
+    lines = list(lines)
+    if not lines:
+        raise ValidationError("Add at least one item to the sale.")
+
+    movements = []
+    with transaction.atomic():
+        seen = set()
+        for variant, quantity in lines:
+            key = variant.pk
+            if key in seen:
+                raise ValidationError(
+                    "Each size may appear once per sale; combine the quantities."
+                )
+            seen.add(key)
+            locked = ListingVariant.objects.select_for_update().get(pk=key)
+            movement = apply_movement(
+                locked,
+                StockMovement.Kind.SOLD,
+                quantity,
+                by=by,
+                reason=reason,
+            )
+            Listing.objects.filter(pk=locked.listing_id).update(
+                sold_count=F("sold_count") + quantity
+            )
+            movements.append(movement)
+    return movements

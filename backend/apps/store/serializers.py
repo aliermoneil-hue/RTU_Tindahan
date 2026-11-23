@@ -110,6 +110,27 @@ class OfficialTicketSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class WalkInSaleLineSerializer(serializers.Serializer):
+    variant = serializers.PrimaryKeyRelatedField(
+        queryset=ListingVariant.objects.all()
+    )
+    quantity = serializers.IntegerField(min_value=1)
+
+
+class WalkInSaleSerializer(serializers.Serializer):
+    """A face-to-face sale at the window: items sold, no student ticket."""
+
+    items = WalkInSaleLineSerializer(many=True)
+    reason = serializers.CharField(
+        required=False, allow_blank=True, default="", max_length=200
+    )
+
+    def validate_items(self, value):
+        if not value:
+            raise serializers.ValidationError("Add at least one item to the sale.")
+        return value
+
+
 class StockMovementSerializer(serializers.ModelSerializer):
     item = serializers.CharField(source="variant.listing.title", read_only=True)
     variant_name = serializers.CharField(source="variant.name", read_only=True)

@@ -130,6 +130,7 @@ import {
   mergeApiTickets,
   patchStoreSettings,
   recordDailyCount,
+  sellStock as postWalkInSale,
   stockIn as postStockIn,
   transitionTicket as postTicketTransition,
 } from '../api/store'
@@ -617,7 +618,7 @@ export type ActiveModal =
   | { kind: 'reset-all' }
   | { kind: 'section-tips'; section: 'books' | 'merch' }
   | { kind: 'bao-ticket'; txnId: string }
-  | { kind: 'bao-move'; pid: string; vid: string; type: 'Stock In' | 'Adjustment' }
+  | { kind: 'bao-move'; pid: string; vid: string; type: 'Stock In' | 'Adjustment' | 'Sold' }
   | { kind: 'bao-item'; pid: string }
   | { kind: 'bao-email-prev'; emailId: string }
 
@@ -7582,15 +7583,24 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         if (!r.ok) return prev
         return next
       })
-      // Stock In is the one movement the store API accepts directly; the other
-      // kinds are produced by tickets on the server. Variant ids carry the
-      // backend's primary key as `v<id>`, so a row without one stays local.
+      // Stock In and Sold are the movements the store API accepts directly;
+      // the other kinds are produced by tickets on the server. Variant ids
+      // carry the backend's primary key as `v<id>`, so a row without one
+      // stays local.
       if (result.ok) {
         items
-          .filter((item) => item.type === 'Stock In' && /^v\d+$/.test(item.vid || ''))
+          .filter(
+            (item) =>
+              (item.type === 'Stock In' || item.type === 'Sold') &&
+              /^v\d+$/.test(item.vid || ''),
+          )
           .forEach((item) => {
             const variant = Number((item.vid || '').slice(1))
-            void postStockIn(variant, item.qty, item.reason)
+            const call =
+              item.type === 'Sold'
+                ? postWalkInSale(variant, Math.abs(item.qty), item.reason)
+                : postStockIn(variant, item.qty, item.reason)
+            void call
               .then(() => refreshStore())
               .catch((err: unknown) => {
                 toast(

@@ -304,7 +304,7 @@ Then run `python manage.py seed_official_store` again to reopen the stock.
 | Reserved | — | −n | Student sends a request |
 | Released | — | +n | Request is cancelled |
 | Issued | −n | — | Request is claimed |
-| Sold | −n | −n | Face to face sale (not wired yet) |
+| Sold | −n | −n | Face to face sale at the window (Staff → Store inventory → Record sale) |
 | Adjustment | ±n | ±n | Daily count correction |
 
 Two invariants are enforced on every change:

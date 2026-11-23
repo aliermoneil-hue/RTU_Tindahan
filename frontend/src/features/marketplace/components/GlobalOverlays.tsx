@@ -1908,7 +1908,7 @@ function BaoMoveDialog(
   props: ModalContentProps & {
     pid: string
     vid: string
-    moveType: 'Stock In' | 'Adjustment'
+    moveType: 'Stock In' | 'Adjustment' | 'Sold'
   },
 ) {
   const { baoApplyStockMove } = useTindahan()
@@ -1923,7 +1923,13 @@ function BaoMoveDialog(
 
   return (
     <DialogShell
-      title={`${props.moveType === 'Stock In' ? 'Stock in: ' : 'Adjust stock: '}${baoUnitName(u)}`}
+      title={`${
+        props.moveType === 'Stock In'
+          ? 'Stock in: '
+          : props.moveType === 'Sold'
+            ? 'Record sale: '
+            : 'Adjust stock: '
+      }${baoUnitName(u)}`}
       onClose={props.closeModal}
     >
       <div className="note blue">
@@ -1932,6 +1938,14 @@ function BaoMoveDialog(
           Now: {u.onHand} on hand, {baoReserved(u)} reserved, {u.available} available.
         </span>
       </div>
+
+      {props.moveType === 'Sold' && (
+        <p className="small muted" style={{ margin: 0 }}>
+          A walk-in sale at the window: on hand and available both drop by the
+          number sold, and the item's best-selling count moves. No student
+          account or ticket is needed.
+        </p>
+      )}
 
       <form
         className="stack"
@@ -1951,7 +1965,12 @@ function BaoMoveDialog(
               type: props.moveType,
               qty: q * sign,
               reason:
-                reason.trim() || (props.moveType === 'Stock In' ? 'Stock in' : ''),
+                reason.trim() ||
+                (props.moveType === 'Stock In'
+                  ? 'Stock in'
+                  : props.moveType === 'Sold'
+                    ? 'Walk-in sale'
+                    : ''),
             },
           ])
           if (!r.ok) {
@@ -1960,7 +1979,11 @@ function BaoMoveDialog(
           }
           props.closeModal()
           props.toast(
-            props.moveType === 'Stock In' ? 'Stock added.' : 'Stock adjusted.',
+            props.moveType === 'Stock In'
+              ? 'Stock added.'
+              : props.moveType === 'Sold'
+                ? 'Sale recorded.'
+                : 'Stock adjusted.',
           )
         }}
       >
@@ -1995,10 +2018,11 @@ function BaoMoveDialog(
 
         <div className="field">
           <label htmlFor="mv-r">
-            Reason
             {props.moveType === 'Adjustment'
-              ? ' (required)'
-              : ' (optional, for example what arrived)'}
+              ? 'Reason (required)'
+              : props.moveType === 'Sold'
+                ? 'Note (optional, for example cash sale)'
+                : 'Reason (optional, for example what arrived)'}
           </label>
           <textarea
             className="input"
@@ -2014,7 +2038,7 @@ function BaoMoveDialog(
             Cancel
           </button>
           <button type="submit" className="btn">
-            Save
+            {props.moveType === 'Sold' ? 'Record sale' : 'Save'}
           </button>
         </div>
       </form>

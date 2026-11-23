@@ -7,6 +7,7 @@ from .views import (
     StockInView,
     StockLedgerViewSet,
     StoreSettingView,
+    WalkInSaleView,
 )
 
 router = SimpleRouter()
@@ -18,6 +19,7 @@ urlpatterns = [
     # Fixed paths first; they cannot collide with the router's <pk> patterns
     # because "stock-in" never follows the ".../stock/<pk>/" shape.
     path("store/stock-in/", StockInView.as_view(), name="stock-in"),
+    path("store/sales/", WalkInSaleView.as_view(), name="store-sales"),
     path("store/settings/", StoreSettingView.as_view(), name="store-settings"),
     *router.urls,
 ]

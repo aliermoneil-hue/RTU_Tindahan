@@ -424,3 +424,86 @@ class StoreSettingApiTests(StoreApiTestCase):
 
         self.assertEqual(allowed.status_code, status.HTTP_200_OK)
         self.assertEqual(StoreSetting.get_solo().max_quantity_per_ticket, 5)
+
+
+class WalkInSaleApiTests(StoreApiTestCase):
+    """A face-to-face sale at the window: no ticket, real ledger rows."""
+
+    def sell(self, quantity=2, reason=""):
+        self.client.force_authenticate(self.staff)
+        payload = {
+            "items": [{"variant": self.variant.pk, "quantity": quantity}],
+        }
+        if reason:
+            payload["reason"] = reason
+        return self.client.post("/api/v1/store/sales/", payload, format="json")
+
+    def test_a_cashier_records_a_sale_and_stock_moves(self):
+        self.listing.refresh_from_db()
+        before = self.listing.sold_count
+
+        response = self.sell(2)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.variant.refresh_from_db()
+        self.assertEqual(self.variant.on_hand, 8)
+        self.assertEqual(self.variant.available, 8)
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.sold_count, before + 2)
+        self.assertTrue(
+            StockMovement.objects.filter(
+                kind=StockMovement.Kind.SOLD,
+                variant=self.variant,
+                quantity=2,
+            ).exists()
+        )
+
+    def test_selling_more_than_is_available_changes_nothing(self):
+        self.listing.refresh_from_db()
+        before = self.listing.sold_count
+
+        response = self.sell(99)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.variant.refresh_from_db()
+        self.assertEqual(self.variant.on_hand, 10)
+        self.assertEqual(self.variant.available, 10)
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.sold_count, before)
+        self.assertFalse(
+            StockMovement.objects.filter(kind=StockMovement.Kind.SOLD).exists()
+        )
+
+    def test_only_office_staff_may_record_a_sale(self):
+        self.client.force_authenticate(self.student)
+
+        response = self.client.post(
+            "/api/v1/store/sales/",
+            {"items": [{"variant": self.variant.pk, "quantity": 1}]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_a_size_cannot_appear_twice_in_one_sale(self):
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.post(
+            "/api/v1/store/sales/",
+            {
+                "items": [
+                    {"variant": self.variant.pk, "quantity": 1},
+                    {"variant": self.variant.pk, "quantity": 2},
+                ]
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.variant.refresh_from_db()
+        self.assertEqual(self.variant.on_hand, 10)
+
+    def test_a_zero_quantity_is_refused(self):
+        response = self.sell(0)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

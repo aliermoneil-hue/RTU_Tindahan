@@ -110,10 +110,17 @@ shape, including `slug`, `status`, and the photo URLs.
 | POST | `/api/v1/store/tickets/<reference>/transition/` | staff, or buyer cancelling | Body `{"status": "...", "note": "..."}` |
 | GET | `/api/v1/store/stock/` | Office Staff | Ledger, newest last. `?variant=<id>` filters |
 | POST | `/api/v1/store/stock-in/` | Office Staff | Body `{"variant": 3, "quantity": 5, "reason": "Delivery"}` |
+| POST | `/api/v1/store/sales/` | Office Staff | A walk-in sale: `{"items": [{"variant": 3, "quantity": 1}], "reason": "Cash sale"}`. Writes a `sold` ledger row, drops on-hand and available, and raises the listing's `sold_count`. No ticket and no student account. One size per sale; a failure rolls the whole sale back |
 | GET | `/api/v1/store/daily-counts/` | Office Staff | Physical counts |
 | POST | `/api/v1/store/daily-counts/` | Office Staff | Body `{"variant": 3, "counted_quantity": 8, "reason": "..."}` |
 | GET | `/api/v1/store/settings/` | public | Ordering window, limits, thresholds |
 | PATCH | `/api/v1/store/settings/` | Office Staff | |
+
+A walk-in sale is a **ledger** row, not a ticket: it appears in Store inventory
+(the stock ledger) and moves `sold_count`, but it has no row in the
+Transactions list, which is built from tickets. That is deliberate — there is no
+student account to attach it to, and inventing one would put a stranger's name
+on a sale.
 
 ### Placing a request
 
