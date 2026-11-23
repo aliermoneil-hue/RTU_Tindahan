@@ -63,7 +63,7 @@ PROHIBITED_TERMS = (
     "shabu",
     "marijuana",
     "cocaine",
-    "ecstasy",
+    "ecstasy pills",
     "illegal drugs",
     # Vapes, e-cigarettes and tobacco.
     "vape",
@@ -71,24 +71,27 @@ PROHIBITED_TERMS = (
     "e-cigarette",
     "tobacco",
     "nicotine",
-    # Alcohol.
+    # Alcohol. "beer" and "wine" are left out on purpose: root beer, ginger
+    # beer and cooking wine are ordinary food words, and the sample pass showed
+    # them flagging clean listings. The model handles the semantic cases.
     "liquor",
     "vodka",
     "whiskey",
-    "beer",
-    "wine",
     # Medicines, prescription or not.
     "prescription medicine",
     "prescription drug",
     "antibiotic",
-    # Gambling.
+    # Gambling. Bare "casino" flags a film or a book title; the chips do not.
     "betting",
     "gambling",
-    "casino",
+    "casino chips",
     "jueteng",
     "sabong",
-    # Stolen goods and another person's ID or personal details.
-    "stolen",
+    # Stolen goods and another person's ID or personal details. "stolen" alone
+    # flags a novel called The Stolen Heir; the phrase is what a seller of
+    # stolen goods actually writes.
+    "stolen goods",
+    "stolen items",
     "fake student id",
     "someone else's id",
     "another person's id",

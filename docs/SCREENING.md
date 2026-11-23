@@ -188,18 +188,15 @@ Each listing in that response carries, for moderators only:
 
 ## 6. What is not done
 
-- **The moderation screen in the browser still reads local prototype data.**
-  `frontend/src/features/core/routes.ts` marks `moderation` as
-  `backend: 'missing'`, and `ModerationPage` renders `db.flags`. Wiring it to
-  `?status=needs_review` is the next step after this service.
-- **Only listings are screened.** Forum posts, comments, and reviews have no
-  backend yet; when they arrive they should call `run_screening` with their
-  own text, or a sibling function that accepts plain strings.
-- **Nothing publishes automatically.** If the team later wants clean listings
-  to go live without a moderator, that is a deliberate change to
-  `run_screening` plus its tests — not a side effect.
-- **Buyer-to-seller orders are not modelled in the backend**, so only Official
-  Store tickets can complete a sale.
+- **Only listings are screened.** Forum posts and comments rely on reporting
+  and moderator action instead of a screening pass; if that changes, the
+  provider needs an entry point that takes plain text rather than a `Listing`.
+- **Nothing publishes automatically.** A clean verdict still waits for a
+  moderator. Auto-publishing would be a deliberate change to `run_screening`
+  plus its tests — not a side effect.
+- **The keyword list is high-precision, not exhaustive.** It cannot read
+  intent, and the model is what handles semantic cases; see the calibration
+  below.
 
 ---
 
@@ -223,3 +220,48 @@ curl "http://localhost:8000/api/v1/listings/?status=pending_screening,needs_revi
 
 The audit trail is in Django admin under **Screening results**: listing,
 verdict, score, reasons, provider, and when it ran.
+
+---
+
+## 8. Calibration against a realistic sample
+
+On 2026-11-23 the rules provider was run against 20 listings chosen to look like
+the real catalogue: 14 ordinary ones (calculator, reviewer, food, uniform, lab
+gown, tutoring, printing, Arduino kit), three deliberate traps, and three that
+must flag (vape, answer key, pay-first GCash scam).
+
+| Set | Listings | Rules result |
+| --- | --- | --- |
+| Ordinary | 14 | 14 clean, score 0 |
+| Traps: "Nude color heels", "Root beer float", "The Stolen Heir" | 3 | 3 clean after the fixes below |
+| Prohibited: vape, answer key, pay-first scam | 3 | 3 flagged (90, 90, 85) |
+
+Two traps were false positives in the first pass, both at score 90:
+
+    Root beer float  -> "Mentions a prohibited item: beer."
+    The Stolen Heir  -> "Mentions a prohibited item: stolen."
+
+A moderator who sees a book and a float in the queue learns to ignore the queue,
+so the list was tightened rather than widened:
+
+- `beer` and `wine` dropped — root beer, ginger beer and cooking wine are food
+  words. `liquor`, `vodka` and `whiskey` stay.
+- `stolen` became `stolen goods` / `stolen items`; a novel title is not a
+  confession.
+- `casino` became `casino chips` (a film title is not gambling), and
+  `ecstasy` became `ecstasy pills` (a perfume shares the name).
+
+Regression tests pin each decision: root beer and the book stay clean, while
+`stolen goods` and `liquor` still flag.
+
+### The model during this window
+
+Gemini answered only a handful of the samples: the API returned `503 Service
+Unavailable` or timed out on 18 of 20 with three attempts each, while the few
+answers it gave were right — "Vape starter kit" flagged 100, the GCash scam
+flagged 90, and ordinary listings including "Nude color heels" scored 0.
+
+That is the fallback doing its job, not a screening failure: every listing still
+received a verdict and still waits for a moderator. It is also a reminder for
+the panel — if the free tier is exhausted during a demo, the queue will show
+"gemini+fallback" as the provider and the deterministic rules' reasons.

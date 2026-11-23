@@ -139,6 +139,47 @@ class StubProviderTests(TestCase):
         # "wine" must not fire inside "twine".
         self.assertEqual(verdict.verdict, "clean")
 
+    def test_root_beer_does_not_flag_as_alcohol(self):
+        listing = make_listing(
+            title="Root beer float",
+            description="Root beer float, served cold at the food stall.",
+        )
+
+        verdict = StubProvider().screen(listing)
+
+        self.assertEqual(verdict.verdict, "clean")
+
+    def test_a_book_title_does_not_flag_as_stolen_goods(self):
+        listing = make_listing(
+            title="The Stolen Heir",
+            description="Paperback novel, The Stolen Heir, good condition, no markings.",
+        )
+
+        verdict = StubProvider().screen(listing)
+
+        self.assertEqual(verdict.verdict, "clean")
+
+    def test_stolen_goods_still_flags(self):
+        listing = make_listing(
+            title="Stolen goods",
+            description="Brand new phone, still boxed, no questions asked, meet at the gate.",
+        )
+
+        verdict = StubProvider().screen(listing)
+
+        self.assertEqual(verdict.verdict, "flagged")
+        self.assertTrue(any("prohibited item" in reason for reason in verdict.reasons))
+
+    def test_liquor_still_flags(self):
+        listing = make_listing(
+            title="Liquor for sale",
+            description="Unopened bottle, picked up at the main gate after class.",
+        )
+
+        verdict = StubProvider().screen(listing)
+
+        self.assertEqual(verdict.verdict, "flagged")
+
     def test_the_stub_is_deterministic(self):
         listing = make_listing()
 
