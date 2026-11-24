@@ -251,33 +251,62 @@ class TextSubject:
     description: str
     price: str | None = None
     kind: str = "listing"
+    # AI-09: what was taken out before the provider saw this text, in words.
+    redactions: str = ""
 
     @classmethod
     def for_listing(cls, listing):
-        return cls(
+        # AI-09: the author's own name is the one name this platform can find
+        # without a model, so it goes in with the text.
+        return cls._cleaned(
             title=listing.title or "",
             description=listing.description or "",
             price="" if listing.price is None else str(listing.price),
             kind="listing",
+            names=[getattr(getattr(listing, "seller", None), "display_name", "")],
         )
 
     @classmethod
     def for_post(cls, post):
-        return cls(
+        return cls._cleaned(
             title=post.title or "",
             description=post.body or "",
             price=None,
             kind="post",
+            names=[getattr(getattr(post, "author", None), "display_name", "")],
         )
 
     @classmethod
     def for_comment(cls, comment):
-        return cls(
+        return cls._cleaned(
             title="",
             description=comment.text or "",
             price=None,
             kind="comment",
+            names=[getattr(getattr(comment, "author", None), "display_name", "")],
         )
+
+    @classmethod
+    def _cleaned(cls, *, title, description, price, kind, names):
+        """Build a subject whose fields are already stripped of identifying details."""
+        from .redact import redact, summarize
+
+        title_clean, title_removed = redact(title, names=names)
+        body_clean, body_removed = redact(description, names=names)
+        return cls(
+            title=title_clean,
+            description=body_clean,
+            price=price,
+            kind=kind,
+            redactions=summarize(title_removed + body_removed),
+        )
+
+    def as_text(self) -> str:
+        """Exactly what the provider reads, for AI-08's audit row."""
+        parts = [self.title.strip(), self.description.strip()]
+        if self.kind == "listing" and self.price not in (None, ""):
+            parts.append(f"Price: {self.price}")
+        return "\n\n".join(part for part in parts if part)
 
 
 def as_subject(item) -> TextSubject:

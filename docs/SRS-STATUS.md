@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 85 |
+| Implemented, verified | 87 |
 | Implemented | 79 |
-| Partial | 7 |
+| Partial | 5 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 1 |
@@ -205,8 +205,8 @@ browser or the tests in this repository.
 | AI-05 | The system shall block the publication of submissions classified as Rejected and present the submitting user with the specific reason for rejection. | Partly | Implemented, verified | a rejected item is not published and the seller is told the exact reasons, with an appeal path |
 | AI-06 | The system shall let a user appeal a Rejected decision after a moderator has confirmed it (AI-11). A different moderator, or an Administrator, shal... | Not yet | Implemented, verified | POST /appeals/ + decide; the moderator who confirmed the rejection is refused via original_decider |
 | AI-07 | The system shall send content to the moderator queue, and not publish it, if the LLM service is unavailable or returns an error. | Not yet | Implemented, verified | provider failure falls back to rules, and with the fallback off the item is held |
-| AI-08 | The system shall keep a log of every screening: the content ID, the cleaned text that was sent to the LLM, the outcome, the reason, the confidence... | Not yet | Partial | verdict, score, reasons, provider, model and time are logged; the cleaned text is not stored |
-| AI-09 | The system shall send to the LLM service only the content being checked, and only after removing names, contact numbers, and other identifying deta... | Not yet | Partial | only the content is sent, but names and numbers inside it are not redacted |
+| AI-08 | The system shall keep a log of every screening: the content ID, the cleaned text that was sent to the LLM, the outcome, the reason, the confidence... | Not yet | Implemented, verified | the row keeps the content id, the exact cleaned text sent to the provider, the verdict, reasons, confidence, provider, model and time; staff read the text from the queue |
+| AI-09 | The system shall send to the LLM service only the content being checked, and only after removing names, contact numbers, and other identifying deta... | Not yet | Implemented, verified | emails, contact numbers, student numbers, handles and the author's known names are redacted on the way into every provider; the limitation for third-party names is documented |
 | AI-10 | The system shall let an Administrator update the screening rules without changing the program code. | Not yet | Implemented, verified | ScreeningRule table seeded from the code list, editable by an administrator; both providers read it, audited |
 | AI-11 | The system shall place every Rejected item in the moderator queue so a moderator can confirm or reverse the rejection. A reversed rejection shall b... | Not yet | Implemented, verified | a definite violation is rejected into the queue, and a moderator confirms or reverses it; a reversal publishes |
 | AI-12 | The system shall have the LLM give a confidence level with each outcome, and shall treat a low confidence result as Needs Review. | Not yet | Implemented, verified | every outcome carries a confidence, and anything below the floor is treated as needs review |

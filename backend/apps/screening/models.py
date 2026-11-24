@@ -89,6 +89,12 @@ class ScreeningResult(models.Model):
     decided_at = models.DateTimeField(null=True, blank=True)
     decision_note = models.CharField(max_length=300, blank=True)
 
+    # AI-08: the exact text the provider was given — after AI-09's redaction, so
+    # the log holds what the model saw and never a second copy of the member's
+    # contact details. `redactions` says what was taken out, in words.
+    screened_text = models.TextField(blank=True)
+    redactions = models.CharField(max_length=200, blank=True)
+
     # Which implementation answered, so a verdict can be explained later.
     provider = models.CharField(max_length=40)
     model_name = models.CharField(max_length=80, blank=True)

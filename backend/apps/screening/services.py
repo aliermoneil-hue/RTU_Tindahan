@@ -52,7 +52,25 @@ FALLBACK_REASON = (
 )
 
 
-def _store(target, *, verdict, score, reasons, provider, model="", confidence=None, raw=None):
+def _store(
+    target,
+    *,
+    verdict,
+    score,
+    reasons,
+    provider,
+    model="",
+    confidence=None,
+    raw=None,
+    subject=None,
+):
+    """Write the audit row (AI-08), including the cleaned text the provider read."""
+    screened_text = ""
+    redactions = ""
+    if subject is not None:
+        text_of = getattr(subject, "as_text", None)
+        screened_text = text_of() if callable(text_of) else ""
+        redactions = getattr(subject, "redactions", "") or ""
     return ScreeningResult.objects.create(
         **target,
         verdict=verdict,
@@ -62,6 +80,8 @@ def _store(target, *, verdict, score, reasons, provider, model="", confidence=No
         provider=provider,
         model_name=model,
         raw=raw or {},
+        screened_text=screened_text,
+        redactions=redactions,
     )
 
 
@@ -81,6 +101,7 @@ def _run(target, subject) -> ScreeningResult:
             fallback = StubProvider().screen(subject)
             result = _store(
                 target,
+                subject=subject,
                 verdict=fallback.verdict,
                 score=fallback.score,
                 reasons=[FALLBACK_REASON.format(provider=configured, error=error)]
@@ -93,6 +114,7 @@ def _run(target, subject) -> ScreeningResult:
         else:
             result = _store(
                 target,
+                subject=subject,
                 verdict=ScreeningResult.Verdict.FLAGGED,
                 score=None,
                 reasons=[
@@ -105,6 +127,7 @@ def _run(target, subject) -> ScreeningResult:
     else:
         result = _store(
             target,
+            subject=subject,
             verdict=verdict.verdict,
             score=verdict.score,
             reasons=verdict.reasons,

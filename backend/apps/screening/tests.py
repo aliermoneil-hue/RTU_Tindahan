@@ -6,7 +6,7 @@ from unittest.mock import patch
 from decimal import Decimal
 
 from django.core.exceptions import ImproperlyConfigured
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -872,3 +872,213 @@ class TaglishScreeningTests(TestCase):
 
         rule.is_active = True
         rule.save(update_fields=["is_active"])
+
+
+class RedactionTests(SimpleTestCase):
+    """AI-09: names, numbers and handles come out before any provider reads."""
+
+    def test_a_contact_number_comes_out(self):
+        from apps.screening.redact import redact
+
+        cleaned, removed = redact("Text me on 0917 123 4567 please.")
+
+        self.assertNotIn("0917", cleaned)
+        self.assertIn("[contact number]", cleaned)
+        self.assertIn("contact number", ", ".join(removed))
+
+    def test_every_shape_of_philippine_number_comes_out(self):
+        from apps.screening.redact import redact
+
+        for number in ("09171234567", "+63 917 123 4567", "63-917-123-4567", "0917.123.4567"):
+            cleaned, _ = redact(f"Call {number} now")
+            self.assertNotIn("917", cleaned.replace("[contact number]", ""), number)
+
+    def test_an_email_comes_out(self):
+        from apps.screening.redact import redact
+
+        cleaned, _ = redact("Send to seller@example.com")
+
+        self.assertNotIn("seller@example.com", cleaned)
+        self.assertIn("[email]", cleaned)
+
+    def test_a_student_number_comes_out(self):
+        from apps.screening.redact import redact
+
+        cleaned, _ = redact("I am 2024-200797 from BSIT.")
+
+        self.assertNotIn("2024-200797", cleaned)
+        self.assertIn("[student number]", cleaned)
+
+    def test_a_handle_comes_out(self):
+        from apps.screening.redact import redact
+
+        cleaned, _ = redact("Look for @juan_dela at the gate")
+
+        self.assertNotIn("@juan_dela", cleaned)
+        self.assertIn("[handle]", cleaned)
+
+    def test_the_authors_own_name_comes_out(self):
+        from apps.screening.redact import redact
+
+        cleaned, removed = redact(
+            "Hi, I am Juan Dela Cruz. Juan here, selling my calculator.",
+            names=["Juan Dela Cruz"],
+        )
+
+        self.assertNotIn("Juan", cleaned)
+        self.assertNotIn("Cruz", cleaned)
+        self.assertIn("[name]", cleaned)
+        self.assertIn("name mention", ", ".join(removed))
+
+    def test_ordinary_words_are_left_alone(self):
+        from apps.screening.redact import redact
+
+        text = "Selling a scientific calculator, good for engineering students."
+        cleaned, removed = redact(text, names=["Juan Dela Cruz"])
+
+        self.assertEqual(cleaned, text)
+        self.assertEqual(removed, [])
+
+    def test_the_subject_handed_to_a_provider_is_already_clean(self):
+        from apps.screening.providers import TextSubject
+
+        subject = TextSubject._cleaned(
+            title="Calculator ni Juan",
+            description="Text 0917 123 4567 or email seller@example.com. I am Juan Dela Cruz.",
+            price="450.00",
+            kind="listing",
+            names=["Juan Dela Cruz"],
+        )
+
+        sent = subject.as_text()
+        self.assertNotIn("0917", sent)
+        self.assertNotIn("seller@example.com", sent)
+        self.assertNotIn("Juan", sent)
+        self.assertIn("450.00", sent)
+        self.assertTrue(subject.redactions)
+
+
+class ScreeningAuditRowTests(APITestCase):
+    """AI-08: the row keeps the content id, the cleaned text, outcome, reason,
+    confidence and time — and the member's own text is untouched."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name="School Supplies")
+        self.seller = User.objects.create_user(
+            email="2024-770101@rtu.edu.ph",
+            display_name="Juan Dela Cruz",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.seller.verify()
+
+    def test_the_row_holds_the_cleaned_text_and_says_what_was_removed(self):
+        listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Calculator ni Juan Dela Cruz",
+            description="Text me at 0917 123 4567 or juan@example.com. Scientific calculator.",
+            price=Decimal("450.00"),
+        )
+
+        result = run_screening(listing)
+        result.refresh_from_db()
+
+        self.assertEqual(result.listing_id, listing.pk)  # the content id
+        self.assertTrue(result.screened_text)
+        self.assertNotIn("0917", result.screened_text)
+        self.assertNotIn("juan@example.com", result.screened_text)
+        self.assertNotIn("Juan", result.screened_text)
+        self.assertIn("Scientific calculator", result.screened_text)
+        self.assertIn("450.00", result.screened_text)
+        self.assertIn("contact number", result.redactions)
+        # outcome, reason, confidence and time are on the same row
+        self.assertIn(result.verdict, dict(ScreeningResult.Verdict.choices))
+        self.assertIsNotNone(result.created_at)
+        self.assertEqual(result.provider, "stub")
+
+    def test_the_members_own_text_is_never_rewritten(self):
+        listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Calculator",
+            description="Text me at 0917 123 4567, I am Juan Dela Cruz.",
+            price=Decimal("450.00"),
+        )
+
+        run_screening(listing)
+        listing.refresh_from_db()
+
+        self.assertIn("0917 123 4567", listing.description)
+        self.assertIn("Juan Dela Cruz", listing.description)
+
+    def test_a_provider_that_fails_still_leaves_the_cleaned_text(self):
+        listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Uniform",
+            description="Call 0917 000 1111 for details.",
+            price=Decimal("500.00"),
+        )
+
+        with override_settings(SCREENING_PROVIDER="gemini", LLM_API_KEY=""):
+            result = run_screening(listing)
+
+        self.assertTrue(result.screened_text)
+        self.assertNotIn("0917", result.screened_text)
+        self.assertIn("fallback", result.provider)
+
+
+class ScreeningEvidenceApiTests(APITestCase):
+    """AI-08 read back through the API: staff see the text the model read."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name="School Supplies")
+        self.seller = User.objects.create_user(
+            email="2024-770202@rtu.edu.ph",
+            display_name="Maria Santos",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.seller.verify()
+        self.moderator = User.objects.create_user(
+            email="mod-evidence@rtu.edu.ph",
+            display_name="Mod",
+            password="SecurePass123!",
+            role=User.Role.MODERATOR,
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=3,
+        )
+        self.moderator.verify()
+        self.listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Reviewer ni Maria Santos",
+            description="Message 0917 555 1234 or maria@example.com for the file.",
+            price=Decimal("120.00"),
+        )
+        run_screening(self.listing)
+
+    def test_staff_read_the_evidence_and_the_redactions(self):
+        self.client.force_authenticate(self.moderator)
+
+        row = self.client.get(f"/api/v1/listings/{self.listing.slug}/").json()
+
+        evidence = row["screening"]
+        self.assertIn("Reviewer", evidence["screened_text"])
+        self.assertNotIn("0917", evidence["screened_text"])
+        self.assertNotIn("maria@example.com", evidence["screened_text"])
+        self.assertIn("contact number", evidence["redactions"])
+        self.assertEqual(evidence["provider"], "stub")
+
+    def test_a_visitor_does_not_see_the_evidence(self):
+        row = self.client.get(f"/api/v1/listings/{self.listing.slug}/").json()
+
+        # Either the field is withheld or it is null — what matters is that the
+        # evidence does not travel to someone who is not staff.
+        self.assertTrue("screening" not in row or row["screening"] is None)

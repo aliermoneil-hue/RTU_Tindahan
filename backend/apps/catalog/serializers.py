@@ -196,6 +196,11 @@ class ListingReadSerializer(serializers.ModelSerializer):
             "reasons": latest.reasons,
             "provider": latest.provider,
             "model": latest.model_name,
+            # AI-08: what the model actually read, and what was taken out before
+            # it did (AI-09), so a moderator can judge the verdict against the
+            # evidence rather than against the original text.
+            "screened_text": latest.screened_text,
+            "redactions": latest.redactions,
             "decision": latest.decision,
             "decided_by": (
                 latest.decided_by.display_name or latest.decided_by.email

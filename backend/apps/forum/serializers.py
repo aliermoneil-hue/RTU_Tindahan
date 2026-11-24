@@ -124,6 +124,9 @@ class ForumCommentSerializer(serializers.ModelSerializer):
             "reasons": latest.reasons,
             "provider": latest.provider,
             "model": latest.model_name,
+            # AI-08/AI-09: the text the model read, and the details removed first.
+            "screened_text": latest.screened_text,
+            "redactions": latest.redactions,
             "at": latest.created_at,
         }
 
@@ -234,6 +237,9 @@ class ForumPostSerializer(serializers.ModelSerializer):
             "reasons": latest.reasons,
             "provider": latest.provider,
             "model": latest.model_name,
+            # AI-08/AI-09: the text the model read, and the details removed first.
+            "screened_text": latest.screened_text,
+            "redactions": latest.redactions,
             "at": latest.created_at,
         }
 

@@ -310,6 +310,52 @@ problem the fix is a background job, not a longer timeout.
 
 ---
 
+## 4b. What the model is allowed to read (AI-09), and the log of it (AI-08)
+
+Before any text leaves the building it is cleaned. `apps/screening/redact.py` runs on
+the way into `TextSubject`, so no provider — stub or Gemini — can be handed the raw
+text even by accident: the subject it receives has already been stripped.
+
+| Taken out | Becomes |
+| --- | --- |
+| email addresses | `[email]` |
+| Philippine contact numbers (`0917 123 4567`, `+63 917…`, `0912…`, landlines) | `[contact number]` |
+| RTU student numbers (`2024-200797`) | `[student number]` |
+| `@handles` | `[handle]` |
+| the author's own display name, and its first and last tokens | `[name]` |
+
+The stored content is never rewritten — the listing keeps what the member typed.
+Only the copy the provider reads is cleaned, and the row records exactly that copy
+in `screened_text` (AI-08) together with `redactions`, a plain-words summary such
+as `1 name mention, 1 email address, 1 contact number`. The rest of the row already
+carried what AI-08 asks for: the content id (a foreign key to the listing, post,
+comment or review), the verdict, the reasons, the confidence and the time.
+
+**The honest limit.** Names are removed only when the platform already knows them —
+the author's own display name. A third party's name written into the text ("my
+friend Ana is selling this") is not detectable without a model that finds names,
+and this pass does not have one. So the log proves *the identifiers we can find are
+gone*, not that the text is anonymous. `docs/PRIVACY.md` and the screening notice
+members see say the same thing in plainer words.
+
+Proved against the live service with the configured Gemini provider: a listing
+titled "Calculator ni Lorenz Aliermo" with "Text me at 0917 555 9876 or
+lorenz@example.com" produced the audit row `redactions: 1 name mention, 1 email
+address, 1 contact number`, and `screened_text` read back as
+
+    Calculator ni [name] Aliermo
+    Selling my scientific calculator. Text me at [contact number] or [email]. Meet at the covered court.
+    Price: 450.00
+
+— the number, the address and the known name gone; "Aliermo", which is not on the
+account, still there. That is the limitation above, visible in one line.
+
+Staff read `screening.screened_text` and `screening.redactions` on a listing, and
+the same two fields on a forum post or comment, from the moderator queue; members
+and visitors never receive them.
+
+---
+
 ## 5. The moderator queue
 
 There is no separate queue endpoint. The catalogue API answers it:
