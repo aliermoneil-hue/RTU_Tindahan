@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { ScreeningNotice } from '@/common/components/ScreeningNotice'
 import { Icon } from '@/common/components/Icon'
 import { navigate, useRoute } from '@/common/router/router'
 import { REACTS, ago, peso, priceLabel, stamp } from '../constants'
@@ -821,6 +822,7 @@ export function ForumPostPage() {
             <Icon name="send" size="sm" />
           </button>
         </form>
+        <ScreeningNotice />
 
         {(f.comments || []).some((c) => !c.parent) ? (
           renderCommentTree(null, 0)

@@ -94,6 +94,27 @@ and all-caps rules apply to listings.
 
 ---
 
+## 1b. Telling the member (AI-13, AI-16)
+
+Screening a member's words without ever saying so is a quiet kind of
+dishonesty, and the SRS asks for both notices in plain language. One component
+carries the wording — `frontend/src/common/components/ScreeningNotice.tsx` — so
+the text cannot drift between screens:
+
+- **at sign-up** (under the privacy consent): *"Listings, posts and comments
+  are checked automatically for prohibited content before other students can
+  see them. A moderator reviews anything the check flags."*
+- **on the posting screens** (create-listing form, forum composer, comment
+  box): *"Checked automatically before it is published. The check looks for
+  prohibited content only — it is not a guarantee of quality or safety."*
+
+The second sentence is the AI-16 notice: the check is not a promise about the
+seller, the item or the thread. The listing form also says the submission is
+reviewed before it becomes available, which is the same fact in the seller's
+own words.
+
+---
+
 ## 2. The provider boundary
 
 All model calls happen in one file: `apps/screening/providers.py`. Nothing

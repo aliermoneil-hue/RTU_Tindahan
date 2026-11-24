@@ -127,10 +127,10 @@ DECIDED = {
     "AI-10": ("open", "screening rules live in `providers.py`, not in an admin-editable table"),
     "AI-11": ("partial", "held items reach the queue and a moderator decides; there is no rejected-then-appeal path"),
     "AI-12": ("partial", "a 0-100 score is stored and the threshold flags; no confidence mapping"),
-    "AI-13": ("open", "no plain-language notice at registration or on the posting screens"),
+    "AI-13": ("verified", "ScreeningNotice at sign-up, create-listing, forum composer and comment box"),
     "AI-14": ("partial", "the model handles Filipino and Taglish; the rules list is English"),
     "AI-15": ("verified", "screening audit row plus the item's moderation status"),
-    "AI-16": ("open", "no notice that screening is not a quality guarantee"),
+    "AI-16": ("verified", "the same component states the check is not a quality or safety guarantee"),
     # --- moderation and audit ----------------------------------------------
     "RM-01": ("partial", "posts, comments and orders can be reported; listings, users, reviews and conversations cannot"),
     "RM-02": ("partial", "statuses are open, reviewed, dismissed, actioned"),

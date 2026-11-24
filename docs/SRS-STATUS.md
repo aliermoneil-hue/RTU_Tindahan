@@ -11,10 +11,10 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 49 |
+| Implemented, verified | 51 |
 | Implemented | 78 |
 | Partial | 26 |
-| Not implemented | 14 |
+| Not implemented | 12 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
 | **total** | **174** |
@@ -210,10 +210,10 @@ browser or the tests in this repository.
 | AI-10 | The system shall let an Administrator update the screening rules without changing the program code. | Not yet | Not implemented | screening rules live in `providers.py`, not in an admin-editable table |
 | AI-11 | The system shall place every Rejected item in the moderator queue so a moderator can confirm or reverse the rejection. A reversed rejection shall b... | Not yet | Partial | held items reach the queue and a moderator decides; there is no rejected-then-appeal path |
 | AI-12 | The system shall have the LLM give a confidence level with each outcome, and shall treat a low confidence result as Needs Review. | Not yet | Partial | a 0-100 score is stored and the threshold flags; no confidence mapping |
-| AI-13 | The system shall tell users in plain language, at registration and on the posting screens, that content is screened automatically and how to appeal... | Not yet | Not implemented | no plain-language notice at registration or on the posting screens |
+| AI-13 | The system shall tell users in plain language, at registration and on the posting screens, that content is screened automatically and how to appeal... | Not yet | Implemented, verified | ScreeningNotice at sign-up, create-listing, forum composer and comment box |
 | AI-14 | The system shall screen content written in English, Filipino, or a mix of both (Taglish). | Not yet | Partial | the model handles Filipino and Taglish; the rules list is English |
 | AI-15 | The system shall store, for each screened item, the AI outcome and the moderator's final decision, so accuracy, precision, and recall can be measured. | Not yet | Implemented, verified | screening audit row plus the item's moderation status |
-| AI-16 | The system shall show a notice that screening checks only for inappropriate content and does not guarantee the quality, safety, or legality of items. | Not yet | Not implemented | no notice that screening is not a quality guarantee |
+| AI-16 | The system shall show a notice that screening checks only for inappropriate content and does not guarantee the quality, safety, or legality of items. | Not yet | Implemented, verified | the same component states the check is not a quality or safety guarantee |
 
 ## Reporting and moderation (RM)
 
@@ -337,8 +337,6 @@ with the reason:
 | AI-03 | The system shall automatically publish submissions that receive an Approved classification. | a clean verdict still waits for a human: `docs/SCREENING.md` §6 |
 | AI-06 | The system shall let a user appeal a Rejected decision after a moderator has confirmed it (AI-11). A different moderator | no appeal flow for a rejected item |
 | AI-10 | The system shall let an Administrator update the screening rules without changing the program code. | screening rules live in `providers.py`, not in an admin-editable table |
-| AI-13 | The system shall tell users in plain language, at registration and on the posting screens, that content is screened auto | no plain-language notice at registration or on the posting screens |
-| AI-16 | The system shall show a notice that screening checks only for inappropriate content and does not guarantee the quality,  | no notice that screening is not a quality guarantee |
 | RM-08 | The system shall let a user appeal a moderator's removal, warning, or suspension. An Administrator who did not make the  | no appeal flow for a removal, warning or suspension |
 | PR-05 | The system shall follow a data retention period that is defined and documented (to be confirmed, see Appendix B). | no documented retention period |
 

@@ -7,6 +7,7 @@ import { IMG_RULES, imgSrc, imgsOf } from '../imageStore'
 import type { ForumPost } from '../types'
 import { AvatarBadge } from '../components/AvatarBadge'
 import { PhotoUploader } from '../components/PhotoUploader'
+import { ScreeningNotice } from '@/common/components/ScreeningNotice'
 import './ForumPage.css'
 
 function postTitle(f: ForumPost): string {
@@ -174,6 +175,8 @@ export function ForumPage() {
           label="Photos (optional)"
           onChange={setImgs}
         />
+
+        <ScreeningNotice />
 
         <div className="row between wrap">
           <span className="row wrap" style={{ gap: 10 }}>

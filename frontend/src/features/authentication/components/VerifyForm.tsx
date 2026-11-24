@@ -3,6 +3,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import { navigate } from '@/common/router/router'
 import { Icon } from '@/common/components/Icon'
+import { ScreeningNotice } from '@/common/components/ScreeningNotice'
+
 import { Button } from '@/common/components/Button'
 import { useAuth } from '../AuthContext'
 
@@ -441,6 +443,7 @@ export function VerifyForm({ onStep3Complete, onStepChange }: VerifyFormProps) {
               run the marketplace (RA 10173).
             </span>
           </label>
+          <ScreeningNotice tone="auth" />
           {agreeErr && (
             <p className="err" role="alert">
               {agreeErr}

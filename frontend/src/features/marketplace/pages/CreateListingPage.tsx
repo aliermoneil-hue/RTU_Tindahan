@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { ScreeningNotice } from '@/common/components/ScreeningNotice'
 import { Icon } from '@/common/components/Icon'
 import { navigate } from '@/common/router/router'
 import type { IconName } from '@/common/components/icons'
@@ -1108,6 +1109,8 @@ export function CreateListingPage() {
             ) : (
               <span />
             )}
+
+            <ScreeningNotice />
 
             <div className="row">
               {!editing && (
