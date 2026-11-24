@@ -29,6 +29,8 @@ Suggested contents, copied from the CapStone folder:
 - `PRIVACY.md` — PR-01: the privacy notice itself — what is collected and why,
   who sees it, how long it is kept, the rights and where each is exercised, and
   what is verified by tests rather than asserted.
+- `USABILITY-TEST.md` — UX-02: the twenty-minute protocol for ten new users, the
+  exact words to say, the score sheet, and the rule for reading the result.
 - `PERFORMANCE.md` — PF-01, PF-02, PF-04: the load test, the hardware the
   numbers describe, the page-load timing, and the two changes they forced
   (gunicorn, SQLite in WAL mode).

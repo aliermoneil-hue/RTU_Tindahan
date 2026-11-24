@@ -441,6 +441,9 @@ export function MyShopPage() {
             </div>
           )}
 
+          {/* SD-02: the period the seller is asking about, before the totals. */}
+          <SalesPeriodCard orders={apiOrders} sellerEmail={currentAccount.email} />
+
           {/* 4 KPI cards matching prototype SCREENS.seller */}
           <div
             style={{
@@ -1610,6 +1613,177 @@ function rDateSuffix(edited?: number | null): string {
  * file in the browser — so the CSV and the screen can never disagree about what
  * counts as a sale.
  */
+/** SD-02: whats sold in a chosen period, and the money from completed orders only. */
+function SalesPeriodCard({
+  orders,
+  sellerEmail,
+}: {
+  orders: ApiOrder[]
+  sellerEmail: string
+}) {
+  type Period = 'month' | 'thirty' | 'year' | 'all' | 'custom'
+  const [period, setPeriod] = useState<Period>('month')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+
+  const today = new Date()
+  const iso = (d: Date) => d.toISOString().slice(0, 10)
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+  const thirtyAgo = new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000)
+  const firstOfYear = new Date(today.getFullYear(), 0, 1)
+
+  const window = useMemo(() => {
+    if (period === 'all') return { start: '', end: '' }
+    if (period === 'custom') return { start: from, end: to }
+    if (period === 'month') return { start: iso(firstOfMonth), end: iso(today) }
+    if (period === 'year') return { start: iso(firstOfYear), end: iso(today) }
+    return { start: iso(thirtyAgo), end: iso(today) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, from, to])
+
+  const mine = useMemo(
+    () =>
+      orders.filter((o) => {
+        if (o.seller_email !== sellerEmail) return false
+        const day = (o.created_at || '').slice(0, 10)
+        if (window.start && day < window.start) return false
+        if (window.end && day > window.end) return false
+        return true
+      }),
+    [orders, sellerEmail, window],
+  )
+
+  const byStatus = useMemo(() => {
+    const counts: Record<string, number> = {
+      requested: 0,
+      accepted: 0,
+      completed: 0,
+      cancelled: 0,
+      declined: 0,
+    }
+    mine.forEach((o) => {
+      counts[o.status] = (counts[o.status] ?? 0) + 1
+    })
+    return counts
+  }, [mine])
+
+  // The SRS is explicit: the money counts completed orders only. An accepted
+  // order is a promise, not a sale, and counting it would inflate the shop.
+  const completedAmount = useMemo(
+    () =>
+      mine
+        .filter((o) => o.status === 'completed')
+        .reduce((sum, o) => sum + Number(o.total_amount || 0), 0),
+    [mine],
+  )
+
+  const label =
+    period === 'all'
+      ? 'all time'
+      : period === 'month'
+        ? 'this month'
+        : period === 'year'
+          ? 'this year'
+          : period === 'thirty'
+            ? 'the last 30 days'
+            : `${window.start || 'the beginning'} to ${window.end || 'today'}`
+
+  return (
+    <div className="card stack" style={{ gap: 10 }}>
+      <div className="row between wrap">
+        <div>
+          <b>Sales in a period</b>
+          <p className="small muted" style={{ margin: 0 }}>
+            Completed sales and the money from them, for {label}.
+          </p>
+        </div>
+        <div className="row wrap" style={{ gap: 6 }}>
+          {(
+            [
+              ['month', 'This month'],
+              ['thirty', 'Last 30 days'],
+              ['year', 'This year'],
+              ['all', 'All time'],
+              ['custom', 'Custom'],
+            ] as const
+          ).map(([key, text]) => (
+            <button
+              key={key}
+              type="button"
+              className={`btn sm ${period === key ? '' : 'ghost'}`.trim()}
+              aria-pressed={period === key}
+              onClick={() => setPeriod(key)}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {period === 'custom' && (
+        <div className="row wrap" style={{ gap: 10 }}>
+          <label className="small" style={{ gap: 4 }}>
+            From
+            <input
+              className="input"
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+          </label>
+          <label className="small" style={{ gap: 4 }}>
+            To
+            <input
+              className="input"
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </label>
+        </div>
+      )}
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: 12,
+        }}
+      >
+        <div className="stack" style={{ gap: 2 }}>
+          <span className="small muted">Completed sales</span>
+          <b className="tnum" style={{ fontSize: 24 }}>{byStatus.completed}</b>
+        </div>
+        <div className="stack" style={{ gap: 2 }}>
+          <span className="small muted">Sales amount</span>
+          <b className="tnum" style={{ fontSize: 24 }}>{peso(completedAmount)}</b>
+          <span className="tiny muted">Completed orders only</span>
+        </div>
+        <div className="stack" style={{ gap: 2 }}>
+          <span className="small muted">All requests</span>
+          <b className="tnum" style={{ fontSize: 24 }}>{mine.length}</b>
+        </div>
+      </div>
+
+      <div className="row wrap" style={{ gap: 6 }}>
+        {(['requested', 'accepted', 'completed', 'cancelled', 'declined'] as const).map((k) => (
+          <span key={k} className="pill">
+            {k}: <b className="tnum">{byStatus[k] ?? 0}</b>
+          </span>
+        ))}
+      </div>
+
+      {!mine.length && (
+        <p className="small muted" style={{ margin: 0 }}>
+          No orders in this period. Widen it, or pick All time.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function SalesHistoryCard({
   orders,
   sellerEmail,

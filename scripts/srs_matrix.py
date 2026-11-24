@@ -111,7 +111,7 @@ DECIDED = {
     "RR-06": ("partial", "the buyer can write one review per order; edit and delete are not exposed"),
     # --- seller dashboard ---------------------------------------------------
     "SD-01": ("verified", "My shop lists received orders"),
-    "SD-02": ("partial", "counts and totals per status exist; no period selector"),
+    "SD-02": ("verified", "the seller overview has a period selector; completed sales, the amount from completed orders only, and counts by status"),
     "SD-03": ("verified", "GET /orders/?role=seller&status=&from=&to= plus the filter row on the seller dashboard"),
     "SD-04": ("verified", "GET /orders/export/ returns the seller's own rows as CSV, filters honoured"),
     # --- forum --------------------------------------------------------------

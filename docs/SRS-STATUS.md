@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 75 |
+| Implemented, verified | 76 |
 | Implemented | 80 |
-| Partial | 16 |
+| Partial | 15 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 1 |
@@ -178,7 +178,7 @@ browser or the tests in this repository.
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
 | SD-01 | The system shall give each seller a dashboard that lists the orders received and the sales records. | Built | Implemented, verified | My shop lists received orders |
-| SD-02 | The system shall show on the dashboard the total number of completed sales, the number of orders by status, and the total sales amount for a chosen... | Partly | Partial | counts and totals per status exist; no period selector |
+| SD-02 | The system shall show on the dashboard the total number of completed sales, the number of orders by status, and the total sales amount for a chosen... | Partly | Implemented, verified | the seller overview has a period selector; completed sales, the amount from completed orders only, and counts by status |
 | SD-03 | The system shall allow sellers to filter their historical sales records by date range and order status. | Not yet | Implemented, verified | GET /orders/?role=seller&status=&from=&to= plus the filter row on the seller dashboard |
 | SD-04 | The system shall allow sellers to export and download their sales records as a structured file. | Not yet | Implemented, verified | GET /orders/export/ returns the seller's own rows as CSV, filters honoured |
 
