@@ -78,6 +78,7 @@ export function OrdersPage() {
     apiOrders,
     setOrderPaymentMethod,
     actOnOrder,
+    confirmHandover,
     refreshOrders,
     openThreadWith,
   } = useTindahan()
@@ -309,6 +310,26 @@ export function OrdersPage() {
                   >
                     Message
                   </button>
+                  {order.status === 'accepted' && order.awaiting_confirmation === 'buyer' && (
+                    <span className="pill yellow">
+                      The seller says you met — confirm to finish
+                    </span>
+                  )}
+                  {order.status === 'accepted' && order.awaiting_confirmation === 'seller' && (
+                    <span className="pill">Waiting for the seller to confirm</span>
+                  )}
+                  {order.status === 'accepted' && (
+                    <button
+                      type="button"
+                      className={`btn sm ${order.awaiting_confirmation === 'buyer' ? '' : 'ghost'}`.trim()}
+                      onClick={() => void confirmHandover(order.reference)}
+                    >
+                      <Icon name="check" size="sm" />
+                      {order.awaiting_confirmation === 'buyer'
+                        ? 'Confirm the meet-up'
+                        : 'I received it'}
+                    </button>
+                  )}
                   {order.is_open && (
                     <button
                       type="button"

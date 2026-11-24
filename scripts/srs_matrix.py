@@ -98,7 +98,7 @@ DECIDED = {
     "OT-03": ("verified", "requested, accepted, declined, cancelled, completed"),
     "OT-06": ("verified", "cash at the meet-up or a person-to-person transfer, recorded on the order and changeable while open; nothing is processed"),
     "OT-07": ("verified", "order payload shares the other party's number only while Accepted"),
-    "OT-10": ("partial", "the seller completes; there is no second confirmation from the buyer"),
+    "OT-10": ("verified", "each side confirms the meet-up; the order completes and the stock moves only when both have"),
     "OT-11": ("verified", "accept moves stock; a decline or cancel returns it"),
     "OT-12": ("verified", "ORDER_REQUEST_TTL_HOURS (48) stamps expires_at; swept on read and by cron at 04:00, both parties notified"),
     "MS-01": ("verified", "threads tied to a listing, unread counts, polls"),

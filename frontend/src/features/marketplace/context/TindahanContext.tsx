@@ -119,6 +119,7 @@ import {
   orderRecordFromApi,
   orderStatusFromApi,
   setOrderPayment as setOrderPaymentApi,
+  confirmOrder as confirmApiOrder,
   transitionOrder as transitionApiOrder,
   type ApiOrder,
 } from '../api/orders'
@@ -660,6 +661,8 @@ interface TindahanContextValue {
     reference: string,
     status: 'accepted' | 'declined' | 'completed' | 'cancelled',
   ) => Promise<boolean>
+  /** OT-10: this side confirms the meet-up; the order completes when both have. */
+  confirmHandover: (reference: string) => Promise<boolean>
   /** Approve or reject a listing in Django, then refresh the queue and catalogue. */
   moderateListing: (slug: string, decision: 'approve' | 'reject', reason?: string) => Promise<boolean>
   hasSettledInitialFetch: boolean
@@ -9045,6 +9048,27 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     [refreshOrders, toast],
   )
 
+  const confirmHandover = useCallback(
+    async (reference: string): Promise<boolean> => {
+      try {
+        const updated = await confirmApiOrder(reference)
+        await refreshOrders()
+        toast(
+          updated.status === 'completed'
+            ? `Order ${reference} is completed. Both sides confirmed the meet-up.`
+            : `Thanks — we are waiting for the other side to confirm ${reference}.`,
+        )
+        return true
+      } catch (err) {
+        toast(
+          err instanceof ApiRequestError ? err.message : 'That confirmation could not be saved.',
+        )
+        return false
+      }
+    },
+    [refreshOrders, toast],
+  )
+
 const value = useMemo<TindahanContextValue>(
     () => ({
       db,
@@ -9062,6 +9086,7 @@ const value = useMemo<TindahanContextValue>(
       refreshOrders,
       setOrderPaymentMethod,
       actOnOrder,
+      confirmHandover,
       openThreadWith,
       moderateListing,
       hasSettledInitialFetch,
@@ -9236,6 +9261,7 @@ const value = useMemo<TindahanContextValue>(
       refreshOrders,
       setOrderPaymentMethod,
       actOnOrder,
+      confirmHandover,
       openThreadWith,
       moderateListing,
       currentAccount,

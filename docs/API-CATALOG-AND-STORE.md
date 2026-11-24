@@ -336,6 +336,19 @@ and no other message of the thread, ever; a whole-thread report carries none.
 `suspend`) and a `note`, which is required for anything but a dismissal because
 it is what the sender is told. See `MESSAGE-REPORTS.md`.
 
+## 8a1. Confirming a handover (OT-10)
+
+An order becomes **completed** only when both sides say the meet-up happened.
+Each party calls `POST /orders/<reference>/confirm/`; the first call stamps that
+side and leaves the order `accepted` with `awaiting_confirmation` naming the other
+party, who is notified. The second call completes the order and moves the stock,
+once. `POST /orders/<reference>/transition/ {"status": "completed"}` still works
+and means the same thing — the caller's half.
+
+A stranger gets 404 (the queryset is already scoped to their orders), a request
+that was never accepted gets 400, and confirming a completed order gets 400 rather
+than counting the sale twice.
+
 ## 8a2. Reporting a listing or a member (RM-01)
 
 `POST /forum/reports/` now takes `type` of `listing` (with the listing `slug`),

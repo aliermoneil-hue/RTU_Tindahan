@@ -189,12 +189,103 @@ def set_payment_method(order, method, *, by):
     return order
 
 
+def confirm_handover(order, *, by):
+    """OT-10: one side says the meet-up happened. It takes both to finish.
+
+    Each party stamps its own half and the order stays Accepted until the other
+    half arrives. Completing on one person's word would let either side close a
+    trade the other never agreed to — a seller marking an order done to dodge a
+    complaint, or a buyer doing it to unlock a review.
+    """
+    is_seller = by.pk == order.seller_id
+    is_buyer = by.pk == order.buyer_id
+    if not (is_seller or is_buyer):
+        raise ValidationError("This is not your order.")
+    if order.status == Order.Status.COMPLETED:
+        raise ValidationError("This order is already completed.")
+    if order.status != Order.Status.ACCEPTED:
+        raise ValidationError("Confirm the handover after the request is accepted.")
+
+    with transaction.atomic():
+        locked = Order.objects.select_for_update().get(pk=order.pk)
+        now = timezone.now()
+        if is_seller:
+            if locked.seller_confirmed_at is None:
+                locked.seller_confirmed_at = now
+        elif locked.buyer_confirmed_at is None:
+            locked.buyer_confirmed_at = now
+
+        both = bool(locked.seller_confirmed_at and locked.buyer_confirmed_at)
+        if both:
+            # The sale is real: the stock leaves the listing, once.
+            for line in locked.lines.select_related("listing"):
+                listing = Listing.objects.select_for_update().get(pk=line.listing_id)
+                listing.quantity = max(0, listing.quantity - line.quantity)
+                listing.sold_count = (listing.sold_count or 0) + line.quantity
+                if listing.quantity == 0:
+                    listing.availability_status = Listing.AvailabilityStatus.SOLD
+                listing.save(
+                    update_fields=["quantity", "sold_count", "availability_status"]
+                )
+            locked.status = Order.Status.COMPLETED
+            locked.decided_at = now
+
+        locked.save(
+            update_fields=[
+                "buyer_confirmed_at",
+                "seller_confirmed_at",
+                "status",
+                "decided_at",
+                "updated_at",
+            ]
+        )
+
+    if both:
+        notify(
+            locked.buyer,
+            f"Order {locked.reference} is completed. Both sides confirmed the meet-up.",
+            kind="order",
+            link_kind="order",
+            link_id=locked.reference,
+            actor=by,
+        )
+        notify(
+            locked.seller,
+            f"Order {locked.reference} is completed. Both sides confirmed the meet-up.",
+            kind="order",
+            link_kind="shop",
+            link_id=locked.reference,
+            actor=by,
+        )
+        return locked
+
+    # Half a handover: tell the other side it is their turn.
+    other = locked.buyer if is_seller else locked.seller
+    notify(
+        other,
+        f"{by.display_name} confirmed the meet-up for {locked.reference}. "
+        "Confirm it on your side to complete the order.",
+        kind="order",
+        link_kind="order" if is_seller else "shop",
+        link_id=locked.reference,
+        actor=by,
+    )
+    return locked
+
+
 def change_order_status(order, new_status, *, by):
     """Move an order along, refusing anything the caller's role may not do."""
     is_seller = by.pk == order.seller_id
     is_buyer = by.pk == order.buyer_id
     if not (is_seller or is_buyer):
         raise ValidationError("This is not your order.")
+
+    # OT-10: completing is not a status one person sets. The seller's button is
+    # their half of the handover, and the buyer confirms theirs.
+    if new_status == Order.Status.COMPLETED:
+        if not (is_seller or is_buyer):
+            raise ValidationError("This is not your order.")
+        return confirm_handover(order, by=by)
 
     if new_status in SELLER_ACTIONS:
         if not is_seller:

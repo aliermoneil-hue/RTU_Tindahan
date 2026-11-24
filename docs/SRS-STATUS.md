@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 77 |
+| Implemented, verified | 78 |
 | Implemented | 80 |
-| Partial | 14 |
+| Partial | 13 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 1 |
@@ -146,7 +146,7 @@ browser or the tests in this repository.
 | OT-07 | The system shall show a user's contact number, if the user entered one, to the other party only while the order is Accepted or Ready for Meet-up, a... | Not yet | Implemented, verified | order payload shares the other party's number only while Accepted |
 | OT-08 | The system shall permit either the buyer or the seller to cancel an active order prior to its final completion. | Partly | Implemented | `apps/orders`, `apps/messaging` |
 | OT-09 | The system shall record the mutually agreed campus meet-up location and scheduled time for every transaction. | Built | Implemented | `apps/orders`, `apps/messaging` |
-| OT-10 | The system shall mark an order Completed only after both the buyer and the seller confirm that the meet-up took place. | Partly | Partial | the seller completes; there is no second confirmation from the buyer |
+| OT-10 | The system shall mark an order Completed only after both the buyer and the seller confirm that the meet-up took place. | Partly | Implemented, verified | each side confirms the meet-up; the order completes and the stock moves only when both have |
 | OT-11 | The system shall hold the ordered quantity when the seller accepts an order, and shall not let a seller accept more than the quantity available. Th... | Partly | Implemented, verified | accept moves stock; a decline or cancel returns it |
 | OT-12 | The system shall cancel a Pending order that the seller has not answered within a set time, and shall tell the buyer and the seller. | Not yet | Implemented, verified | ORDER_REQUEST_TTL_HOURS (48) stamps expires_at; swept on read and by cron at 04:00, both parties notified |
 

@@ -21,7 +21,12 @@ from .serializers import (
     OrderTransitionSerializer,
     details,
 )
-from .services import change_order_status, expire_overdue_requests, set_payment_method
+from .services import (
+    change_order_status,
+    confirm_handover,
+    expire_overdue_requests,
+    set_payment_method,
+)
 
 
 class OrderViewSet(
@@ -166,6 +171,16 @@ class OrderViewSet(
             order = set_payment_method(
                 order, serializer.validated_data["method"], by=request.user
             )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(details(exc))
+        return Response(OrderSerializer(order, context=self.get_serializer_context()).data)
+
+    @action(detail=True, methods=["post"])
+    def confirm(self, request, reference=None):
+        """OT-10: this side says the meet-up happened. Both sides make it final."""
+        order = self.get_object()
+        try:
+            order = confirm_handover(order, by=request.user)
         except DjangoValidationError as exc:
             raise serializers.ValidationError(details(exc))
         return Response(OrderSerializer(order, context=self.get_serializer_context()).data)

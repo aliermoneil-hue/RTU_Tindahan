@@ -41,6 +41,8 @@ class OrderSerializer(serializers.ModelSerializer):
     )
     buyer_contact = serializers.SerializerMethodField()
     seller_contact = serializers.SerializerMethodField()
+    # OT-10: whose half of the handover is still missing.
+    awaiting_confirmation = serializers.CharField(read_only=True)
 
     class Meta:
         model = Order
@@ -68,6 +70,9 @@ class OrderSerializer(serializers.ModelSerializer):
             "lines",
             "total_amount",
             "is_open",
+            "buyer_confirmed_at",
+            "seller_confirmed_at",
+            "awaiting_confirmation",
             "decided_at",
             "created_at",
             "updated_at",

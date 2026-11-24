@@ -15,6 +15,11 @@ class Order(models.Model):
         CANCELLED = "cancelled", "Cancelled"
 
     reference = models.CharField(max_length=24, unique=True, blank=True)
+
+    # OT-10: an order is completed only when both sides say the meet-up happened.
+    # Each party stamps their own half; the status moves when the second one does.
+    buyer_confirmed_at = models.DateTimeField(null=True, blank=True)
+    seller_confirmed_at = models.DateTimeField(null=True, blank=True)
     buyer = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="orders_placed"
     )
@@ -70,6 +75,21 @@ class Order(models.Model):
                 name="order_buyer_is_not_seller",
             )
         ]
+
+    @property
+    def awaiting_confirmation(self) -> str | None:
+        """Which side still has to confirm the handover, if any.
+
+        None means either nobody has confirmed yet on an order that is not at the
+        handover stage, or both have and it is completed.
+        """
+        if self.status != self.Status.ACCEPTED:
+            return None
+        if self.seller_confirmed_at and not self.buyer_confirmed_at:
+            return "buyer"
+        if self.buyer_confirmed_at and not self.seller_confirmed_at:
+            return "seller"
+        return None
 
     def __str__(self):
         return f"{self.reference} ({self.status})"

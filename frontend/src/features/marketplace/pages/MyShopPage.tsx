@@ -575,11 +575,16 @@ export function MyShopPage() {
                       {order.status === 'accepted' && (
                         <button
                           type="button"
-                          className="btn sm"
+                          className={`btn sm ${order.awaiting_confirmation === 'seller' ? '' : 'ghost'}`.trim()}
                           onClick={() => void actOnOrder(order.reference, 'completed')}
                         >
-                          Mark completed
+                          {order.awaiting_confirmation === 'seller'
+                            ? 'The buyer confirmed — confirm the handover'
+                            : 'I handed the item over'}
                         </button>
+                      )}
+                      {order.status === 'accepted' && order.awaiting_confirmation === 'buyer' && (
+                        <span className="pill">Waiting for the buyer to confirm</span>
                       )}
                     </div>
                   ))}

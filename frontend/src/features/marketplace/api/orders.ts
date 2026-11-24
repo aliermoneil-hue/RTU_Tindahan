@@ -56,6 +56,10 @@ export interface ApiOrder {
   lines: ApiOrderLine[]
   total_amount: string
   is_open: boolean
+  /** OT-10: each side's half of the handover, and whose turn is missing. */
+  buyer_confirmed_at: string | null
+  seller_confirmed_at: string | null
+  awaiting_confirmation: 'buyer' | 'seller' | null
   decided_at: string | null
   created_at: string
   updated_at: string
@@ -106,6 +110,11 @@ export async function createOrder(input: {
 }
 
 /** OT-06: either party may agree how to pay, while the order is open. */
+/** OT-10: this side confirms the meet-up. Both sides complete the order. */
+export async function confirmOrder(reference: string): Promise<ApiOrder> {
+  return apiFetch<ApiOrder>(`/orders/${reference}/confirm/`, { method: 'POST' })
+}
+
 export async function setOrderPayment(
   reference: string,
   method: 'cash' | 'p2p',

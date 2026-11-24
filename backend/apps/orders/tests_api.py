@@ -13,7 +13,7 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import User
 from apps.catalog.models import Category, Listing
 from apps.notifications.models import Notification
-from apps.orders.models import Order
+from apps.orders.models import Order, OrderLine
 
 
 def make_user(email, **extra):
@@ -168,11 +168,20 @@ class OrderApiTests(APITestCase):
             f"/api/v1/orders/{reference}/transition/", {"status": "accepted"}, format="json"
         )
 
-        done = self.client.post(
+        # OT-10: the seller's confirmation is half a handover.
+        half = self.client.post(
             f"/api/v1/orders/{reference}/transition/", {"status": "completed"}, format="json"
         )
+        self.assertEqual(half.status_code, status.HTTP_200_OK)
+        self.assertEqual(half.json()["status"], "accepted")
+        self.assertEqual(half.json()["awaiting_confirmation"], "buyer")
+
+        # The buyer's half finishes it, and that is when the stock moves.
+        self.client.force_authenticate(self.buyer)
+        done = self.client.post(f"/api/v1/orders/{reference}/confirm/")
 
         self.assertEqual(done.status_code, status.HTTP_200_OK)
+        self.assertEqual(done.json()["status"], "completed")
         self.listing.refresh_from_db()
         self.assertEqual(self.listing.quantity, 1)
         self.assertEqual(self.listing.sold_count, 2)
@@ -189,9 +198,11 @@ class OrderApiTests(APITestCase):
             f"/api/v1/orders/{reference}/transition/", {"status": "accepted"}, format="json"
         )
 
-        done = self.client.post(
+        self.client.post(
             f"/api/v1/orders/{reference}/transition/", {"status": "completed"}, format="json"
         )
+        self.client.force_authenticate(self.buyer)
+        done = self.client.post(f"/api/v1/orders/{reference}/confirm/")
 
         self.assertEqual(done.status_code, status.HTTP_200_OK)
         self.listing.refresh_from_db()
@@ -298,12 +309,17 @@ class OrderContactVisibilityTests(APITestCase):
     def test_a_completed_order_stops_sharing(self):
         self.accept()
         self.client.force_authenticate(self.seller)
-        done = self.client.post(
+        self.client.post(
             f"/api/v1/orders/{self.reference}/transition/",
             {"status": "completed"},
             format="json",
         )
+        # OT-10: the contact is hidden once the order is Completed, which now
+        # takes both halves of the handover.
+        self.client.force_authenticate(self.buyer)
+        done = self.client.post(f"/api/v1/orders/{self.reference}/confirm/")
         self.assertEqual(done.status_code, status.HTTP_200_OK, done.content)
+        self.assertEqual(done.json()["status"], "completed")
 
         self.assertIsNone(self.read_as(self.buyer)["seller_contact"])
         self.assertIsNone(self.read_as(self.seller)["buyer_contact"])
@@ -536,6 +552,8 @@ class PaymentMethodTests(APITestCase):
         self.client.post(
             f"/api/v1/orders/{reference}/transition/", {"status": "completed"}, format="json"
         )
+        self.client.force_authenticate(self.buyer)
+        self.client.post(f"/api/v1/orders/{reference}/confirm/")
 
         refused = self.client.post(
             f"/api/v1/orders/{reference}/payment/", {"method": "cash"}, format="json"
@@ -697,3 +715,130 @@ class RequestExpiryTests(APITestCase):
         out = StringIO()
         call_command("expire_order_requests", stdout=out)
         self.assertIn("never expire", out.getvalue())
+
+
+class TwoSidedCompletionTests(APITestCase):
+    """OT-10: Completed only after both the buyer and the seller confirm.
+
+    One person's word is not enough: a seller could mark a trade done to dodge a
+    complaint, and a buyer could mark it done to unlock a review.
+    """
+
+    def setUp(self):
+        self.seller = make_user("2024-880001@rtu.edu.ph")
+        self.buyer = make_user("2024-880002@rtu.edu.ph")
+        self.other = make_user("2024-880003@rtu.edu.ph")
+        self.category = Category.objects.first() or Category.objects.create(name="Misc")
+        self.listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Desk lamp",
+            description="Adjustable lamp, working, complete with bulb.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price=Decimal("300.00"),
+            quantity=3,
+            meetup_place="Main lobby",
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+        )
+        self.order = Order.objects.create(
+            reference="ORD-261124-911",
+            buyer=self.buyer,
+            seller=self.seller,
+            status=Order.Status.REQUESTED,
+            meetup_place="Main lobby",
+        )
+        OrderLine.objects.create(
+            order=self.order, listing=self.listing, quantity=1, unit_price=Decimal("300.00")
+        )
+
+    def accept(self):
+        self.client.force_authenticate(self.seller)
+        self.client.post(
+            f"/api/v1/orders/{self.order.reference}/transition/",
+            {"status": "accepted"},
+            format="json",
+        )
+
+    def confirm(self, user):
+        self.client.force_authenticate(user)
+        return self.client.post(f"/api/v1/orders/{self.order.reference}/confirm/")
+
+    def test_the_seller_alone_leaves_it_accepted(self):
+        self.accept()
+
+        half = self.confirm(self.seller)
+
+        self.assertEqual(half.status_code, status.HTTP_200_OK, half.json())
+        self.assertEqual(half.json()["status"], "accepted")
+        self.assertEqual(half.json()["awaiting_confirmation"], "buyer")
+
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, Order.Status.ACCEPTED)
+        self.assertIsNotNone(self.order.seller_confirmed_at)
+        self.assertIsNone(self.order.buyer_confirmed_at)
+        # No stock has moved: nothing was sold yet.
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.quantity, 3)
+
+    def test_the_buyer_alone_leaves_it_accepted(self):
+        self.accept()
+
+        half = self.confirm(self.buyer)
+
+        self.assertEqual(half.json()["status"], "accepted")
+        self.assertEqual(half.json()["awaiting_confirmation"], "seller")
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, Order.Status.ACCEPTED)
+
+    def test_both_sides_complete_it_and_the_stock_moves_once(self):
+        self.accept()
+        self.confirm(self.seller)
+        done = self.confirm(self.buyer)
+
+        self.assertEqual(done.json()["status"], "completed")
+        self.assertIsNone(done.json()["awaiting_confirmation"])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, Order.Status.COMPLETED)
+        self.assertIsNotNone(self.order.buyer_confirmed_at)
+        self.assertIsNotNone(self.order.seller_confirmed_at)
+
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.quantity, 2)
+        self.assertEqual(self.listing.sold_count, 1)
+
+    def test_the_other_party_is_told_it_is_their_turn(self):
+        self.accept()
+        self.confirm(self.seller)
+
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.buyer, kind="order", text__icontains="Confirm it on your side"
+            ).exists()
+        )
+
+    def test_confirming_twice_is_refused_rather_than_counted_twice(self):
+        self.accept()
+        self.confirm(self.seller)
+        self.confirm(self.buyer)
+
+        again = self.confirm(self.buyer)
+
+        self.assertEqual(again.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already completed", str(again.json()))
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.sold_count, 1)
+
+    def test_a_stranger_cannot_confirm(self):
+        self.accept()
+
+        refused = self.confirm(self.other)
+
+        self.assertEqual(refused.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_a_request_that_was_never_accepted_cannot_be_confirmed(self):
+        refused = self.confirm(self.buyer)
+
+        self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("after the request is accepted", str(refused.json()))
