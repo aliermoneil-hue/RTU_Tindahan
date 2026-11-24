@@ -23,9 +23,14 @@ Suggested contents, copied from the CapStone folder:
 - `POSTGRES.md` — the approved database, the switch in settings, and the
   proof that migrations and the full suite pass on PostgreSQL 16.
 - `INTEGRATION-SETUP.md` — connecting the React app to the Django API.
-- `BACKUP.md` — the nightly verified database copy, the restore procedure,
-  what the copy does not cover (media files, offsite), and the drill that
-  proved a copy by reading it back through the ORM.
+- `BACKUP.md` — the nightly verified database copy (database plus uploads),
+  the restore procedure, and the drill that proved a copy by reading it back
+  through the ORM.
+- `REQUIREMENTS-TRACE.md` — each requirement ID this repository cites, the file
+  that enforces it, the surface to touch, and the test that would fail if it
+  stopped being true.
+- `DEMO-RUNBOOK.md` — the eight-minute demonstration: pre-flight checks, what
+  each role should show, what to say, and what to do when a step misbehaves.
 
 Rules:
 
