@@ -3,6 +3,7 @@ from rest_framework.routers import SimpleRouter
 
 from .views import (
     DailyCountViewSet,
+    EmailOutboxViewSet,
     OfficialTicketViewSet,
     StockInView,
     StockLedgerViewSet,
@@ -14,6 +15,7 @@ router = SimpleRouter()
 router.register("store/tickets", OfficialTicketViewSet, basename="official-ticket")
 router.register("store/stock", StockLedgerViewSet, basename="stock-movement")
 router.register("store/daily-counts", DailyCountViewSet, basename="daily-count")
+router.register("store/outbox", EmailOutboxViewSet, basename="store-outbox")
 
 urlpatterns = [
     # Fixed paths first; they cannot collide with the router's <pk> patterns

@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 80 |
+| Implemented, verified | 82 |
 | Implemented | 80 |
-| Partial | 11 |
+| Partial | 9 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 1 |
@@ -131,7 +131,7 @@ browser or the tests in this repository.
 | EM-03 | A student message must hold the reference, the queue number if any, the status, the items, the pickup date, and the claim notes. It must not hold t... | Built | Implemented | `apps/accounts/emails.py`, `apps/store` |
 | EM-04 | A low stock message shall go to the staff email addresses entered in the settings. If there are none, it shall be marked Skipped. | Built | Implemented | `apps/accounts/emails.py`, `apps/store` |
 | EM-05 | The system shall never forward an email from the browser. The sending switch shall stay off and locked until the IT Office decisions are made and c... | Built | Implemented | `apps/accounts/emails.py`, `apps/store` |
-| EM-06 | The system shall let the staff view the outbox, preview each of the messages, and export the outbox as JSON. | Built | Partial | per-ticket email drafts exist in the UI; no outbox/preview screen |
+| EM-06 | The system shall let the staff view the outbox, preview each of the messages, and export the outbox as JSON. | Built | Implemented, verified | a staff outbox at GET /store/outbox/ with a full-body preview per row and a JSON export that honours the same filters |
 
 ## Orders and transactions (OT)
 
@@ -233,7 +233,7 @@ browser or the tests in this repository.
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
 | NT-01 | The system shall send in-app notifications for new orders, order status changes, new messages, screening outcomes, appeal decisions, report status... | Partly | Implemented, verified | one row per event, written by the causing service, polled at 20 s |
-| NT-02 | The system shall send emails for account verification and password reset. Official store ticket updates and low stock warning shall also be sent by... | Partly | Partial | verification, reset and the password-changed notice are sent; store mail is not |
+| NT-02 | The system shall send emails for account verification and password reset. Official store ticket updates and low stock warning shall also be sent by... | Partly | Implemented, verified | every ticket status and every low-stock crossing writes its message to the outbox, to the student's RTU address or the office address, and skips with a reason when there is none |
 
 ## Administration (AD)
 

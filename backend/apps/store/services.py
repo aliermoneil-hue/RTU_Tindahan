@@ -101,7 +101,7 @@ def apply_movement(
     variant.available = available
     variant.save(update_fields=["on_hand", "available", "updated_at"])
 
-    return StockMovement.objects.create(
+    movement = StockMovement.objects.create(
         variant=variant,
         ticket=ticket,
         daily_count=daily_count,
@@ -112,6 +112,19 @@ def apply_movement(
         on_hand_after=on_hand,
         available_after=available,
     )
+
+    # EM-01 and EM-04: a size that has just fallen to or below the threshold is
+    # worth telling the office about. Only the movement that crosses the line
+    # writes a message, so a busy day does not fill the outbox with the same
+    # warning; a restock clears the condition for the next crossing.
+    if kind in {StockMovement.Kind.SOLD, StockMovement.Kind.ISSUED}:
+        previous = on_hand + quantity
+        from .mail import prepare_low_stock_email
+
+        threshold = int(StoreSetting.get_solo().low_stock_threshold or 0)
+        if threshold and on_hand <= threshold < previous:
+            prepare_low_stock_email(variant)
+    return movement
 
 
 def record_stock_in(variant, quantity, *, by=None, reason="New stock received"):
@@ -324,6 +337,11 @@ def change_ticket_status(ticket, new_status, *, by=None, note=""):
             kind="ticket",
             actor=by,
         )
+
+    # NT-02: every status the office can set leaves a message in the outbox.
+    from .mail import prepare_ticket_email, ticket_event_label
+
+    prepare_ticket_email(ticket, event=ticket_event_label(ticket, new_status))
     return ticket
 
 

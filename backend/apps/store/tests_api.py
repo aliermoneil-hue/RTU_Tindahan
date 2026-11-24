@@ -1,5 +1,6 @@
 """API tests for the Official Store: tickets, stock, counts, and settings."""
 
+import json
 from decimal import Decimal
 
 from rest_framework import status
@@ -7,7 +8,7 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
 from apps.catalog.models import Category, Listing, ListingVariant
-from apps.store.models import OfficialTicket, StockMovement, StoreSetting
+from apps.store.models import EmailOutbox, OfficialTicket, StockMovement, StoreSetting
 from apps.store.services import record_stock_in
 
 
@@ -507,3 +508,238 @@ class WalkInSaleApiTests(StoreApiTestCase):
         response = self.sell(0)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class EmailOutboxApiTests(APITestCase):
+    """EM-06: staff read the outbox, preview a message, and export it as JSON."""
+
+    def setUp(self):
+        self.staff = make_user("staff-outbox@rtu.edu.ph", role=User.Role.OFFICE_STAFF)
+        self.student = make_user("2024-770010@rtu.edu.ph")
+        self.moderator = make_user("mod-outbox@rtu.edu.ph", role=User.Role.MODERATOR)
+        self.message = EmailOutbox.objects.create(
+            kind=EmailOutbox.Kind.STUDENT,
+            event="ready_for_pickup",
+            recipients=["2024-770010@rtu.edu.ph"],
+            subject="Your RTU Store order ORD-261124-001 is ready",
+            body="Reference ORD-261124-001\nQueue number 012\nStatus Ready for Pickup\n"
+            "Items: Official Uniform (M) x1\nPickup date: 2026-11-26\n"
+            "This message is automatic.",
+            note="",
+        )
+        EmailOutbox.objects.create(
+            kind=EmailOutbox.Kind.STAFF,
+            event="low_stock",
+            recipients=[],
+            subject="Low stock: Official Uniform (M)",
+            body="On hand 2, threshold 3.",
+            state=EmailOutbox.State.SKIPPED,
+            note="No staff address is set.",
+        )
+
+    def test_staff_read_the_outbox(self):
+        self.client.force_authenticate(self.staff)
+
+        rows = self.client.get("/api/v1/store/outbox/").json()
+
+        self.assertEqual(rows["count"], 2)
+        first = rows["results"][0]
+        self.assertIn("subject", first)
+        self.assertIn("body", first)
+        self.assertIn("kind_display", first)
+
+    def test_one_message_can_be_previewed_in_full(self):
+        self.client.force_authenticate(self.staff)
+
+        one = self.client.get(f"/api/v1/store/outbox/{self.message.pk}/")
+
+        self.assertEqual(one.status_code, status.HTTP_200_OK)
+        body = one.json()["body"]
+        self.assertIn("ORD-261124-001", body)
+        self.assertIn("Queue number 012", body)
+        self.assertIn("automatic", body)
+
+    def test_a_student_cannot_read_it(self):
+        self.client.force_authenticate(self.student)
+
+        refused = self.client.get("/api/v1/store/outbox/")
+
+        self.assertEqual(refused.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_the_list_can_be_narrowed_by_kind_and_state(self):
+        self.client.force_authenticate(self.staff)
+
+        students = self.client.get("/api/v1/store/outbox/?kind=student").json()
+        skipped = self.client.get("/api/v1/store/outbox/?state=skipped").json()
+
+        self.assertEqual(students["count"], 1)
+        self.assertEqual(students["results"][0]["ticket_reference"], None)
+        self.assertEqual(skipped["count"], 1)
+        self.assertEqual(skipped["results"][0]["state"], "skipped")
+
+    def test_the_export_is_a_json_file_with_every_message(self):
+        self.client.force_authenticate(self.staff)
+
+        export = self.client.get("/api/v1/store/outbox/export/")
+
+        self.assertEqual(export.status_code, status.HTTP_200_OK)
+        self.assertEqual(export["Content-Type"], "application/json")
+        self.assertIn("attachment;", export["Content-Disposition"])
+        payload = json.loads(export.content.decode())
+        self.assertEqual(payload["count"], 2)
+        self.assertEqual(len(payload["messages"]), 2)
+        self.assertIn("exported_at", payload)
+        self.assertEqual(
+            {row["kind"] for row in payload["messages"]}, {"student", "staff"}
+        )
+
+    def test_the_export_can_be_narrowed_the_same_way(self):
+        self.client.force_authenticate(self.staff)
+
+        export = self.client.get("/api/v1/store/outbox/export/?kind=staff")
+
+        payload = json.loads(export.content.decode())
+        self.assertEqual(payload["count"], 1)
+        self.assertEqual(payload["messages"][0]["event"], "low_stock")
+
+
+class StoreMailTests(StoreApiTestCase):
+    """NT-02 with EM-01 to EM-04: the store's mail is prepared, honest, and skipped
+    when there is nowhere to send it."""
+
+    def prepare_with_status(self, status):
+        from apps.store.services import change_ticket_status
+
+        ticket = self.make_ticket()
+        change_ticket_status(ticket, status, by=self.staff)
+        return ticket
+
+    def make_ticket(self):
+        from apps.store.models import TicketItem
+
+        ticket = OfficialTicket.objects.create(
+            buyer=self.student,
+            status=OfficialTicket.Status.REQUEST_RECEIVED,
+            pickup_date=None,
+            claim_notes="After class, around 4pm.",
+        )
+        TicketItem.objects.create(
+            ticket=ticket,
+            listing=self.listing,
+            variant=self.variant,
+            quantity=1,
+            unit_price=Decimal("450.00"),
+        )
+        return ticket
+
+    def test_every_status_leaves_a_prepared_message(self):
+        ticket = self.make_ticket()
+        from apps.store.services import change_ticket_status
+
+        change_ticket_status(ticket, OfficialTicket.Status.CONFIRMED, by=self.staff)
+        change_ticket_status(ticket, OfficialTicket.Status.READY_FOR_PICKUP, by=self.staff)
+
+        rows = EmailOutbox.objects.filter(ticket=ticket).order_by("created_at")
+        self.assertEqual([r.event for r in rows], ["confirmed", "ready_for_pickup"])
+        self.assertTrue(all(r.state == EmailOutbox.State.PREPARED for r in rows))
+        self.assertEqual(rows[0].recipients, ["2024-123456@rtu.edu.ph"])
+
+    def test_the_message_carries_what_the_srs_lists_and_nothing_it_forbids(self):
+        ticket = self.make_ticket()
+        from apps.store.mail import ticket_message
+
+        message = ticket_message(ticket)
+        body = message["body"]
+
+        self.assertIn(ticket.reference, body)
+        self.assertIn("Request Received", body)
+        self.assertIn("Official Uniform", body)
+        self.assertIn("Medium", body)          # the size, from the variant
+        self.assertIn("Pickup date", body)
+        self.assertIn("After class", body)     # the claim notes
+        self.assertIn("automatic", body)
+
+        # EM-03: never the student number, the name, or a payment link.
+        self.assertNotIn("2024-123456", body)
+        self.assertNotIn(self.student.display_name, body)
+        self.assertNotIn("http", body.lower())
+        self.assertNotIn("pay now", body.lower())
+
+    def test_a_non_rtu_address_skips_the_message_with_a_reason(self):
+        outsider = make_user("someone@gmail.com")
+        ticket = OfficialTicket.objects.create(
+            buyer=outsider,
+            status=OfficialTicket.Status.REQUEST_RECEIVED,
+        )
+        from apps.store.mail import prepare_ticket_email
+
+        row = prepare_ticket_email(ticket)
+
+        self.assertEqual(row.state, EmailOutbox.State.SKIPPED)
+        self.assertEqual(row.recipients, [])
+        self.assertIn("No RTU email address", row.note)
+
+    def test_a_low_stock_crossing_warns_the_office(self):
+        """A walk-in sale is the simplest crossing: on hand falls to the line."""
+        from apps.store.models import StoreSetting
+        from apps.store.services import record_walk_in_sale
+
+        setting = StoreSetting.get_solo()
+        setting.low_stock_threshold = 3
+        setting.low_stock_emails = ["bao@rtu.edu.ph"]
+        setting.save()
+
+        self.variant.on_hand = 4
+        self.variant.available = 4  # the schema requires available <= on_hand
+        self.variant.save(update_fields=["on_hand", "available"])
+
+        record_walk_in_sale([(self.variant, 1)], by=self.staff)
+
+        low = EmailOutbox.objects.filter(event="low_stock").first()
+        self.assertIsNotNone(low)
+        self.assertEqual(low.recipients, ["bao@rtu.edu.ph"])
+        self.assertEqual(low.state, EmailOutbox.State.PREPARED)
+        self.assertIn("Official Uniform", low.body)
+
+        # Selling another unit does not repeat the warning: only the crossing does.
+        record_walk_in_sale([(self.variant, 1)], by=self.staff)
+        self.assertEqual(EmailOutbox.objects.filter(event="low_stock").count(), 1)
+
+    def test_a_low_stock_message_without_an_address_is_skipped(self):
+        from apps.store.models import StoreSetting
+        from apps.store.mail import prepare_low_stock_email
+
+        setting = StoreSetting.get_solo()
+        setting.low_stock_threshold = 5
+        setting.low_stock_emails = []
+        setting.save()
+        self.variant.on_hand = 2
+        self.variant.available = 2  # the schema requires available <= on_hand
+        self.variant.save(update_fields=["on_hand", "available"])
+
+        row = prepare_low_stock_email(self.variant)
+
+        self.assertEqual(row.state, EmailOutbox.State.SKIPPED)
+        self.assertIn("No staff address", row.note)
+
+    def test_the_outbox_keeps_the_newest_five_hundred(self):
+        from apps.store.mail import OUTBOX_LIMIT
+        from apps.store.services import prepare_email
+
+        for index in range(OUTBOX_LIMIT + 5):
+            prepare_email(
+                kind=EmailOutbox.Kind.STAFF,
+                event="bulk",
+                recipients=["bao@rtu.edu.ph"],
+                subject=f"Bulk {index}",
+                body="…",
+            )
+        from apps.store.mail import _prune
+
+        _prune()
+
+        self.assertEqual(EmailOutbox.objects.count(), OUTBOX_LIMIT)
+        self.assertFalse(EmailOutbox.objects.filter(subject="Bulk 0").exists())
+        self.assertTrue(
+            EmailOutbox.objects.filter(subject=f"Bulk {OUTBOX_LIMIT + 4}").exists()
+        )

@@ -112,6 +112,8 @@ export interface ApiStoreSettings {
   ordering_window_start: string | null
   ordering_window_end: string | null
   allow_cancel_from: string[]
+  /** EM-04: where a low stock message goes; empty means it is Skipped. */
+  low_stock_emails: string[]
   updated_at: string
 }
 
@@ -519,3 +521,47 @@ export function mergeApiStore<T extends StoreShape>(prev: T, payload: StorePaylo
   }
 }
 
+/** EM-06: one prepared message in the store's outbox. Nothing here was sent. */
+export interface ApiOutboxMessage {
+  id: number
+  kind: 'student' | 'staff'
+  kind_display: string
+  event: string
+  state: 'prepared' | 'skipped'
+  state_display: string
+  recipients: string[]
+  subject: string
+  body: string
+  note: string
+  ticket_reference: string | null
+  sent_at: string | null
+  created_at: string
+}
+
+/** EM-06: the outbox, newest first, optionally narrowed. */
+export async function fetchOutbox(filters: {
+  kind?: string
+  state?: string
+} = {}): Promise<ApiOutboxMessage[]> {
+  const params = new URLSearchParams()
+  if (filters.kind) params.set('kind', filters.kind)
+  if (filters.state) params.set('state', filters.state)
+  const query = params.toString()
+  const collected: ApiOutboxMessage[] = []
+  let path: string | null = query ? `/store/outbox/?${query}` : '/store/outbox/'
+  for (let page = 0; page < 10 && path; page += 1) {
+    const data: ApiPage<ApiOutboxMessage> = await apiFetch<ApiPage<ApiOutboxMessage>>(path)
+    collected.push(...(data.results ?? []))
+    path = data.next ? data.next.slice(data.next.indexOf('/api/v1') + '/api/v1'.length) : null
+  }
+  return collected
+}
+
+/** EM-06: the same rows as a file. */
+export function outboxExportPath(filters: { kind?: string; state?: string } = {}): string {
+  const params = new URLSearchParams()
+  if (filters.kind) params.set('kind', filters.kind)
+  if (filters.state) params.set('state', filters.state)
+  const query = params.toString()
+  return `/store/outbox/export/${query ? `?${query}` : ''}`
+}

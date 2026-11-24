@@ -58,6 +58,8 @@ export const APP_PAGES: PageInfo[] = [
     about: 'Completed pickups and CSV export.' },
   { path: 'forum-reports', title: 'Forum Reports', icon: 'flag', section: 'ADMIN', backend: 'available',
     about: 'Reported forum posts.' },
+  { path: 'outbox', title: 'Email outbox', icon: 'msg', section: 'ADMIN', backend: 'available',
+    about: 'The store messages the system prepared, to preview and export. Office Staff only.' },
   { path: 'categories', title: 'Categories', icon: 'tag', section: 'ADMIN', backend: 'available',
     about: 'The marketplace categories a seller picks from. Administrator only.' },
   { path: 'screening-rules', title: 'Screening rules', icon: 'shield', section: 'ADMIN', backend: 'available',

@@ -16,7 +16,11 @@ the HTTP layer only checks who is allowed to call what and converts errors.
     PATCH  /api/v1/store/settings/                Office Staff only
 """
 
+import json
+
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -27,10 +31,17 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import IsOfficeStaff, IsVerifiedUser
 from apps.catalog.serializers import ListingVariantSerializer
 
-from .models import DailyCount, OfficialTicket, StockMovement, StoreSetting
+from .models import (
+    DailyCount,
+    EmailOutbox,
+    OfficialTicket,
+    StockMovement,
+    StoreSetting,
+)
 from .serializers import (
     DailyCountCreateSerializer,
     DailyCountSerializer,
+    EmailOutboxSerializer,
     OfficialTicketCreateSerializer,
     OfficialTicketSerializer,
     StockInSerializer,
@@ -250,3 +261,46 @@ class StoreSettingView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save(updated_by=request.user)
         return Response(serializer.data)
+
+
+class EmailOutboxViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    """EM-06: the staff read what the store prepared, and export it.
+
+    Read-only on purpose. A message in here is a draft that EM-05 keeps from
+    being sent; letting a screen edit or delete one would turn a record into an
+    opinion. The export is the same rows as a file, for whoever wants to look at
+    them outside the panel.
+    """
+
+    serializer_class = EmailOutboxSerializer
+    permission_classes = [IsOfficeStaff]
+
+    def get_queryset(self):
+        queryset = EmailOutbox.objects.select_related("ticket")
+        params = self.request.query_params
+        if kind := params.get("kind"):
+            queryset = queryset.filter(kind=kind)
+        if state := params.get("state"):
+            queryset = queryset.filter(state=state)
+        if event := params.get("event"):
+            queryset = queryset.filter(event=event)
+        return queryset
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        rows = self.get_queryset().order_by("-created_at")
+        payload = EmailOutboxSerializer(rows, many=True).data
+        body = json.dumps(
+            {"exported_at": timezone.now().isoformat(), "count": len(payload), "messages": payload},
+            indent=2,
+            default=str,
+        )
+        response = HttpResponse(body, content_type="application/json")
+        response["Content-Disposition"] = (
+            f'attachment; filename="tindahan-outbox-{timezone.localdate():%Y%m%d}.json"'
+        )
+        return response

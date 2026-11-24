@@ -213,6 +213,51 @@ sellers first" sort uses the same fields.
 
 ---
 
+## 6a. The store's mail: outbox, preview, export (EM-01 to EM-06, NT-02)
+
+Nothing in the store sends email. Every status change and every low-stock crossing
+writes a row to the outbox, and the sending switch stays off until the IT Office
+decides (EM-05). The outbox is therefore the complete, honest record of what would
+have gone out.
+
+| Method | Path | Who | Notes |
+| --- | --- | --- | --- |
+| GET | `/api/v1/store/outbox/` | Office Staff | Newest first, paginated 20. `?kind=student\|staff`, `?state=prepared\|skipped`, `?event=<status>` |
+| GET | `/api/v1/store/outbox/<id>/` | Office Staff | One message in full — the preview |
+| GET | `/api/v1/store/outbox/export/` | Office Staff | The same rows as a JSON file (`Content-Disposition: attachment`), honouring the same filters |
+
+Read-only by design: a message here is a record, not a draft to edit. The rows
+carry `subject`, `body` (plain text), `recipients`, `kind`, `event`, `state`,
+`note`, `ticket_reference`, `sent_at` (always null while sending is off) and
+`created_at`.
+
+What a student message says (EM-03): the reference, the status, one line per item
+(`1 x Official PE Shirt (Medium)`), the pickup date or "To be confirmed", the
+claim notes, and the line "This message is automatic." What it never says: the
+student number, the member's name, or a payment link — payment is at the counter.
+
+What decides `state`:
+
+- **EM-02** — a student message needs an RTU address (`…@rtu.edu.ph`). Without
+  one the row is `skipped` with a note saying so, rather than being quietly
+  dropped.
+- **EM-04** — a low-stock message goes to `low_stock_emails` in the store
+  settings; with none set it is `skipped`, again with a note. Only the movement
+  that crosses the threshold writes one, so a busy day does not repeat the same
+  warning.
+- **EM-06** — the table keeps the newest 500 rows.
+
+The office sets `low_stock_emails` with `PATCH /api/v1/store/settings/`
+(`{"low_stock_emails": ["bao@rtu.edu.ph"]}`); a value that is not a list of email
+addresses is refused. For tickets that predate the switch, `manage.py
+prepare_store_mail [--dry-run]` writes the message each of them would have had.
+
+The screen is under **ADMIN → Email outbox** for Office Staff: the list with
+audience and state filters, a count, "Preview" per row showing the recipients and
+the plain-text body, and **Download JSON**, which fetches the same filtered rows.
+
+---
+
 ## 7. Favorites API (saved listings and sellers)
 
 Favourites used to live in the browser snapshot, so a heart on one device did

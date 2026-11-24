@@ -93,7 +93,7 @@ DECIDED = {
     "IV-12": ("verified", "ledger CSV export"),
     "FF-01": ("verified", "Record sale writes the ledger; `store/tests_api.py`"),
     "FF-02": ("partial", "walk-in sales carry no student account, by design"),
-    "EM-06": ("partial", "per-ticket email drafts exist in the UI; no outbox/preview screen"),
+    "EM-06": ("verified", "a staff outbox at GET /store/outbox/ with a full-body preview per row and a JSON export that honours the same filters"),
     # --- orders, messaging --------------------------------------------------
     "OT-03": ("verified", "requested, accepted, declined, cancelled, completed"),
     "OT-06": ("verified", "cash at the meet-up or a person-to-person transfer, recorded on the order and changeable while open; nothing is processed"),
@@ -145,7 +145,7 @@ DECIDED = {
     "RM-08": ("verified", "appeals for removals and suspensions; suspended accounts appeal from /appeals/suspension/, decided by someone who did not decide"),
     # --- notifications ------------------------------------------------------
     "NT-01": ("verified", "one row per event, written by the causing service, polled at 20 s"),
-    "NT-02": ("partial", "verification, reset and the password-changed notice are sent; store mail is not"),
+    "NT-02": ("verified", "every ticket status and every low-stock crossing writes its message to the outbox, to the student's RTU address or the office address, and skips with a reason when there is none"),
     # --- administration -----------------------------------------------------
     "AD-02": ("verified", "`/admin/users/<id>/role/`, administrator only"),
     "AD-03": ("verified", "administrators create, rename, reorder, turn off and delete categories in the panel, and edit the screening rules"),

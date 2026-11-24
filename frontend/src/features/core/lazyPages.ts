@@ -61,6 +61,9 @@ export const ForumPage = lazy(() =>
 export const ForumPostPage = lazy(() =>
   import('@/features/marketplace/pages/ForumPostPage').then((m) => ({ default: m.ForumPostPage })),
 )
+export const OutboxPage = lazy(() =>
+  import('@/features/marketplace/pages/admin/OutboxPage').then((m) => ({ default: m.OutboxPage })),
+)
 export const CategoriesPage = lazy(() =>
   import('@/features/marketplace/pages/admin/CategoriesPage').then((m) => ({
     default: m.CategoriesPage,

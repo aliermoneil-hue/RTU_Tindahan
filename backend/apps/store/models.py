@@ -92,6 +92,12 @@ class StoreSetting(models.Model):
     ordering_window_enabled = models.BooleanField(default=False)
     ordering_window_start = models.TimeField(null=True, blank=True)
     ordering_window_end = models.TimeField(null=True, blank=True)
+    # EM-04: where a low stock message goes. Empty means the message is Skipped.
+    low_stock_emails = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="RTU staff addresses for low stock mail, e.g. [\"bao@rtu.edu.ph\"].",
+    )
     allow_cancel_from = models.JSONField(
         default=list,
         blank=True,

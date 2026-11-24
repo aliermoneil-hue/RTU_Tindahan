@@ -12,6 +12,7 @@ from apps.accounts.models import User
 from apps.catalog.models import Listing, ListingVariant
 
 from .models import (
+    EmailOutbox,
     DailyCount,
     OfficialTicket,
     StockMovement,
@@ -196,9 +197,25 @@ class StoreSettingSerializer(serializers.ModelSerializer):
             "ordering_window_start",
             "ordering_window_end",
             "allow_cancel_from",
+            # EM-04: where a low stock message goes.
+            "low_stock_emails",
             "updated_at",
         )
         read_only_fields = ("updated_at",)
+
+    def validate_low_stock_emails(self, value):
+        if value in (None, ""):
+            return []
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Send a list of email addresses.")
+        cleaned = []
+        for address in value:
+            text = str(address).strip()
+            if text and "@" not in text:
+                raise serializers.ValidationError(f"{text!r} is not an email address.")
+            if text:
+                cleaned.append(text)
+        return cleaned
 
 
 # ---------------------------------------------------------------------------
@@ -292,3 +309,36 @@ class DailyCountCreateSerializer(serializers.Serializer):
         required=False, allow_blank=True, default="", max_length=500
     )
     counted_on = serializers.DateField(required=False)
+
+
+class EmailOutboxSerializer(serializers.ModelSerializer):
+    """EM-06: one prepared message, as the staff panel reads it.
+
+    Nothing here has been sent — the outbox is a record of what *would* go out,
+    which is the point of EM-05's locked sending switch.
+    """
+
+    ticket_reference = serializers.CharField(
+        source="ticket.reference", read_only=True, default=None
+    )
+    kind_display = serializers.CharField(source="get_kind_display", read_only=True)
+    state_display = serializers.CharField(source="get_state_display", read_only=True)
+
+    class Meta:
+        model = EmailOutbox
+        fields = (
+            "id",
+            "kind",
+            "kind_display",
+            "event",
+            "state",
+            "state_display",
+            "recipients",
+            "subject",
+            "body",
+            "note",
+            "ticket_reference",
+            "sent_at",
+            "created_at",
+        )
+        read_only_fields = fields
