@@ -220,3 +220,104 @@ class OrderApiTests(APITestCase):
             response.status_code,
             (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
         )
+
+
+class OrderContactVisibilityTests(APITestCase):
+    """OT-07: a phone number reaches the other party only while Accepted."""
+
+    def setUp(self):
+        self.seller = make_user("2024-444444@rtu.edu.ph", contact_number="09998887777")
+        self.buyer = make_user("2024-555555@rtu.edu.ph", contact_number="09171234567")
+        self.stranger = make_user("2024-666666@rtu.edu.ph")
+        self.category = Category.objects.create(name="Gadgets")
+        self.listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Calculator",
+            description="All keys working.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price=Decimal("350.00"),
+            quantity=2,
+            meetup_place="Main lobby",
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+        )
+        self.client.force_authenticate(self.buyer)
+        placed = self.client.post(
+            "/api/v1/orders/",
+            {
+                "lines": [{"listing": self.listing.id, "quantity": 1}],
+                "meetup_place": "Main lobby",
+            },
+            format="json",
+        )
+        self.assertEqual(placed.status_code, status.HTTP_201_CREATED, placed.json())
+        self.reference = placed.json()["reference"]
+
+    def read_as(self, user):
+        self.client.force_authenticate(user)
+        response = self.client.get(f"/api/v1/orders/{self.reference}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+        return response.json()
+
+    def accept(self):
+        self.client.force_authenticate(self.seller)
+        response = self.client.post(
+            f"/api/v1/orders/{self.reference}/transition/",
+            {"status": "accepted"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+
+    def test_an_unanswered_request_shares_no_number(self):
+        buyer_view = self.read_as(self.buyer)
+        seller_view = self.read_as(self.seller)
+
+        self.assertIsNone(buyer_view["seller_contact"])
+        self.assertIsNone(seller_view["buyer_contact"])
+
+    def test_an_accepted_order_shares_the_other_partys_number(self):
+        self.accept()
+
+        buyer_view = self.read_as(self.buyer)
+        seller_view = self.read_as(self.seller)
+
+        self.assertEqual(buyer_view["seller_contact"], "09998887777")
+        self.assertEqual(seller_view["buyer_contact"], "09171234567")
+        # Neither party is handed their own number back.
+        self.assertIsNone(buyer_view["buyer_contact"])
+        self.assertIsNone(seller_view["seller_contact"])
+
+    def test_a_completed_order_stops_sharing(self):
+        self.accept()
+        self.client.force_authenticate(self.seller)
+        done = self.client.post(
+            f"/api/v1/orders/{self.reference}/transition/",
+            {"status": "completed"},
+            format="json",
+        )
+        self.assertEqual(done.status_code, status.HTTP_200_OK, done.content)
+
+        self.assertIsNone(self.read_as(self.buyer)["seller_contact"])
+        self.assertIsNone(self.read_as(self.seller)["buyer_contact"])
+
+    def test_a_cancelled_order_stops_sharing(self):
+        self.accept()
+        self.client.force_authenticate(self.buyer)
+        cancelled = self.client.post(
+            f"/api/v1/orders/{self.reference}/transition/",
+            {"status": "cancelled"},
+            format="json",
+        )
+        self.assertEqual(cancelled.status_code, status.HTTP_200_OK, cancelled.content)
+
+        self.assertIsNone(self.read_as(self.buyer)["seller_contact"])
+
+    def test_a_stranger_cannot_read_the_order_at_all(self):
+        self.accept()
+
+        self.client.force_authenticate(self.stranger)
+        response = self.client.get(f"/api/v1/orders/{self.reference}/")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

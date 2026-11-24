@@ -35,9 +35,12 @@ export interface ApiOrder {
   buyer: number
   buyer_name: string
   buyer_email: string
+  /** OT-07: present only while the order is Accepted, and only for the other party. */
+  buyer_contact: string | null
   seller: number
   seller_name: string
   seller_email: string
+  seller_contact: string | null
   status: ApiOrderStatus
   status_display: string
   fulfillment: 'pickup' | 'delivery' | 'both'
@@ -164,6 +167,8 @@ export function orderRecordFromApi(row: ApiOrder): OrderRecord {
     icon: 'bag',
     buyerEmail: row.buyer_email,
     sellerEmail: row.seller_email,
+    buyerContact: row.buyer_contact,
+    sellerContact: row.seller_contact,
     lines,
     fulfillment: row.fulfillment === 'both' ? 'pickup' : row.fulfillment,
   }

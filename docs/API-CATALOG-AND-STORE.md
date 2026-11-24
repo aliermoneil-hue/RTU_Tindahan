@@ -277,6 +277,14 @@ Server orders are also merged into the buyer's My Orders snapshot
 tab, the rating panel and the "requests you sent" summary agree. Order lines
 carry the backend listing id, so an item stays rateable after it sells out.
 
+**Contact numbers (OT-07).** An order payload carries `buyer_contact` and
+`seller_contact`, and both are `null` unless the order is **Accepted** — then
+each party receives the *other* party's number, and only that one. The rule
+lives in `OrderSerializer._contact_for_other_party`. Before acceptance there is
+no meet-up to arrange; after completion the number has no business travelling
+with the record. The UI shows it as a `tel:` pill on the buyer's Orders page
+and on the seller's Incoming orders tab.
+
 ---
 
 ## 9. Forum API (posts, comments, reactions, reports)

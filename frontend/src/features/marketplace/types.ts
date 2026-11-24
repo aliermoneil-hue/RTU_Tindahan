@@ -135,6 +135,9 @@ export interface OrderRecord {
   icon: IconName
   buyerEmail: string
   sellerEmail: string | null
+  /** OT-07: only while the order is Accepted, and only for the other party. */
+  buyerContact?: string | null
+  sellerContact?: string | null
   lines: OrderLine[]
   fulfillment?: ChosenFulfillment
   proofPhoto?: string | null

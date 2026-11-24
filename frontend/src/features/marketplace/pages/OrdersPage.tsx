@@ -267,6 +267,15 @@ export function OrdersPage() {
                   >
                     {order.status_display}
                   </span>
+                  {order.seller_contact ? (
+                    <a
+                      className="pill green"
+                      href={`tel:${order.seller_contact}`}
+                      title="Shared while the order is accepted"
+                    >
+                      {order.seller_contact}
+                    </a>
+                  ) : null}
                   <button
                     type="button"
                     className="btn ghost sm"

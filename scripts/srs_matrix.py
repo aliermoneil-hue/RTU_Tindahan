@@ -92,7 +92,7 @@ DECIDED = {
     # --- orders, messaging --------------------------------------------------
     "OT-03": ("verified", "requested, accepted, declined, cancelled, completed"),
     "OT-06": ("open", "no payment method on an order; cash or e-wallet is not recorded"),
-    "OT-07": ("open", "contact number is never shown to the other party"),
+    "OT-07": ("verified", "order payload shares the other party's number only while Accepted"),
     "OT-10": ("partial", "the seller completes; there is no second confirmation from the buyer"),
     "OT-11": ("verified", "accept moves stock; a decline or cancel returns it"),
     "OT-12": ("open", "a pending order is never auto-cancelled on a timer"),

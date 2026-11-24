@@ -791,6 +791,15 @@ export function MyShopPage() {
                   >
                     Decline
                   </button>
+                  {order.buyer_contact ? (
+                    <a
+                      className="pill green"
+                      href={`tel:${order.buyer_contact}`}
+                      title="Shared while the order is accepted"
+                    >
+                      {order.buyer_contact}
+                    </a>
+                  ) : null}
                   <button
                     type="button"
                     className="btn ghost sm"

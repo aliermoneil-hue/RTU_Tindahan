@@ -36,6 +36,8 @@ class OrderSerializer(serializers.ModelSerializer):
         max_digits=12, decimal_places=2, read_only=True
     )
     is_open = serializers.BooleanField(read_only=True)
+    buyer_contact = serializers.SerializerMethodField()
+    seller_contact = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -45,9 +47,11 @@ class OrderSerializer(serializers.ModelSerializer):
             "buyer",
             "buyer_name",
             "buyer_email",
+            "buyer_contact",
             "seller",
             "seller_name",
             "seller_email",
+            "seller_contact",
             "status",
             "status_display",
             "fulfillment",
@@ -63,6 +67,35 @@ class OrderSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = fields
+
+    def _contact_for_other_party(self, obj, party):
+        """OT-07: a phone number is shown to the other party only while the order
+        is Accepted.
+
+        Before a seller answers there is no meet-up to arrange, so the number
+        would be handed out for nothing; after the sale it has no business
+        travelling with the record. Only the other party receives it — seeing
+        your own number back is noise.
+        """
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not (user and user.is_authenticated):
+            return None
+        if obj.status != Order.Status.ACCEPTED:
+            return None
+        if party is None or user.id == party.id:
+            return None
+        if user.id not in (obj.buyer_id, obj.seller_id):
+            return None
+        return (getattr(party, "contact_number", "") or "").strip() or None
+
+    def get_buyer_contact(self, obj):
+        # The buyer's number goes to the seller.
+        return self._contact_for_other_party(obj, obj.buyer)
+
+    def get_seller_contact(self, obj):
+        # The seller's number goes to the buyer.
+        return self._contact_for_other_party(obj, obj.seller)
 
 
 class OrderCreateLineSerializer(serializers.Serializer):
