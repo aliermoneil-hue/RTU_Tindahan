@@ -1,6 +1,7 @@
 """Auth hardening (AV-06): password reset, token lifetime, ending sessions."""
 
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.core import mail
 from django.core.cache import cache
@@ -245,3 +246,63 @@ class TokenLifetimeTests(APITestCase):
         self.assertEqual(
             self.client.get("/api/v1/auth/me/", **self.auth(fresh)).status_code, 200
         )
+
+
+class PasswordChangedEmailTests(APITestCase):
+    """AV-06: the one mail that arrives after the change, so it must be true."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = make_user()
+        self.code = issue_reset_code(self.user)
+
+    def confirm(self, **overrides):
+        payload = {
+            "email": self.user.email,
+            "code": self.code,
+            "password": "BrandNewPass456!",
+            "password_confirm": "BrandNewPass456!",
+        }
+        payload.update(overrides)
+        return self.client.post(RESET_CONFIRM, payload, format="json")
+
+    def test_the_account_holder_is_told_the_password_changed(self):
+        response = self.confirm()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertEqual(sent.to, [self.user.email])
+        self.assertIn("password was changed", sent.subject.lower())
+        self.assertIn("signed out", sent.body.lower())
+        self.assertIn("if you did not change it", sent.body.lower())
+        # It is a notification, never a code: nothing in it can be spent.
+        self.assertNotRegex(sent.body, r"\b\d{6}\b")
+
+    def test_no_mail_goes_out_when_the_code_is_wrong(self):
+        response = self.confirm(code="000000")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(mail.outbox, [])
+
+    def test_no_mail_goes_out_when_the_code_has_expired(self):
+        PasswordResetCode.objects.filter(user=self.user).update(
+            expires_at=timezone.now() - timedelta(minutes=1)
+        )
+
+        response = self.confirm()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(mail.outbox, [])
+
+    def test_a_failed_mail_does_not_undo_the_change(self):
+        with patch(
+            "apps.accounts.views.send_password_changed_email",
+            side_effect=RuntimeError("smtp down"),
+        ):
+            response = self.confirm()
+
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("BrandNewPass456!"))
+        self.assertEqual(Token.objects.filter(user=self.user).count(), 0)

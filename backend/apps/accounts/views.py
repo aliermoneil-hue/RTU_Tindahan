@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 
 from .authentication import token_lifetime
 from .emails import (
+    send_password_changed_email,
     send_password_reset_code_email,
     send_verification_code_email,
     send_verification_email,
@@ -417,6 +418,14 @@ class PasswordResetConfirmView(APIView):
         # A reset is the moment to end other sessions: whoever had the old
         # password, or a token taken from a shared laptop, is now locked out.
         Token.objects.filter(user=user).delete()
+
+        # Then say so by mail. A failure here must not turn a completed reset
+        # into a 500: the code is spent, so the student would be stuck
+        # retrying a dead code to fix a mail problem they cannot see.
+        try:
+            send_password_changed_email(user)
+        except Exception:  # noqa: BLE001 - the password change already stands
+            logger.exception("Password changed email failed for %s", email)
 
         return Response(
             {"detail": "Password changed. Sign in with the new password."}

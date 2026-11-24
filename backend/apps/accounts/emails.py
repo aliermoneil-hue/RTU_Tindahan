@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
+from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
@@ -75,6 +76,36 @@ def send_password_reset_code_email(user: User, code: str) -> None:
         "If you did not ask to reset your password, do not share this code. "
         "Sign in and change your password, then tell your instructor or the "
         "site administrator.\n\n"
+        "RTU Tindahan\n"
+        "Rizal Technological University, Pasig Campus"
+    )
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+
+def send_password_changed_email(user: User) -> None:
+    """Tell the account holder that the password changed (AV-06).
+
+    The reset-request mail can be read and ignored; this one arrives *after*
+    the change and cannot. It is the only message that tells a student who did
+    not ask for a reset that someone else had their code — and by the time it
+    is sent every session has already been ended, so "sign in again" is true.
+    """
+    changed_at = timezone.localtime().strftime("%d %B %Y, %I:%M %p")
+    subject = "Your RTU Tindahan password was changed"
+    message = (
+        f"Hello {user.display_name},\n\n"
+        f"The password for this RTU Tindahan account was changed on {changed_at}.\n\n"
+        "Every device that was signed in has been signed out. Sign in again "
+        "with the new password.\n\n"
+        "If you did not change it, someone else used your reset code. Ask for "
+        "another reset code now, change the password again, and tell the site "
+        "administrator.\n\n"
         "RTU Tindahan\n"
         "Rizal Technological University, Pasig Campus"
     )

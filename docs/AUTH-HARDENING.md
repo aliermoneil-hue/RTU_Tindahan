@@ -50,6 +50,13 @@ Rules, all of them enforced in code and covered by tests:
   laptop — is locked out.
 - **The email tells the reader what to do if they did not ask.** A reset mail
   that arrives unrequested is the first sign of someone probing the account.
+- **A second mail says the change happened.** Sent only after the password is
+  actually replaced — never for a wrong, expired or burnt code — with the local
+  time, the fact that every session was signed out, and what to do if the
+  reader did not do it. It carries no code, so nothing in it can be spent. A
+  failure to send it is logged and swallowed: the password is already changed
+  and the code is already spent, so a 500 would only leave the student
+  retrying a dead code.
 
 The new password goes through Django's own validators, the same ones sign-up
 uses, so a reset cannot install something sign-up would have refused.
@@ -137,9 +144,6 @@ move to per-device tokens, which is the change that will actually need it.
 - **JWT access + refresh pair.** Cleaner lifetime semantics than rotating an
   opaque token, at the cost of a dependency and a client change. The current
   scheme expires and rotates correctly; it just cannot refresh silently.
-- **A "your password changed" confirmation email.** Standard practice, cheap to
-  add, not yet written. The only signal a student gets today is that the reset
-  code arrived; if they did not ask for it, the mail itself is the alarm.
 
 ---
 
@@ -166,7 +170,7 @@ curl -s -X POST $BASE/auth/token/refresh/ -H "Authorization: Token $TOKEN"
 curl -s -X POST $BASE/auth/logout-all/  -H "Authorization: Token $TOKEN"
 ```
 
-`python manage.py test apps.accounts` runs the 18 tests behind this document.
+`python manage.py test apps.accounts` runs the 22 tests behind this document.
 
 ---
 
@@ -177,12 +181,12 @@ curl -s -X POST $BASE/auth/logout-all/  -H "Authorization: Token $TOKEN"
 | `backend/apps/accounts/models.py` | `PasswordResetCode` |
 | `backend/apps/accounts/migrations/0003_passwordresetcode.py` | new table |
 | `backend/apps/accounts/verification.py` | generic issue / check, reset wrappers |
-| `backend/apps/accounts/emails.py` | `send_password_reset_code_email()` |
+| `backend/apps/accounts/emails.py` | `send_password_reset_code_email()`, `send_password_changed_email()` |
 | `backend/apps/accounts/serializers.py` | request + confirm serializers |
 | `backend/apps/accounts/authentication.py` | `ExpiringTokenAuthentication` |
-| `backend/apps/accounts/views.py` | four views, fresh-token-on-login |
+| `backend/apps/accounts/views.py` | four views, fresh-token-on-login, the changed-mail on reset |
 | `backend/apps/accounts/urls.py` | four routes |
-| `backend/apps/accounts/tests/test_hardening.py` | 18 tests |
+| `backend/apps/accounts/tests/test_hardening.py` | 22 tests |
 | `backend/config/settings.py` | auth class, `AUTH_TOKEN_TTL_DAYS`, throttle scope |
 
 Run `python manage.py migrate` after pulling this, or the reset table is
