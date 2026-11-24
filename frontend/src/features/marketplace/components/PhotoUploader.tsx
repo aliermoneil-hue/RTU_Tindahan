@@ -37,6 +37,7 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
   const [zoom, setZoom] = useState(1.0)
   const [rotation, setRotation] = useState(0) // 0, 90, 180, 270
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [mode, setMode] = useState<'original' | 'crop'>('original')
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null)
   const [dragging, setDragging] = useState(false)
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -45,9 +46,15 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
-  // Viewport dimensions: 4:3 aspect ratio
+  // Viewport dimensions: always fixed 4:3 (400 × 300)
   const VIEW_W = 400
   const VIEW_H = 300
+
+  const handleModeChange = (next: 'original' | 'crop') => {
+    setMode(next)
+    setZoom(1.0)
+    setPan({ x: 0, y: 0 })
+  }
 
   // Load natural dimensions
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -64,7 +71,12 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
       const iw = isRotated90 ? imgSize.h : imgSize.w
       const ih = isRotated90 ? imgSize.w : imgSize.h
 
-      const baseScale = Math.max(VIEW_W / iw, VIEW_H / ih)
+      // baseScale depends on mode: 'crop' fills the 4:3 box, 'original' fits the whole image
+      const baseScale =
+        mode === 'crop'
+          ? Math.max(VIEW_W / iw, VIEW_H / ih)
+          : Math.min(VIEW_W / iw, VIEW_H / ih)
+
       const renderedW = iw * baseScale * curZoom
       const renderedH = ih * baseScale * curZoom
 
@@ -76,7 +88,7 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
         y: Math.max(-maxPanY, Math.min(maxPanY, nextY)),
       }
     },
-    [imgSize],
+    [imgSize, mode],
   )
 
   const handleZoomChange = (newZoom: number) => {
@@ -145,9 +157,35 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
       return
     }
 
+    const isRotated90 = rotation === 90 || rotation === 270
+    const iw = isRotated90 ? imgSize.h : imgSize.w
+    const ih = isRotated90 ? imgSize.w : imgSize.h
+
+    let OUT_W: number
+    let OUT_H: number
+    let viewW: number
+
+    if (mode === 'crop') {
+      OUT_W = 800
+      OUT_H = 600
+      viewW = VIEW_W
+    } else {
+      // 'original' mode: preserve exact rotated aspect ratio, cap longest edge at 1600
+      const maxEdge = 1600
+      const baseScaleOrig = Math.min(VIEW_W / iw, VIEW_H / ih)
+      const fittedW = iw * baseScaleOrig
+      if (Math.max(iw, ih) <= maxEdge) {
+        OUT_W = iw
+        OUT_H = ih
+      } else {
+        const fit = maxEdge / Math.max(iw, ih)
+        OUT_W = Math.round(iw * fit)
+        OUT_H = Math.round(ih * fit)
+      }
+      viewW = fittedW
+    }
+
     const canvas = document.createElement('canvas')
-    const OUT_W = 800
-    const OUT_H = 600
     canvas.width = OUT_W
     canvas.height = OUT_H
     const ctx = canvas.getContext('2d')
@@ -157,12 +195,11 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
       return
     }
 
-    const isRotated90 = rotation === 90 || rotation === 270
-    const iw = isRotated90 ? imgSize.h : imgSize.w
-    const ih = isRotated90 ? imgSize.w : imgSize.h
-
-    const baseScale = Math.max(VIEW_W / iw, VIEW_H / ih)
-    const scaleFactor = OUT_W / VIEW_W // 2x
+    const baseScale =
+      mode === 'crop'
+        ? Math.max(VIEW_W / iw, VIEW_H / ih)
+        : Math.min(VIEW_W / iw, VIEW_H / ih)
+    const scaleFactor = OUT_W / viewW
 
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, OUT_W, OUT_H)
@@ -187,7 +224,11 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
   const isRotated90 = rotation === 90 || rotation === 270
   const iw = imgSize ? (isRotated90 ? imgSize.h : imgSize.w) : VIEW_W
   const ih = imgSize ? (isRotated90 ? imgSize.w : imgSize.h) : VIEW_H
-  const baseScale = Math.max(VIEW_W / iw, VIEW_H / ih)
+
+  const baseScale =
+    mode === 'crop'
+      ? Math.max(VIEW_W / iw, VIEW_H / ih)
+      : Math.min(VIEW_W / iw, VIEW_H / ih)
 
   return (
     <div className="crop-overlay" role="dialog" aria-modal="true" aria-label="Adjust photo preview">
@@ -234,6 +275,26 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
             }}
           />
           <div className="crop-grid-overlay" />
+        </div>
+
+        {/* Framing mode toggle: Original vs Crop 4:3 */}
+        <div className="row wrap" style={{ gap: 8, justifyContent: 'center', marginTop: 10 }}>
+          <button
+            type="button"
+            className={`mode-pill ${mode === 'original' ? 'on' : ''}`}
+            aria-label="Original aspect ratio"
+            onClick={() => handleModeChange('original')}
+          >
+            Original
+          </button>
+          <button
+            type="button"
+            className={`mode-pill ${mode === 'crop' ? 'on' : ''}`}
+            aria-label="Crop 4:3"
+            onClick={() => handleModeChange('crop')}
+          >
+            Crop 4:3
+          </button>
         </div>
 
         <div className="crop-controls stack" style={{ gap: 12, marginTop: 14 }}>
@@ -283,6 +344,270 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
                 Cancel
               </button>
               <button type="button" className="btn yellow sm" onClick={handleSaveCrop}>
+                Apply & Save
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface AvatarAdjustModalProps {
+  src: string
+  onClose: () => void
+  onSave: (dataUrl: string) => void
+}
+
+/**
+ * AvatarAdjustModal — circular 1:1 avatar crop/zoom/rotate editor.
+ * Fixed 300×300 viewport with a circular preview mask so the user sees
+ * exactly how their circular avatar will look. Exports a crisp 512×512
+ * JPEG data URL via onSave.
+ */
+export function AvatarAdjustModal({ src, onClose, onSave }: AvatarAdjustModalProps) {
+  const [zoom, setZoom] = useState(1.0)
+  const [rotation, setRotation] = useState(0) // 0, 90, 180, 270
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [startPan, setStartPan] = useState({ x: 0, y: 0 })
+
+  const viewportRef = useRef<HTMLDivElement | null>(null)
+  const imgRef = useRef<HTMLImageElement | null>(null)
+
+  // Fixed square viewport for avatar (1:1)
+  const VIEW_W = 300
+  const VIEW_H = 300
+  const OUT_W = 512
+  const OUT_H = 512
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    setImgSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
+    setPan({ x: 0, y: 0 })
+  }
+
+  const clampPan = useCallback(
+    (nextX: number, nextY: number, curZoom: number, curRot: number) => {
+      if (!imgSize) return { x: 0, y: 0 }
+      const isRotated90 = curRot === 90 || curRot === 270
+      const iw = isRotated90 ? imgSize.h : imgSize.w
+      const ih = isRotated90 ? imgSize.w : imgSize.h
+      // Always fit mode: min scale keeps the whole image inside the box
+      const baseScale = Math.min(VIEW_W / iw, VIEW_H / ih)
+      const renderedW = iw * baseScale * curZoom
+      const renderedH = ih * baseScale * curZoom
+      const maxPanX = Math.max(0, (renderedW - VIEW_W) / 2)
+      const maxPanY = Math.max(0, (renderedH - VIEW_H) / 2)
+      return {
+        x: Math.max(-maxPanX, Math.min(maxPanX, nextX)),
+        y: Math.max(-maxPanY, Math.min(maxPanY, nextY)),
+      }
+    },
+    [imgSize],
+  )
+
+  const handleZoomChange = (newZoom: number) => {
+    const clampedZoom = Math.max(1.0, Math.min(3.0, newZoom))
+    setZoom(clampedZoom)
+    setPan((prev) => clampPan(prev.x, prev.y, clampedZoom, rotation))
+  }
+
+  const handleRotate = () => {
+    const nextRot = (rotation + 90) % 360
+    setRotation(nextRot)
+    setPan((prev) => clampPan(prev.x, prev.y, zoom, nextRot))
+  }
+
+  const handleReset = () => {
+    setZoom(1.0)
+    setRotation(0)
+    setPan({ x: 0, y: 0 })
+  }
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setDragging(true)
+    setDragStart({ x: e.clientX, y: e.clientY })
+    setStartPan(pan)
+  }
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!dragging) return
+    const dx = e.clientX - dragStart.x
+    const dy = e.clientY - dragStart.y
+    const clamped = clampPan(startPan.x + dx, startPan.y + dy, zoom, rotation)
+    setPan(clamped)
+  }
+
+  const onMouseUp = () => {
+    setDragging(false)
+  }
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      setDragging(true)
+      setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY })
+      setStartPan(pan)
+    }
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!dragging || e.touches.length !== 1) return
+    const dx = e.touches[0].clientX - dragStart.x
+    const dy = e.touches[0].clientY - dragStart.y
+    const clamped = clampPan(startPan.x + dx, startPan.y + dy, zoom, rotation)
+    setPan(clamped)
+  }
+
+  const onTouchEnd = () => {
+    setDragging(false)
+  }
+
+  const handleSaveAvatar = () => {
+    if (!imgRef.current || !imgSize) {
+      onClose()
+      return
+    }
+    const canvas = document.createElement('canvas')
+    canvas.width = OUT_W
+    canvas.height = OUT_H
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      onClose()
+      return
+    }
+    const isRotated90 = rotation === 90 || rotation === 270
+    const iw = isRotated90 ? imgSize.h : imgSize.w
+    const ih = isRotated90 ? imgSize.w : imgSize.h
+    const baseScale = Math.min(VIEW_W / iw, VIEW_H / ih)
+    const scaleFactor = OUT_W / VIEW_W
+
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, OUT_W, OUT_H)
+    ctx.save()
+    ctx.translate(OUT_W / 2 + pan.x * scaleFactor, OUT_H / 2 + pan.y * scaleFactor)
+    ctx.rotate((rotation * Math.PI) / 180)
+    ctx.scale(baseScale * zoom * scaleFactor, baseScale * zoom * scaleFactor)
+    ctx.drawImage(imgRef.current, -imgSize.w / 2, -imgSize.h / 2)
+    ctx.restore()
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.88)
+    onSave(dataUrl)
+    onClose()
+  }
+
+  // Preview base scale (fit mode)
+  const isRotated90 = rotation === 90 || rotation === 270
+  const iw = imgSize ? (isRotated90 ? imgSize.h : imgSize.w) : VIEW_W
+  const ih = imgSize ? (isRotated90 ? imgSize.w : imgSize.h) : VIEW_H
+  const baseScale = Math.min(VIEW_W / iw, VIEW_H / ih)
+
+  return (
+    <div
+      className="avatar-adjust-overlay"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Adjust avatar"
+    >
+      <div
+        className="avatar-adjust-shell"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="avatar-adjust-header">
+          <h2 className="avatar-adjust-title">Adjust profile picture</h2>
+          <button
+            type="button"
+            className="avatar-adjust-close"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            &times;
+          </button>
+        </div>
+
+        <div
+          ref={viewportRef}
+          className={`avatar-viewport ${dragging ? 'is-dragging' : ''}`}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onMouseLeave={onMouseUp}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          <img
+            ref={imgRef}
+            src={src}
+            alt="Adjusting avatar"
+            draggable={false}
+            onLoad={handleImageLoad}
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px) rotate(${rotation}deg) scale(${baseScale * zoom})`,
+              transformOrigin: 'center center',
+              userSelect: 'none',
+              pointerEvents: 'none',
+              maxWidth: 'none',
+              maxHeight: 'none',
+            }}
+          />
+          <div className="avatar-mask" />
+          <div className="avatar-grid-overlay" />
+        </div>
+
+        <div className="avatar-adjust-controls stack" style={{ gap: 12, marginTop: 14 }}>
+          <div className="row wrap" style={{ alignItems: 'center', gap: 10 }}>
+            <span className="small muted">Zoom</span>
+            <button
+              type="button"
+              className="btn ghost sm"
+              aria-label="Zoom out"
+              onClick={() => handleZoomChange(zoom - 0.2)}
+            >
+              −
+            </button>
+            <input
+              type="range"
+              min="1.0"
+              max="3.0"
+              step="0.05"
+              value={zoom}
+              onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
+              style={{ flex: 1, minWidth: 120 }}
+            />
+            <button
+              type="button"
+              className="btn ghost sm"
+              aria-label="Zoom in"
+              onClick={() => handleZoomChange(zoom + 0.2)}
+            >
+              +
+            </button>
+            <span className="tiny tnum muted">{Math.round(zoom * 100)}%</span>
+          </div>
+
+          <div className="row wrap" style={{ gap: 8, justifyContent: 'space-between' }}>
+            <div className="row" style={{ gap: 6 }}>
+              <button type="button" className="btn ghost sm" onClick={handleRotate}>
+                <Icon name="arrow" size="sm" />
+                Rotate 90°
+              </button>
+              <button type="button" className="btn ghost sm" onClick={handleReset}>
+                Reset
+              </button>
+            </div>
+            <div className="row" style={{ gap: 6 }}>
+              <button type="button" className="btn ghost sm" onClick={onClose}>
+                Cancel
+              </button>
+              <button type="button" className="btn yellow sm" onClick={handleSaveAvatar}>
                 Apply & Save
               </button>
             </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '@/common/components/Icon'
 import { navigate } from '@/common/router/router'
 import { REACTS, TOPICS, ago, peso, priceLabel, stamp } from '../constants'
@@ -38,13 +38,29 @@ export function ForumPage() {
   const [forumSort, setForumSort] = useState<'latest' | 'popular'>('latest')
   const [fpLimit, setFpLimit] = useState(10)
 
+  // Create post modal state (Facebook two-step pattern)
+  const [createPostOpen, setCreatePostOpen] = useState(false)
+  const [showPhotos, setShowPhotos] = useState(false)
+  const [posting, setPosting] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [topic, setTopic] = useState<string>(TOPICS[0])
-  const [asNotice, setAsNotice] = useState(false)
   const [imgs, setImgs] = useState<string[]>([])
+  const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null)
   const [openReactPostId, setOpenReactPostId] = useState<string | null>(null)
+
+  const closeCreatePost = useCallback(() => {
+    setCreatePostOpen(false)
+    setShowPhotos(false)
+    setTitle('')
+    setBody('')
+    setTopic(TOPICS[0])
+    setImgs([])
+    setPosting(false)
+    bodyTextareaRef.current = null
+  }, [])
 
   useEffect(() => {
     if (!openMenuKey && !openReactPostId) return
@@ -55,6 +71,34 @@ export function ForumPage() {
     window.addEventListener('click', onDocClick)
     return () => window.removeEventListener('click', onDocClick)
   }, [openMenuKey, openReactPostId])
+
+  // Close Create post modal on Escape; lock body scroll while open
+  useEffect(() => {
+    if (!createPostOpen) return
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeCreatePost()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.removeProperty('overflow')
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [createPostOpen, closeCreatePost])
+
+  const handleCreatePost = useCallback(() => {
+    if (posting || (!body.trim() && !imgs.length)) return
+    setPosting(true)
+    const ok = createForumPost(title, body, topic, false, imgs)
+    if (ok) {
+      closeCreatePost()
+      setForumSort('latest')
+    } else {
+      setPosting(false)
+    }
+  }, [title, body, topic, imgs, posting, closeCreatePost, createForumPost, setForumSort])
+
+  const firstName = currentAccount?.first || 'Student'
 
   if (!currentAccount) return null
 
@@ -85,8 +129,6 @@ export function ForumPage() {
   const nOpenReports = isStaffUser
     ? db.freports.filter((r) => r.status === 'open').length
     : 0
-  const notice = isStaffUser && asNotice
-
   const tabs: ['all' | 'post' | 'listing' | 'notice', string][] = [
     ['all', 'All posts'],
     ['post', 'Discussions'],
@@ -127,90 +169,147 @@ export function ForumPage() {
         </div>
       )}
 
-      <form
-        className="card stack"
-        style={{ gap: 10 }}
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (createForumPost(title, body, topic, notice, imgs)) {
-            setTitle('')
-            setBody('')
-            setImgs([])
-            setAsNotice(false)
-            setForumSort('latest')
-          }
-        }}
-      >
-        <div className="row" style={{ alignItems: 'flex-start' }}>
-          <AvatarBadge account={currentAccount} isStaff={isStaffUser} size="md" />
-          <div className="stack grow" style={{ gap: 8, minWidth: 0 }}>
+      {/* Compact "What's on your mind?" trigger bar (Facebook two-step pattern) */}
+      <div className="composer-trigger card">
+        <AvatarBadge account={currentAccount} isStaff={isStaffUser} size="md" />
+        <button
+          type="button"
+          className="composer-pill"
+          aria-label="Create post"
+          onClick={() => {
+            setShowPhotos(false)
+            setCreatePostOpen(true)
+          }}
+        >
+          What's on your mind, {firstName}?
+        </button>
+        <button
+          type="button"
+          className="composer-photo-btn"
+          aria-label="Add photo"
+          title="Add photo"
+          onClick={() => {
+            setShowPhotos(true)
+            setCreatePostOpen(true)
+          }}
+        >
+          <Icon name="img" size="sm" />
+        </button>
+      </div>
+
+      {/* "Create post" popup modal */}
+      {createPostOpen && (
+        <div
+          className="create-post-modal"
+          onClick={closeCreatePost}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Create post"
+        >
+          <div
+            className="create-post-shell"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="create-post-header">
+              <h2 className="create-post-title-text">Create post</h2>
+              <button
+                type="button"
+                className="create-post-close"
+                aria-label="Close"
+                onClick={closeCreatePost}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="create-post-author">
+              <AvatarBadge account={currentAccount} isStaff={isStaffUser} size="sm" />
+              <div className="create-post-author-info">
+                <div className="create-post-author-name">
+                  {currentAccount.name}
+                </div>
+                <select
+                  className="create-post-topic"
+                  id="fp-topic"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                >
+                  {TOPICS.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <input
-              className="input"
+              className="create-post-title-input"
               id="fp-title"
               maxLength={120}
               value={title}
-              placeholder={notice ? 'Notice title' : 'Title (optional)'}
-              aria-label={notice ? 'Notice title' : 'Post title'}
+              placeholder="Title (optional)"
+              aria-label="Post title"
               autoComplete="off"
               onChange={(e) => setTitle(e.target.value)}
             />
+
             <textarea
-              className="input"
+              className="create-post-body-input"
               id="fp-text"
               maxLength={2000}
-              placeholder={`What is on your mind, ${currentAccount.first}?`}
+              placeholder={`What's on your mind, ${firstName}?`}
               aria-label="Write a post"
               value={body}
+              ref={bodyTextareaRef}
               onChange={(e) => setBody(e.target.value)}
+              onFocus={() => {
+                if (!showPhotos) setShowPhotos(false)
+              }}
             />
+
+            <div className="create-post-add-bar">
+              <span className="create-post-add-label">Add to your post</span>
+              <button
+                type="button"
+                className="create-post-photo-toggle"
+                aria-label="Add photo"
+                title="Add photo"
+                onClick={() => setShowPhotos((prev) => !prev)}
+              >
+                <Icon name="img" size="sm" />
+              </button>
+            </div>
+
+            {showPhotos && (
+              <div className="create-post-photos">
+                <PhotoUploader
+                  ids={imgs}
+                  max={IMG_RULES.post}
+                  label="Photos (optional)"
+                  onChange={setImgs}
+                />
+                <button
+                  type="button"
+                  className="create-post-photos-hide"
+                  onClick={() => setShowPhotos(false)}
+                >
+                  Hide photos
+                </button>
+              </div>
+            )}
+
+            <div className="create-post-footer">
+              <button
+                type="button"
+                className="create-post-post-btn"
+                disabled={posting || (!body.trim() && !imgs.length)}
+                onClick={handleCreatePost}
+              >
+                {posting ? 'Posting…' : 'Post'}
+              </button>
+            </div>
           </div>
         </div>
-
-        <PhotoUploader
-          ids={imgs}
-          max={IMG_RULES.post}
-          label="Photos (optional)"
-          onChange={setImgs}
-        />
-
-        <div className="row between wrap">
-          <span className="row wrap" style={{ gap: 10 }}>
-            <label className="row small" style={{ gap: 6 }}>
-              Topic{' '}
-              <select
-                className="input"
-                id="fp-topic"
-                style={{ width: 'auto' }}
-                disabled={notice}
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-              >
-                {TOPICS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {isStaffUser && (
-              <label className="check">
-                <input
-                  type="checkbox"
-                  id="fp-notice"
-                  checked={asNotice}
-                  onChange={(e) => setAsNotice(e.target.checked)}
-                />
-                Official notice (alerts every member)
-              </label>
-            )}
-          </span>
-          <button type="submit" className="btn yellow">
-            <Icon name="send" size="sm" />
-            {notice ? 'Post notice' : 'Post'}
-          </button>
-        </div>
-      </form>
+      )}
 
       <div className="row between wrap" style={{ gap: 10 }}>
         <div className="tabs" role="tablist" aria-label="Forum filter">

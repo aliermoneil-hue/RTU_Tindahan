@@ -165,18 +165,24 @@
   stroke: #e5b54c;
 }
 
-/* Price tag + string: cream/off-white with warm gold tag */
-:root[data-theme='dark'] .bl-tag-group path[stroke="#ffffff"],
+/* Price tag string paths: thin clean strokes, never filled */
+:root[data-theme='dark'] .bl-tag-group path[stroke="#ffffff"] {
+  fill: none;
+  stroke: rgba(228, 230, 235, 0.85);
+  stroke-width: 1.5;
+}
+/* Any remaining white-filled tag paths */
 :root[data-theme='dark'] .bl-tag-group path[fill="#ffffff"] {
-  stroke: #fffaf0;
   fill: #fffaf0;
 }
+/* Price tag body: warm gold */
 :root[data-theme='dark'] .bl-tag-group path[fill="#c25959"] {
   fill: #e5b54c;
 }
+/* Price tag pinhole: dark */
 :root[data-theme='dark'] .bl-tag-group circle {
-  fill: #e4e6eb;
-  stroke: #fffaf0;
+  fill: #16171a;
+  stroke: none;
 }
 
 /* Cursor arrow: warm gold */

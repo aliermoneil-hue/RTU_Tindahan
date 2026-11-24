@@ -28,8 +28,9 @@ import {
   stamp,
 } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
-import { imgAdd, imgSrc } from '../imageStore'
+import { imgAdd, imgSrc, imgValidate } from '../imageStore'
 import { AvatarBadge } from './AvatarBadge'
+import { AvatarAdjustModal } from './PhotoUploader'
 import { RatingText } from './StarRating'
 import './GlobalOverlays.css'
 
@@ -901,7 +902,6 @@ function EditProfileDialog(props: ModalContentProps) {
   const [yearLevel, setYearLevel] = useState<string>(
     user?.year_level != null ? String(user.year_level) : '2',
   )
-  const [contactNumber, setContactNumber] = useState<string>(user?.contact_number || '')
   const [newAvatarId, setNewAvatarId] = useState<string | null>(null)
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null)
   const [removeAvatar, setRemoveAvatar] = useState(false)
@@ -909,6 +909,8 @@ function EditProfileDialog(props: ModalContentProps) {
   const [avatarErr, setAvatarErr] = useState('')
   const [nameErr, setNameErr] = useState('')
   const [saving, setSaving] = useState(false)
+  const [avatarAdjustOpen, setAvatarAdjustOpen] = useState(false)
+  const [avatarAdjustSrc, setAvatarAdjustSrc] = useState<string | null>(null)
 
   if (!u) return null
 
@@ -925,16 +927,57 @@ function EditProfileDialog(props: ModalContentProps) {
     if (!file) return
     setAvatarBusy(true)
     setAvatarErr('')
-    const res = await imgAdd(file, { minSide: 64, maxSide: 360, square: true })
-    setAvatarBusy(false)
-    if (res.err || !res.id) {
-      setAvatarErr(res.err || 'Could not upload photo.')
+    // Revoke any previous object URL to avoid memory leaks
+    if (avatarAdjustSrc && avatarAdjustSrc.startsWith('blob:')) {
+      URL.revokeObjectURL(avatarAdjustSrc)
+    }
+    const bad = await imgValidate(file)
+    if (bad) {
+      setAvatarBusy(false)
+      setAvatarErr(bad)
       return
     }
-    setNewAvatarId(res.id)
-    setProfilePhotoFile(file)
-    setRemoveAvatar(false)
-    props.bumpImgVersion()
+    const url = URL.createObjectURL(file)
+    setAvatarAdjustSrc(url)
+    setAvatarAdjustOpen(true)
+    setAvatarBusy(false)
+  }
+
+  const dataUrlToFile = (dataUrl: string, filename: string): File => {
+    const arr = dataUrl.split(',')
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
+    const bstr = atob(arr[1])
+    let n = bstr.length
+    const u8arr = new Uint8Array(n)
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n)
+    }
+    return new File([u8arr], filename, { type: mime })
+  }
+
+  const handleAvatarAdjustSave = async (dataUrl: string) => {
+    setAvatarBusy(true)
+    setAvatarErr('')
+    try {
+      const file = dataUrlToFile(dataUrl, 'avatar.jpg')
+      const res = await imgAdd(file, { minSide: 64, maxSide: 360, square: true })
+      if (res.err || !res.id) {
+        setAvatarBusy(false)
+        setAvatarErr(res.err || 'Could not save adjusted photo.')
+        return
+      }
+      setNewAvatarId(res.id)
+      setProfilePhotoFile(file)
+      setRemoveAvatar(false)
+      setAvatarAdjustSrc(null)
+      setAvatarAdjustOpen(false)
+      props.bumpImgVersion()
+    } catch {
+      setAvatarBusy(false)
+      setAvatarErr('Failed to save adjusted photo.')
+    } finally {
+      setAvatarBusy(false)
+    }
   }
 
   return (
@@ -956,7 +999,6 @@ function EditProfileDialog(props: ModalContentProps) {
             newAvatarId,
             removeAvatar,
             isStudent ? Number(yearLevel) || 1 : null,
-            contactNumber,
             profilePhotoFile,
           )
           setSaving(false)
@@ -1038,6 +1080,19 @@ function EditProfileDialog(props: ModalContentProps) {
                     Remove picture
                   </button>
                 )}
+                {(pendSrc || curSrc) && !removeAvatar && !avatarAdjustOpen && (
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={() => {
+                      setAvatarAdjustSrc(pendSrc || curSrc || '')
+                      setAvatarAdjustOpen(true)
+                    }}
+                  >
+                    <Icon name="img" size="sm" />
+                    Adjust
+                  </button>
+                )}
               </div>
               <input
                 type="file"
@@ -1097,36 +1152,23 @@ function EditProfileDialog(props: ModalContentProps) {
           </select>
         </div>
 
-        <div className="grid2">
-          {isStudent && (
-            <div className="field">
-              <label htmlFor="pyear">Year level</label>
-              <select
-                className="input"
-                id="pyear"
-                value={yearLevel}
-                onChange={(e) => setYearLevel(e.target.value)}
-              >
-                {[1, 2, 3, 4, 5, 6].map((yr) => (
-                  <option key={yr} value={String(yr)}>
-                    Year {yr}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        {isStudent && (
           <div className="field">
-            <label htmlFor="pcontact">Contact number (optional)</label>
-            <input
+            <label htmlFor="pyear">Year level</label>
+            <select
               className="input"
-              id="pcontact"
-              value={contactNumber}
-              maxLength={20}
-              placeholder="09XX XXX XXXX"
-              onChange={(e) => setContactNumber(e.target.value)}
-            />
+              id="pyear"
+              value={yearLevel}
+              onChange={(e) => setYearLevel(e.target.value)}
+            >
+              {[1, 2, 3, 4, 5, 6].map((yr) => (
+                <option key={yr} value={String(yr)}>
+                  Year {yr}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
+        )}
 
         <div className="row dlg-actions">
           <button type="button" className="btn ghost" onClick={props.closeModal}>
@@ -1137,6 +1179,21 @@ function EditProfileDialog(props: ModalContentProps) {
           </button>
         </div>
       </form>
+
+      {avatarAdjustOpen && avatarAdjustSrc && (
+        <AvatarAdjustModal
+          src={avatarAdjustSrc}
+          onClose={() => {
+            setAvatarAdjustOpen(false)
+            setAvatarAdjustSrc(null)
+            // Revoke the object URL if it's a blob URL
+            if (avatarAdjustSrc.startsWith('blob:')) {
+              URL.revokeObjectURL(avatarAdjustSrc)
+            }
+          }}
+          onSave={handleAvatarAdjustSave}
+        />
+      )}
     </DialogShell>
   )
 }

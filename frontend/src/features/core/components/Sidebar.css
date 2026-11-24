@@ -600,29 +600,91 @@
 /* ==========================================================================
    DARK THEME OVERRIDES for Sidebar
    ========================================================================== */
+
+/* Sidebar rail — neutral charcoal, darker than the #16171a page background.
+   Only the outermost container keeps the right border (single crisp edge). */
 :root[data-theme='dark'] .side,
-:root[data-theme='dark'] .sidebar-inner,
-:root[data-theme='dark'] .sidebar-scroll,
 :root[data-theme='dark'] .side.collapsed:not(.user-closed) {
-  background: var(--navy) !important;
-  background-color: var(--navy) !important;
+  background: #111214 !important;
+  background-color: #111214 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 :root[data-theme='dark'] .side.collapsed {
-  border-right-color: var(--line);
+  border-right-color: rgba(255, 255, 255, 0.08);
 }
 
+/* Inner wrapper & scrollable area: inherit the rail background, NO border-right
+   (prevents a double vertical line on the rail's right edge). */
+:root[data-theme='dark'] .sidebar-inner,
+:root[data-theme='dark'] .sidebar-scroll {
+  background: #111214 !important;
+  background-color: #111214 !important;
+}
+
+/* Clean scrollbar: thin slot, neutral track/thumb so it never draws a
+   permanent vertical line on the rail. */
+:root[data-theme='dark'] .sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+:root[data-theme='dark'] .sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
+}
+
+:root[data-theme='dark'] .sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:root[data-theme='dark'] .sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+}
+
+/* Dark mode: nav item hover — neutral, unchanged */
+:root[data-theme='dark'] .nav:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+/* Dark mode: nav item active — gold highlight, unchanged */
+:root[data-theme='dark'] .nav.on {
+  background: rgba(229, 181, 76, 0.14);
+  color: #fffaf0;
+  font-weight: 700;
+  border: 1px solid rgba(229, 181, 76, 0.3);
+  box-shadow: none;
+}
+:root[data-theme='dark'] .nav.on .ico {
+  color: #e5b54c;
+}
+
+/* Dark mode: section dividers */
+:root[data-theme='dark'] .nav-divider {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* Dark mode: "Pasig Campus only" bottom card — neutral charcoal on the #111214 rail */
+:root[data-theme='dark'] .side .campus {
+  background: #1a1c20;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Dark mode: sidebar collapse toggle button — neutral charcoal on the #111214 rail */
 :root[data-theme='dark'] .sidebar-toggle {
-  background: var(--card);
-  border-color: var(--line);
-  color: var(--ink);
+  background: #1a1c20;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e5b54c;
 }
 :root[data-theme='dark'] .sidebar-toggle:hover {
-  background: var(--soft);
-  border-color: var(--yellow);
+  background: #24262a;
+  border-color: rgba(255, 255, 255, 0.12);
 }
 :root[data-theme='dark'] .toggle-arrow {
-  border-right-color: var(--yellow);
+  border-right-color: #e5b54c;
 }
 
 /* ==========================================================================

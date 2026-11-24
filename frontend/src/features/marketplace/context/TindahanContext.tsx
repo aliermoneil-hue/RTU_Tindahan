@@ -71,7 +71,6 @@ import {
   TIMES,
   TX_FLOW,
   TX_NOTE,
-  VAR_LIMITS,
   blankDraft,
   cleanDays,
   dShort,
@@ -649,7 +648,6 @@ interface TindahanContextValue {
     newAvatarId: string | null,
     removeAvatar: boolean,
     yearLevel?: number | null,
-    contactNumber?: string,
     profilePhotoFile?: File | null,
   ) => Promise<boolean>
   markAllNotifsRead: () => void
@@ -3364,8 +3362,6 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
 
   const validateDraftStep = useCallback((d: ListingDraft, step: 1 | 2): Record<string, string> => {
     const e: Record<string, string> = {}
-    const whole = (v: string, lo: number, hi: number) =>
-      /^\d+$/.test(String(v).trim()) && +v >= lo && +v <= hi
 
     if (step === 1) {
       const svc = d.type === 'service'
@@ -3382,7 +3378,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         e.desc = 'Keep the description to 400 characters or fewer.'
       }
       const pr = Number(d.price)
-      if (!(pr > 0) || pr > 1000000) {
+      if (!(pr > 0)) {
         e.price = svc ? 'Enter your rate in pesos.' : 'Enter a price above zero.'
       }
       if (svc) {
@@ -3393,7 +3389,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         if (!CONDITIONS.includes(d.cond)) e.cond = 'Choose the condition.'
         if (!d.images.filter((id) => imgSrc(id)).length) e.photos = 'Add at least one photo.'
         if (!d.vOn) {
-          if (!whole(d.qty, 1, VAR_LIMITS.stock)) {
+          const qtyStr = String(d.qty).trim()
+          const qtyNum = +qtyStr
+          if (!/^\d+$/.test(qtyStr) || qtyNum < 1) {
             e.qty = 'Enter how many you have (a whole number from 1).'
           }
         } else {
@@ -3401,7 +3399,10 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           if (!rows.length) {
             e.vars = 'Add at least one option, for example a color or a size.'
           } else {
-            const bad = rows.find((r) => !whole(r.qty, 0, VAR_LIMITS.stock))
+            const bad = rows.find((r) => {
+              const n = +r.qty
+              return !/^\d+$/.test(String(r.qty).trim()) || n < 0
+            })
             if (bad) {
               e.vars = 'Enter a whole quantity for every variation (0 if sold out).'
             } else if (rows.some((r) => String(r.price).trim() !== '' && !(Number(r.price) > 0))) {
@@ -3542,7 +3543,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           const rows = synced.map((r) => ({
             id: r.id,
             opts: { ...r.opts },
-            qty: Math.max(0, Math.min(VAR_LIMITS.stock, Math.floor(+r.qty))),
+            qty: Math.max(0, Math.floor(+r.qty)),
             price:
               String(r.price).trim() !== '' && Number(r.price) > 0 ? Number(r.price) : null,
           }))
@@ -3939,7 +3940,6 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       newAvatarId: string | null,
       removeAvatar: boolean,
       yearLevel?: number | null,
-      contactNumber?: string,
       profilePhotoFile?: File | null,
     ): Promise<boolean> => {
       if (!currentAccount) return false
@@ -3961,7 +3961,6 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
             fd.append('display_name', formattedName)
             fd.append('college', prog)
             if (yearLevel != null) fd.append('year_level', String(yearLevel))
-            if (contactNumber !== undefined) fd.append('contact_number', contactNumber.trim())
             fd.append('profile_photo', profilePhotoFile)
             await fetch(`${baseUrl}/auth/me/`, {
               method: 'PATCH',
@@ -3978,7 +3977,6 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
                 display_name: formattedName,
                 college: prog,
                 ...(yearLevel !== undefined ? { year_level: yearLevel } : {}),
-                ...(contactNumber !== undefined ? { contact_number: contactNumber.trim() } : {}),
                 ...(removeAvatar ? { profile_photo: null } : {}),
               },
             })

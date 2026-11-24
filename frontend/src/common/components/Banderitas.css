@@ -58,6 +58,15 @@
   max-height: 52px;
 }
 
+/* --- header: irregular strands hanging from the top bar edge --- */
+.banderitas--header {
+  top: 0;
+  left: 0;
+  width: 2800px;
+  max-width: none;
+  height: 44px;
+}
+
 /* --- mini: compact inline block (position relative so it flows in layout) --- */
 .banderitas--mini {
   position: relative;

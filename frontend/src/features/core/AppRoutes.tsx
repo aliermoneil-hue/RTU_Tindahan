@@ -216,7 +216,7 @@ function renderActiveRoute(path: string, user: { email: string; role: string } |
 
 export function AppRoutes() {
   const { path, params } = useRoute()
-  const { user, isLoading: authLoading, isSigningIn } = useAuth()
+  const { user, isLoading: authLoading, isTransitioning, clearTransitioning } = useAuth()
   const { hasSettledInitialFetch } = useTindahan()
 
   /** Canonical page key used for both rendering and favicon selection. */
@@ -252,7 +252,7 @@ export function AppRoutes() {
     listingsSettled: hasSettledInitialFetch,
   })
 
-  const showOverlay = !appReady || Boolean(redirectTo) || Boolean(isSigningIn)
+  const showOverlay = !appReady || Boolean(redirectTo) || Boolean(isTransitioning)
 
   /** Swap the page favicon to match the current route. */
   useEffect(() => {
@@ -268,6 +268,16 @@ export function AppRoutes() {
   useEffect(() => {
     if (redirectTo) navigate(redirectTo, { replace: true })
   }, [redirectTo])
+
+  // Keep BrandLoader visible for a minimum duration after a successful login
+  // so its entrance animation can play before the transition completes.
+  useEffect(() => {
+    if (!isTransitioning || path === 'login') return
+    const timer = window.setTimeout(() => {
+      clearTransitioning()
+    }, 1500)
+    return () => window.clearTimeout(timer)
+  }, [isTransitioning, path, clearTransitioning])
 
   // When the user lands on the page they were redirected to after login, clear the saved target.
   useEffect(() => {
@@ -312,8 +322,8 @@ export function AppRoutes() {
     <>
       <BrandLoader
         isLoading={showOverlay}
-        variant={isSigningIn ? 'full' : 'auto'}
-        immediate={isSigningIn}
+        variant="auto"
+        immediate={Boolean(isTransitioning)}
         onExited={() => {}}
       />
       {!authLoading && !redirectTo && (

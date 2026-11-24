@@ -380,8 +380,8 @@ export function CreateListingPage() {
                     className="input tnum"
                     id="lp"
                     type="number"
-                    min="1"
-                    max="1000000"
+                    min="0.01"
+                    step="any"
                     inputMode="numeric"
                     value={draft.price}
                     placeholder="0"
@@ -537,8 +537,8 @@ export function CreateListingPage() {
                       className="input tnum"
                       id="lp"
                       type="number"
-                      min="1"
-                      max="1000000"
+                      min="0.01"
+                      step="any"
                       inputMode="numeric"
                       value={draft.price}
                       placeholder="0"
@@ -562,7 +562,7 @@ export function CreateListingPage() {
                         id="lq"
                         type="number"
                         min="1"
-                        max={VAR_LIMITS.stock}
+                        step="1"
                         inputMode="numeric"
                         value={draft.qty}
                         onChange={(e) => {
@@ -754,7 +754,7 @@ export function CreateListingPage() {
                                       className="input tnum"
                                       type="number"
                                       min="0"
-                                      max={VAR_LIMITS.stock}
+                                      step="1"
                                       inputMode="numeric"
                                       value={r.qty}
                                       style={{ maxWidth: 110 }}
@@ -774,8 +774,8 @@ export function CreateListingPage() {
                                     <input
                                       className="input tnum"
                                       type="number"
-                                      min="1"
-                                      max="1000000"
+                                      min="0.01"
+                                      step="any"
                                       inputMode="numeric"
                                       value={r.price}
                                       placeholder={draft.price || 'Same'}

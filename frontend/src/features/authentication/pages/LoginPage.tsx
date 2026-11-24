@@ -1,7 +1,6 @@
 import { useLayoutEffect, useEffect, useRef, useState, useCallback } from 'react'
 import gsap from 'gsap'
 import { navigate } from '@/common/router/router'
-import { peekAfterLogin } from '@/common/utils/afterLogin'
 import { apiFetch, ApiRequestError } from '@/common/api/client'
 import { LoginForm } from '../components/LoginForm'
 import { useAuth } from '../AuthContext'
@@ -136,14 +135,6 @@ export function LoginPage() {
   const loginStartRef = useRef<number>(0)
   const lockTimerRef = useRef<number>(0)
 
-  // Always scroll down when entering the sign-in page
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
-    }, 1500)
-    return () => clearTimeout(timer)
-  }, [])
-
   // ---- Lockout / cooldown timer ----
   // Remaining time is always computed from `until - Date.now()` so a throttled
   // background tab does not drift. Changing the computer clock only changes the
@@ -233,11 +224,11 @@ export function LoginPage() {
     setNextPenalty(null)
     try {
       await login(email, password)
-      // Successful login: clear any stored lock email.
+      // Successful login: AppRoutes detects the new user and redirects via redirectTo.
+      // BrandLoader is shown during that transition via isTransitioning in AuthContext.
       sessionStorage.removeItem(LAST_LOGIN_EMAIL_KEY)
       clearLockTimer()
       setLock(null)
-      navigate(peekAfterLogin() ?? '', { replace: true }) // the home route shows the marketplace once signed in
     } catch (err) {
       if (err instanceof ApiRequestError) {
         if (err.retryAfter !== undefined) {

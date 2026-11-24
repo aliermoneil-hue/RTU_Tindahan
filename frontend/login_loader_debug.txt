@@ -1,0 +1,1816 @@
+﻿=== C:\Users\Lian Andrew\Desktop\RTU_Tindahan_Capstone\RTU_Tindahan_Final\RTU_Tindahan\frontend\src\common\components\BrandLoader\BrandLoader.css ===
+/* Full-screen fixed overlay that always uses the RTU Tindahan navy background */
+.brand-loader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #1a2f57;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  overflow: hidden;
+  will-change: transform, opacity;
+  /* Starts fully opaque so it covers the screen immediately when BrandLoader
+     mounts â€” no white flash between pre-splash and loader. */
+  opacity: 1;
+}
+
+/* Dark mode overlay: matte charcoal with warm-amber radial glow behind center */
+:root[data-theme='dark'] .brand-loader-overlay {
+  background-color: #16171a;
+  background-image: radial-gradient(circle at 50% 44%, rgba(229, 181, 76, 0.11) 0%, rgba(22, 23, 26, 0) 52%);
+}
+
+/* Allows clicks to pass through to the mounted app underneath during exit */
+.brand-loader-overlay--exiting {
+  pointer-events: none;
+}
+
+/* Responsive wrapper for the layered SVG logo (320px phones to 4K) */
+.brand-loader-stage {
+  width: clamp(240px, 68vw, 520px);
+  max-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform, opacity;
+}
+
+/* --- Fiesta banderitas wrappers: full-screen, behind the stage --- */
+.brand-loader-overlay .bl-bunting {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* Top canopy: full width across the top */
+.brand-loader-overlay .bl-bunting--top .banderitas {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+
+/* Low garland: full width, mid-lower area */
+.brand-loader-overlay .bl-bunting--low .banderitas {
+  top: auto;
+  bottom: 16vh;
+  left: 0;
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+
+/* Bottom garland: full width, near bottom edge */
+.brand-loader-overlay .bl-bunting--bottom .banderitas {
+  top: auto;
+  bottom: 5vh;
+  left: 0;
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+
+/* Mobile: hide the low garland (stage takes most vertical space),
+   scale the top/bottom garlands so flags stay readable.
+   GSAP animates .bl-bunting (translateY/opacity) via inline styles,
+   so scale lives on the inner .bl-bunting-scale div â€” no conflict. */
+@media (max-width: 640px) {
+  .brand-loader-overlay .bl-bunting--low {
+    display: none;
+  }
+  .brand-loader-overlay .bl-bunting--top .bl-bunting-scale {
+    transform: scale(1.8);
+    transform-origin: 50% 0;
+  }
+  .brand-loader-overlay .bl-bunting--bottom .bl-bunting-scale {
+    transform: scale(1.8);
+    transform-origin: 50% 100%;
+  }
+}
+
+/* Keep the retry box above the bunting and clickable */
+.brand-loader-slow {
+  z-index: 50;
+  position: relative;
+}
+
+.brand-loader-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  display: block;
+}
+
+/* GPU-composited hints for animated SVG groups */
+.bl-tindahan,
+.bl-tagline-line,
+.bl-tagline-text,
+.bl-tile,
+.bl-awning-group,
+.bl-letter,
+.bl-cursor,
+.bl-tag-group,
+.bl-shine {
+  will-change: transform, opacity;
+}
+
+/* Prevent flash of unstyled content before GSAP initializes.
+   GSAP sets these to opacity:0 / scaleX:0 in its initial gsap.set() calls,
+   but until that runs the SVG elements render at their default opacity:1.
+   These CSS fallbacks keep them invisible from the very first frame. */
+.bl-tindahan,
+.bl-tagline-text,
+.bl-tile,
+.bl-letter,
+.bl-cursor,
+.bl-tag-group,
+.bl-shine,
+.bl-bunting {
+  opacity: 0;
+}
+/* Tagline lines are hidden by GSAP (scaleX:0 with right/left center origin).
+   CSS opacity:0 covers the initial frame; GSAP sets the correct transform-origin
+   and animates scaleX:0â†’1 to draw the lines outward from center. */
+.bl-tagline-line-left,
+.bl-tagline-line-right {
+  opacity: 0;
+}
+
+/* --- Dark mode SVG color overrides --- */
+/* Letters R, T, U: soft off-white */
+:root[data-theme='dark'] .bl-letter-r path,
+:root[data-theme='dark'] .bl-letter-t path,
+:root[data-theme='dark'] .bl-letter-u path {
+  fill: #e4e6eb;
+}
+
+/* TINDAHAN wordmark: warm gold */
+:root[data-theme='dark'] .bl-tindahan text {
+  fill: #e5b54c;
+}
+
+/* Tagline text: soft off-white */
+:root[data-theme='dark'] .bl-tagline-text {
+  fill: #e4e6eb;
+}
+
+/* Tagline side lines: warm gold */
+:root[data-theme='dark'] .bl-tagline-line {
+  stroke: #e5b54c;
+}
+
+/* Price tag string paths: thin clean strokes, never filled */
+:root[data-theme='dark'] .bl-tag-group path[stroke="#ffffff"] {
+  fill: none;
+  stroke: rgba(228, 230, 235, 0.85);
+  stroke-width: 1.5;
+}
+/* Any remaining white-filled tag paths */
+:root[data-theme='dark'] .bl-tag-group path[fill="#ffffff"] {
+  fill: #fffaf0;
+}
+/* Price tag body: warm gold */
+:root[data-theme='dark'] .bl-tag-group path[fill="#c25959"] {
+  fill: #e5b54c;
+}
+/* Price tag pinhole: dark */
+:root[data-theme='dark'] .bl-tag-group circle {
+  fill: #16171a;
+  stroke: none;
+}
+
+/* Cursor arrow: warm gold */
+:root[data-theme='dark'] .bl-cursor path {
+  fill: #e5b54c;
+}
+
+/* Dark mode slow-load text and retry button */
+:root[data-theme='dark'] .brand-loader-slow {
+  color: #e4e6eb;
+}
+
+:root[data-theme='dark'] .brand-loader-retry {
+  background-color: #e5b54c;
+  color: #16171a;
+}
+
+:root[data-theme='dark'] .brand-loader-retry:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+/* Dark mode progress/status text: calm muted */
+:root[data-theme='dark'] .bl-sr-only {
+  clip: rect(0, 0, 0, 0);
+}
+
+/* Primary labels and secondary text in dark mode */
+:root[data-theme='dark'] .brand-loader-slow span {
+  color: #e4e6eb;
+}
+
+:root[data-theme='dark'] .brand-loader-slow .brand-loader-retry {
+  color: #16171a;
+}
+
+/* Secondary/status text tone */
+:root[data-theme='dark'] .brand-loader-slow {
+  color: #e4e6eb;
+}
+
+/* Dark mode subtle glow behind center brand mark handled via overlay background-image */
+
+/* Slow-load fallback message and retry button shown after ~8s */
+.brand-loader-slow {
+  margin-top: clamp(1rem, 3vh, 2rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: clamp(0.8125rem, 1.5vw, 0.9375rem);
+  text-align: center;
+  animation: bl-fade-in 0.3s ease forwards;
+}
+
+.brand-loader-retry {
+  background-color: #ffbd59;
+  color: #1a2f57;
+  border: none;
+  border-radius: 9999px;
+  padding: 0.45rem 1.15rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.brand-loader-retry:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.brand-loader-retry:active {
+  transform: scale(0.97);
+}
+
+/* Visually hidden text for screen readers */
+.bl-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes bl-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- MiniLoader (Inline & Section-Level Awning Pulse) --- */
+.mini-loader {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  vertical-align: middle;
+}
+
+.mini-loader--section {
+  width: 100%;
+  padding: 2.5rem 1rem;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mini-loader-tiles {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.mini-loader-tile {
+  width: 7px;
+  height: 11px;
+  border-radius: 2px 2px 4px 4px;
+  transform-origin: center bottom;
+  animation: mini-awning-pulse 0.9s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.mini-loader--sm .mini-loader-tile {
+  width: 5px;
+  height: 8px;
+}
+
+.mini-loader--lg .mini-loader-tile {
+  width: 10px;
+  height: 15px;
+}
+
+.mini-loader-tile--gold {
+  background-color: #ffbd59;
+}
+
+.mini-loader-tile--red {
+  background-color: #c25959;
+}
+
+.mini-loader-tile--white {
+  background-color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(26, 47, 87, 0.18);
+}
+
+.mini-loader-label {
+  font-size: 0.875rem;
+  color: inherit;
+  opacity: 0.75;
+}
+
+@keyframes mini-awning-pulse {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+    opacity: 0.55;
+  }
+  45% {
+    transform: translateY(-4px) scaleY(1.12);
+    opacity: 1;
+  }
+}
+
+/* Reduced motion: disable movement, keep gentle opacity fade */
+@media (prefers-reduced-motion: reduce) {
+  .mini-loader-tile {
+    animation: none;
+    opacity: 0.9;
+  }
+}
+
+=== C:\Users\Lian Andrew\Desktop\RTU_Tindahan_Capstone\RTU_Tindahan_Final\RTU_Tindahan\frontend\src\common\components\BrandLoader\BrandLoader.tsx ===
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import gsap from "gsap";
+import { Banderitas } from "@/common/components/Banderitas"
+import "./BrandLoader.css";
+
+/**
+ * TUNING CONFIG â€” Adjust all BrandLoader timings from this single object.
+ * All durations are in seconds; thresholds are in milliseconds.
+ */
+export const LOADER_TIMING = {
+  // Anti-flicker & readiness thresholds (ms)
+  antiFlickerDelayMs: 150, // Never show if ready faster than this
+  slowLoadThresholdMs: 8000, // Show "Taking longer than usual..." + Retry
+
+  // Full intro build (~2.0s total)
+  full: {
+    tindahanDuration: 0.55,
+    taglineLinesDuration: 0.45,
+    tileDropDuration: 0.32,
+    tileStagger: 0.035, // ~40ms stagger across 17 tiles
+    tilesOverlap: "-=0.25", // Slight overlap with step 1
+    letterDropDuration: 0.35,
+    letterStagger: 0.11,
+    cursorPopDuration: 0.2,
+    cursorClickDuration: 0.15,
+    tagSwingDuration: 0.45,
+    exitDuration: 0.45,
+  },
+
+  // Compact variant (~0.9s build, ~0.3s exit) for repeat loads in same session
+  compact: {
+    timeScale: 2.2,
+    exitDuration: 0.3,
+  },
+
+  // Fast-forward multiplier when app becomes ready mid-build (legacy fallback)
+  fastForwardTimeScale: 3.5,
+
+  // Adaptive exit durations based on actual load speed (seconds)
+  adaptiveExitFast: 0.24,   // < 400ms load
+  adaptiveExitNormal: 0.32, // 400â€“1200ms load
+  adaptiveExitSlow: 0.42,   // > 1200ms load
+
+  // Fiesta banderitas: wrapper divs drop in staggered, never flags/SVG
+  bunting: {
+    dropDuration: 0.7,
+    topStart: 0.1,
+    lowStart: 0.3,
+    bottomStart: 0.45,
+    dropDistance: 90, // px
+  },
+
+  // Calm idle shine sweep interval (seconds)
+  idleShineDuration: 0.75,
+  idleShineRepeatDelay: 1.6,
+
+  // Reduced-motion fade duration (seconds)
+  reducedMotionFade: 0.2,
+} as const;
+
+const SESSION_KEY = "rtu_tindahan_intro_seen";
+
+// 17 awning tiles sampled left-to-right from the RTU Tindahan logo
+const AWNING_COLORS = [
+  "#ffbd59", "#c25959", "#ffffff",
+  "#ffbd59", "#c25959", "#ffffff",
+  "#ffbd59", "#c25959", "#ffffff",
+  "#ffbd59", "#c25959", "#ffffff",
+  "#ffbd59", "#c25959", "#ffffff",
+  "#ffbd59", "#c25959",
+] as const;
+
+export type BrandLoaderVariant = "full" | "compact" | "auto";
+
+export interface BrandLoaderProps {
+  /** True when the app/page data is still loading */
+  isLoading: boolean;
+  /** "auto" plays full on first session visit, compact on subsequent boots */
+  variant?: BrandLoaderVariant;
+  /** Optional retry callback for the 8s slow-load fallback */
+  onRetry?: () => void;
+  /** Called after the exit animation finishes and the loader unmounts */
+  onExited?: () => void;
+  /** GSAP timeScale multiplier for build & exit (1 = normal, 2 = 2x faster, etc.) */
+  timeScale?: number;
+  /** Bypass the 150ms anti-flicker delay and show immediately (e.g. login flow) */
+  immediate?: boolean;
+}
+
+function markIntroSeen(): void {
+  try {
+    window.sessionStorage.setItem(SESSION_KEY, "1");
+  } catch {
+    // Ignore storage errors in restricted/private contexts
+  }
+}
+
+export const BrandLoader: React.FC<BrandLoaderProps> = ({
+  isLoading,
+  variant = "auto",
+  onRetry,
+  onExited,
+  timeScale = 1,
+  immediate = false,
+}) => {
+  const [shouldRender, setShouldRender] = useState<boolean>(false);
+  const [isExiting, setIsExiting] = useState<boolean>(false);
+  const [isSlowLoad, setIsSlowLoad] = useState<boolean>(false);
+
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const buildTlRef = useRef<gsap.core.Timeline | null>(null);
+  const idleTlRef = useRef<gsap.core.Timeline | null>(null);
+  const buildCompletedRef = useRef<boolean>(false);
+  const exitStartedRef = useRef<boolean>(false);
+  const isLoadingRef = useRef<boolean>(isLoading);
+  /** Recorded the moment shouldRender becomes true â€” used to compute elapsed load time. */
+  const loadStartMsRef = useRef<number>(0);
+  /** True on the very first render. On initial mount with isLoading=true we skip
+   * the anti-flicker delay so the brand loader always shows on a fresh page load. */
+  const initialMountRef = useRef(true);
+  /** Prop refs â€” updated via effects so the build effect (which depends only on
+   * shouldRender) always reads the latest props without re-running. */
+  const variantRef = useRef<BrandLoaderVariant>(variant);
+  const onExitedRef = useRef<(() => void) | undefined>(onExited);
+  const timeScaleRef = useRef<number>(timeScale);
+  /** Adaptive exit duration in seconds, set by accelerateToFinish(). */
+  const adaptiveExitSecRef = useRef<number>(0.32);
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
+
+  // Keep prop refs in sync so the build effect (which depends only on shouldRender)
+  // always reads the latest props without re-running.
+  useEffect(() => {
+    variantRef.current = variant;
+  }, [variant]);
+  useEffect(() => {
+    onExitedRef.current = onExited;
+  }, [onExited]);
+  useEffect(() => {
+    timeScaleRef.current = timeScale;
+  }, [timeScale]);
+
+  // 1. Anti-flicker gate: don't mount overlay if loading finishes in < 150ms.
+  // On initial mount with isLoading=true we show immediately â€” a full page reload
+  // should always play the brand intro. When `immediate` is true (login flow) we
+  // also bypass the delay so fast logins don't delay or skip the animation.
+  // Subsequent loading states (route changes, data refetches) still get the
+  // 150ms debounce to avoid flicker.
+  useEffect(() => {
+    if (!isLoading) return;
+    if (shouldRender) return;
+
+    if (initialMountRef.current || immediate) {
+      loadStartMsRef.current = Date.now();
+      setShouldRender(true);
+      initialMountRef.current = false;
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (isLoadingRef.current) {
+        setShouldRender(true);
+      }
+    }, LOADER_TIMING.antiFlickerDelayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [isLoading, shouldRender, immediate]);
+
+  // 2. Slow-load timer (8s)
+  useEffect(() => {
+    if (!shouldRender || !isLoading) {
+      setIsSlowLoad(false);
+      return;
+    }
+
+    const slowTimer = window.setTimeout(() => {
+      if (isLoadingRef.current) {
+        setIsSlowLoad(true);
+      }
+    }, LOADER_TIMING.slowLoadThresholdMs);
+
+    return () => window.clearTimeout(slowTimer);
+  }, [shouldRender, isLoading]);
+
+  // 3. Scroll lock + aria-busy on #root while visible
+  useEffect(() => {
+    if (!shouldRender) return;
+
+    const rootEl = document.getElementById("root");
+    document.body.style.overflow = "hidden";
+    rootEl?.setAttribute("aria-busy", "true");
+
+    return () => {
+      // Clear overflow so CSS (and the app's normal scrolling) takes over.
+      document.body.style.removeProperty("overflow");
+      rootEl?.removeAttribute("aria-busy");
+      // Always clear the inline navy background so the app's CSS background
+      // (var(--bg)) shows through even if the exit animation never ran.
+      document.body.style.removeProperty("background-color");
+      document.body.style.removeProperty("margin");
+      document.body.style.removeProperty("height");
+    };
+  }, [shouldRender]);
+
+  // 7. Safety net: if the loader stays visible for more than 10 seconds
+  //    (e.g. auth/restore or listings fetch is hung), force the exit so the
+  //    user is never trapped behind a blank navy overlay.
+  useEffect(() => {
+    if (!shouldRender || !isLoading) return;
+    const safetyTimer = window.setTimeout(() => {
+      runExit(0.2);
+    }, 10000);
+    return () => window.clearTimeout(safetyTimer);
+  }, [shouldRender, isLoading]);
+
+  // 4. Trigger exit animation helper
+  const runExit = (adaptiveExitDuration?: number) => {
+    if (exitStartedRef.current || !overlayRef.current || !stageRef.current) return;
+    exitStartedRef.current = true;
+    setIsExiting(true);
+    idleTlRef.current?.kill();
+    markIntroSeen();
+
+    // Clear <body> inline navy styles immediately so the app's normal
+    // background (var(--bg)) is already visible when the overlay fades out.
+    // Doing this at the start of exit (not at onComplete) prevents a flash
+    // of navy between the overlay disappearing and the styles clearing.
+    const bodyEl = document.body;
+    bodyEl.style.removeProperty("background-color");
+    bodyEl.style.removeProperty("margin");
+    bodyEl.style.removeProperty("height");
+    bodyEl.style.removeProperty("overflow");
+
+    const prefersReduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    let exitDuration: number;
+    if (prefersReduced) {
+      exitDuration = LOADER_TIMING.reducedMotionFade;
+    } else if (adaptiveExitDuration !== undefined) {
+      exitDuration = adaptiveExitDuration;
+    } else {
+      exitDuration = adaptiveExitSecRef.current || 0.32;
+    }
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        setShouldRender(false);
+        setIsExiting(false);
+        exitStartedRef.current = false;
+        buildCompletedRef.current = false;
+        onExited?.();
+      },
+    });
+
+    if (prefersReduced) {
+      tl.to(overlayRef.current, { opacity: 0, duration: exitDuration, ease: "power1.out" });
+    } else {
+      tl.to(stageRef.current, {
+        y: -24,
+        scale: 1.05,
+        opacity: 0,
+        duration: exitDuration * 0.8,
+        ease: "power2.in",
+      }).to(
+        overlayRef.current,
+        {
+          opacity: 0,
+          duration: exitDuration * 0.75,
+          ease: "power2.out",
+        },
+        `-=${exitDuration * 0.45}`
+      );
+    }
+  };
+
+  // 5. GSAP Build & Idle Timeline (StrictMode-safe via gsap.context)
+  //    Depends ONLY on [shouldRender] so prop changes (variant/timeScale/onExited)
+  //    when isSigningIn flips never trigger ctx.revert() or kill the running timeline.
+  useLayoutEffect(() => {
+    if (!shouldRender || !overlayRef.current) return;
+
+    // Resolve variant once for this run â€” never re-resolve on prop changes.
+    const currentVariant =
+      variantRef.current !== "auto"
+        ? variantRef.current
+        : (() => {
+            try {
+              return window.sessionStorage.getItem(SESSION_KEY)
+                ? "compact"
+                : "full";
+            } catch {
+              return "full";
+            }
+          })();
+    const currentTimeScale = timeScaleRef.current;
+
+    const prefersReduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    const ctx = gsap.context(() => {
+      if (prefersReduced) {
+        // Reduced motion: show all elements statically, then fade the overlay in
+        gsap.set([
+          ".bl-tindahan",
+          ".bl-tagline-text",
+          ".bl-tagline-line-left",
+          ".bl-tagline-line-right",
+          ".bl-tile",
+          ".bl-letter",
+          ".bl-cursor",
+          ".bl-tag-group",
+          ".bl-shine",
+          ".bl-bunting",
+        ], { opacity: 1, scaleX: 1, y: 0, x: 0, skewX: 0, rotation: 0, scale: 1, transformOrigin: "center center" });
+        gsap.fromTo(
+          overlayRef.current,
+          { opacity: 0 },
+          {
+            opacity: 1,
+            duration: LOADER_TIMING.reducedMotionFade,
+            onComplete: () => {
+              buildCompletedRef.current = true;
+              if (!isLoadingRef.current) {
+                runExit(adaptiveExitSecRef.current);
+              }
+            },
+          }
+        );
+        return;
+      }
+
+      const cfg = LOADER_TIMING.full;
+
+      // Initial hidden states (transform & opacity only)
+      gsap.set(".bl-tindahan", { x: -70, skewX: -12, opacity: 0 });
+      gsap.set(".bl-tagline-text", { opacity: 0, scale: 0.94, transformOrigin: "center center" });
+      gsap.set(".bl-tagline-line-left", { scaleX: 0, transformOrigin: "right center" });
+      gsap.set(".bl-tagline-line-right", { scaleX: 0, transformOrigin: "left center" });
+      gsap.set(".bl-tile", { y: -32, scaleY: 0.75, opacity: 0, transformOrigin: "center bottom" });
+      gsap.set(".bl-awning-group", { transformOrigin: "center bottom" });
+      gsap.set(".bl-letter", { y: -70, opacity: 0, transformOrigin: "center bottom" });
+      gsap.set(".bl-cursor", { scale: 0, opacity: 0, transformOrigin: "20% 20%" });
+      gsap.set(".bl-tag-group", { rotation: -28, opacity: 0, transformOrigin: "100% 0%" });
+      gsap.set(".bl-shine", { x: -460, opacity: 0 });
+
+      const buntingCfg = LOADER_TIMING.bunting;
+      gsap.set(".bl-bunting", { y: -buntingCfg.dropDistance, opacity: 0 });
+
+      const tl = gsap.timeline({
+        onComplete: () => {
+          buildCompletedRef.current = true;
+          if (!isLoadingRef.current) {
+            runExit(adaptiveExitSecRef.current);
+          } else {
+            // Calm idle state: soft shine sweep across the awning every ~1.6s
+            idleTlRef.current = gsap
+              .timeline({ repeat: -1, repeatDelay: LOADER_TIMING.idleShineRepeatDelay })
+              .fromTo(
+                ".bl-shine",
+                { x: -460, opacity: 0 },
+                {
+                  x: 520,
+                  opacity: 0.45,
+                  duration: LOADER_TIMING.idleShineDuration,
+                  ease: "power1.inOut",
+                }
+              )
+              .to(".bl-shine", { opacity: 0, duration: 0.15 }, "-=0.15");
+          }
+        },
+      });
+
+      // STEP 1: TINDAHAN rushes in + tagline lines draw outward from center
+      tl.to(".bl-tindahan", {
+        x: 0,
+        skewX: 0,
+        opacity: 1,
+        duration: cfg.tindahanDuration,
+        ease: "power3.out",
+      })
+        .to(
+          ".bl-tagline-text",
+          { opacity: 1, scale: 1, duration: 0.3, ease: "power2.out" },
+          `-=${cfg.tindahanDuration * 0.5}`
+        )
+        .to(
+          [".bl-tagline-line-left", ".bl-tagline-line-right"],
+          { scaleX: 1, opacity: 1, duration: cfg.taglineLinesDuration, ease: "power2.out" },
+          `-=${cfg.tindahanDuration * 0.45}`
+        );
+
+      // STEP 2: 17 Awning tiles drop left-to-right with overshoot + squash
+      tl.to(
+        ".bl-tile",
+        {
+          y: 0,
+          scaleY: 1,
+          opacity: 1,
+          duration: cfg.tileDropDuration,
+          stagger: cfg.tileStagger,
+          ease: "back.out(1.6)",
+        },
+        cfg.tilesOverlap
+      ).to(
+        ".bl-tag-group",
+        {
+          rotation: 0,
+          opacity: 1,
+          duration: cfg.tagSwingDuration,
+          ease: "elastic.out(1, 0.45)",
+        },
+        "-=0.35"
+      );
+
+      // STEP 3: R drops first, lands on awning with bounce
+      tl.to(".bl-letter-r", {
+        y: 0,
+        opacity: 1,
+        duration: cfg.letterDropDuration,
+        ease: "bounce.out",
+      }, "+=0.1")
+        .to(".bl-awning-group", {
+          scaleY: 0.94,
+          duration: 0.07,
+          yoyo: true,
+          repeat: 1,
+          ease: "power1.inOut",
+        }, "-=0.15")
+        // T drops right after R lands
+        .to(".bl-letter-t", {
+          y: 0,
+          opacity: 1,
+          duration: cfg.letterDropDuration,
+          ease: "bounce.out",
+        }, "-=0.22")
+        .to(".bl-awning-group", {
+          scaleY: 0.94,
+          duration: 0.07,
+          yoyo: true,
+          repeat: 1,
+          ease: "power1.inOut",
+        }, "-=0.15")
+        // U drops right after T lands
+        .to(".bl-letter-u", {
+          y: 0,
+          opacity: 1,
+          duration: cfg.letterDropDuration,
+          ease: "bounce.out",
+        }, "-=0.22")
+        .to(".bl-awning-group", {
+          scaleY: 0.94,
+          duration: 0.07,
+          yoyo: true,
+          repeat: 1,
+          ease: "power1.inOut",
+        }, "-=0.15");
+
+      // STEP 4: Cursor arrow pops in and performs a single "click" press
+      tl.to(
+        ".bl-cursor",
+        {
+          scale: 1,
+          opacity: 1,
+          duration: cfg.cursorPopDuration,
+          ease: "back.out(2)",
+        },
+        "-=0.1"
+      ).to(".bl-cursor", {
+        scale: 0.84,
+        duration: cfg.cursorClickDuration * 0.5,
+        yoyo: true,
+        repeat: 1,
+        ease: "power2.inOut",
+      });
+
+      // STEP 5: Fiesta banderitas wrappers drop in staggered (absolute start times).
+      // Even though they're added late in the chain, absolute times keep them overlapping
+      // the logo build so the total build duration does not grow.
+      tl.to(
+        ".bl-bunting--top",
+        { y: 0, opacity: 1, duration: buntingCfg.dropDuration, ease: "back.out(1.4)" },
+        buntingCfg.topStart
+      )
+        .to(
+          ".bl-bunting--low",
+          { y: 0, opacity: 1, duration: buntingCfg.dropDuration, ease: "back.out(1.4)" },
+          buntingCfg.lowStart
+        )
+        .to(
+          ".bl-bunting--bottom",
+          {
+            y: 0,
+            opacity: 1,
+            duration: buntingCfg.dropDuration,
+            ease: "back.out(1.4)",
+          },
+          buntingCfg.bottomStart
+        );
+
+      // Network-aware starting speed: slow networks play slower, fast networks play at normal/compact speed
+      const effType = (navigator as any).connection?.effectiveType;
+      const isSlowNetwork =
+        effType === "slow-2g" || effType === "2g" || effType === "3g";
+      let startTimeScale: number;
+      if (isSlowNetwork) {
+        startTimeScale = 0.75;
+      } else if (currentVariant === "compact") {
+        startTimeScale = LOADER_TIMING.compact.timeScale;
+      } else if (currentTimeScale && currentTimeScale !== 1) {
+        startTimeScale = currentTimeScale;
+      } else {
+        startTimeScale = 1.0;
+      }
+      tl.timeScale(startTimeScale);
+
+      buildTlRef.current = tl;
+    }, overlayRef);
+
+    return () => {
+      buildTlRef.current = null;
+      idleTlRef.current = null;
+      ctx.revert();
+    };
+  }, [shouldRender]);
+
+  // Accelerate the build timeline to finish in targetSec seconds,
+  // computed from remaining time and actual load elapsed time.
+  const accelerateToFinish = (tl: gsap.core.Timeline) => {
+    const remaining = Math.max(0.05, tl.duration() - tl.time());
+    const elapsed = Date.now() - loadStartMsRef.current;
+    // Fast load finishes remaining steps briskly (~0.42s); slower load eases out (~0.58s)
+    const targetSec = elapsed < 400 ? 0.42 : elapsed < 1200 ? 0.50 : 0.58;
+    const neededScale = Math.max(1.5, Math.min(6.0, remaining / targetSec));
+    adaptiveExitSecRef.current = elapsed < 400 ? 0.24 : elapsed < 1200 ? 0.32 : 0.40;
+    gsap.killTweensOf(tl);
+    gsap.to(tl, {
+      timeScale: neededScale,
+      duration: 0.12,
+      ease: "power2.out",
+      overwrite: true,
+    });
+  };
+
+  // 6. Bidirectional adaptive speed:
+  //    - While loading drags on, smoothly decelerate the build (calm, never frozen)
+  //    - When loading finishes, fast-forward proportionally to how fast it actually was
+  //    - Safety: if the build timeline is null (e.g. context was recreated), force
+  //      the exit so the overlay never traps the app under a blank navy screen.
+  useEffect(() => {
+    if (!shouldRender) return;
+
+    // ----- Still loading: schedule real-time slowdown -----
+    if (isLoading) {
+      if (loadStartMsRef.current === 0) {
+        loadStartMsRef.current = Date.now();
+      }
+
+      const timer1 = window.setTimeout(() => {
+        if (
+          isLoadingRef.current &&
+          buildTlRef.current &&
+          !buildCompletedRef.current
+        ) {
+          gsap.to(buildTlRef.current, {
+            timeScale: 0.55,
+            duration: 0.5,
+            ease: "power2.out",
+            overwrite: true,
+          });
+        }
+      }, 500);
+
+      const timer2 = window.setTimeout(() => {
+        if (
+          isLoadingRef.current &&
+          buildTlRef.current &&
+          !buildCompletedRef.current
+        ) {
+          gsap.to(buildTlRef.current, {
+            timeScale: 0.35,
+            duration: 0.6,
+            ease: "power2.out",
+            overwrite: true,
+          });
+        }
+      }, 1400);
+
+      return () => {
+        window.clearTimeout(timer1);
+        window.clearTimeout(timer2);
+      };
+    }
+
+    // ----- Loading finished: fast-forward adaptively -----
+    if (!isLoading) {
+      const elapsedMs = Date.now() - loadStartMsRef.current;
+      adaptiveExitSecRef.current =
+        elapsedMs < 400 ? 0.24 : elapsedMs < 1200 ? 0.32 : 0.40;
+
+      if (buildCompletedRef.current) {
+        runExit(adaptiveExitSecRef.current);
+      } else if (buildTlRef.current) {
+        accelerateToFinish(buildTlRef.current);
+      } else {
+        // No timeline exists â€” force the exit immediately so we never
+        // leave the user staring at a blank navy overlay.
+        runExit(adaptiveExitSecRef.current);
+      }
+    }
+  }, [isLoading, shouldRender]);
+
+  if (!shouldRender) return null;
+
+  return (
+    <div
+      ref={overlayRef}
+      className={`brand-loader-overlay${isExiting ? " brand-loader-overlay--exiting" : ""}`}
+      role="status"
+      aria-live="polite"
+    >
+      <span className="bl-sr-only">Loading RTU Tindahan</span>
+
+      <div ref={stageRef} className="brand-loader-stage" style={{ position: "relative", zIndex: 2 }}>
+        <svg
+          className="brand-loader-svg"
+          viewBox="0 0 600 340"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <defs>
+            {/* Clip path for the idle shine sweep across the 17-tile awning */}
+            <clipPath id="bl-awning-clip">
+              <rect x="82" y="166" width="436" height="46" rx="8" />
+            </clipPath>
+            <linearGradient id="bl-shine-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
+              <stop offset="50%" stopColor="#ffffff" stopOpacity="0.65" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
+          {/* LAYER 1: R, T, U Letters (sit directly on top of the awning) */}
+          <g className="bl-letters-group">
+            {/* R */}
+            <g className="bl-letter bl-letter-r">
+              <path
+                d="M126 170V54C126 48.5 130.5 44 136 44H188C214 44 231 59 231 83C231 101 221 114 205 119L232 170H197L174 124H158V170H126ZM158 98H184C194 98 200 92 200 83C200 74 194 69 184 69H158V98Z"
+                fill="#ffffff"
+              />
+            </g>
+            {/* T */}
+            <g className="bl-letter bl-letter-t">
+              <path
+                d="M258 44H352C357.5 44 362 48.5 362 54V66C362 71.5 357.5 76 352 76H322V170H288V76H258C252.5 76 248 71.5 248 66V54C248 48.5 252.5 44 258 44Z"
+                fill="#ffffff"
+              />
+            </g>
+            {/* U */}
+            <g className="bl-letter bl-letter-u">
+              <path
+                d="M388 44H412C417.5 44 422 48.5 422 54V124C422 138 431 146 444 146C457 146 466 138 466 124V54C466 48.5 470.5 44 476 44H500C505.5 44 510 48.5 510 54V126C510 156 484 174 444 174C404 174 378 156 378 126V54C378 48.5 382.5 44 388 44Z"
+                fill="#ffffff"
+              />
+            </g>
+          </g>
+
+          {/* LAYER 2: Cursor Arrow overlapping the T */}
+          <g className="bl-cursor">
+            <path
+              d="M306 116L348 134L332 141L344 156L334 164L322 149L315 163L306 116Z"
+              fill="#ffbd59"
+            />
+          </g>
+
+          {/* LAYER 3: 17-Tile Awning + Idle Shine Sweep */}
+          <g className="bl-awning-group">
+            {AWNING_COLORS.map((color, i) => {
+              const x = 86 + i * 25.2;
+              const skew = (i - 8) * 1.1; // Subtle outward perspective fan
+              return (
+                <path
+                  key={i}
+                  className="bl-tile"
+                  d={`M${x + skew * 0.4} 168 H${x + 25.2 + skew * 0.4} L${x + 25.2 + skew} 196 A12.6 12.6 0 0 1 ${x + skew} 196 Z`}
+                  fill={color}
+                />
+              );
+            })}
+
+            {/* Idle Shine Overlay */}
+            <g clipPath="url(#bl-awning-clip)">
+              <rect
+                className="bl-shine"
+                x="80"
+                y="160"
+                width="90"
+                height="60"
+                fill="url(#bl-shine-grad)"
+                transform="skewX(-20)"
+              />
+            </g>
+          </g>
+
+          {/* LAYER 4: Price Tag + String (left side) */}
+          <g className="bl-tag-group">
+            <path
+              d="M90 198 C78 214, 108 232, 96 254 C90 264, 80 266, 76 266"
+              stroke="#ffffff"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <path
+              d="M78 265 L98 294"
+              stroke="#ffffff"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <g transform="translate(46, 252) rotate(-18)">
+              <path
+                d="M6 0 H30 L42 13 L30 26 H6 A6 6 0 0 1 0 20 V6 A6 6 0 0 1 6 0 Z"
+                fill="#c25959"
+              />
+              <circle cx="31" cy="13" r="3.2" fill="#1a2f57" stroke="#ffffff" strokeWidth="1.5" />
+            </g>
+          </g>
+
+          {/* LAYER 5: TINDAHAN Wordmark */}
+          <g className="bl-tindahan">
+            <text
+              x="300"
+              y="264"
+              textAnchor="middle"
+              fill="#ffbd59"
+              fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+              fontWeight="900"
+              fontSize="64"
+              letterSpacing="5"
+            >
+              TINDAHAN
+            </text>
+          </g>
+
+          {/* LAYER 6: CAMPUS MARKETPLACE + Side Lines */}
+          <g className="bl-tagline-group">
+            <line
+              className="bl-tagline-line bl-tagline-line-left"
+              x1="88"
+              y1="296"
+              x2="164"
+              y2="296"
+              stroke="#ffbd59"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+            <text
+              className="bl-tagline-text"
+              x="300"
+              y="301"
+              textAnchor="middle"
+              fill="#ffffff"
+              fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+              fontWeight="700"
+              fontSize="16"
+              letterSpacing="3.5"
+            >
+              CAMPUS MARKETPLACE
+            </text>
+            <line
+              className="bl-tagline-line bl-tagline-line-right"
+              x1="436"
+              y1="296"
+              x2="512"
+              y2="296"
+              stroke="#ffbd59"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </g>
+        </svg>
+      </div>
+
+      <div className="bl-bunting bl-bunting--top" aria-hidden="true">
+        <div className="bl-bunting-scale">
+          <Banderitas variant="canopy" opacity={0.95} />
+        </div>
+      </div>
+      <div className="bl-bunting bl-bunting--low" aria-hidden="true">
+        <div className="bl-bunting-scale">
+          <Banderitas variant="garland" opacity={0.9} />
+        </div>
+      </div>
+      <div className="bl-bunting bl-bunting--bottom" aria-hidden="true">
+        <div className="bl-bunting-scale">
+          <Banderitas variant="garland" opacity={0.8} />
+        </div>
+      </div>
+
+      {isSlowLoad && (
+        <div className="brand-loader-slow">
+          <span>Taking longer than usualâ€¦</span>
+          <button
+            type="button"
+            className="brand-loader-retry"
+            onClick={() => (onRetry ? onRetry() : window.location.reload())}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+=== C:\Users\Lian Andrew\Desktop\RTU_Tindahan_Capstone\RTU_Tindahan_Final\RTU_Tindahan\frontend\src\features\authentication\pages\LoginPage.tsx ===
+import { useLayoutEffect, useEffect, useRef, useState, useCallback } from 'react'
+import gsap from 'gsap'
+import { navigate } from '@/common/router/router'
+import { apiFetch, ApiRequestError } from '@/common/api/client'
+import { LoginForm } from '../components/LoginForm'
+import { useAuth } from '../AuthContext'
+import { Icon } from '@/common/components/Icon'
+import logoImg from '@/assets/logo-removebg-preview.png'
+import img0 from '@/assets/SampleImages/0.jpg'
+import imgRtu from '@/assets/SampleImages/applying-to-rizal-technological-university.png'
+import imgBef from '@/assets/SampleImages/bef71f2e0c003d63.jpeg'
+import img3 from '@/assets/SampleImages/images (3).jpeg'
+import img4 from '@/assets/SampleImages/images (4).jpeg'
+import img5 from '@/assets/SampleImages/images (5).jpeg'
+import { Banderitas } from '@/common/components/Banderitas'
+import type { LoginCredentials } from '../types'
+import './LoginPage.css'
+
+const LAST_LOGIN_EMAIL_KEY = 'rtu:last-login-email'
+
+const CAROUSEL_IMAGES = [
+  { src: img0, alt: 'Sample image 0' },
+  { src: imgRtu, alt: 'Applying to RTU' },
+  { src: imgBef, alt: 'Sample image bef71f2e0c003d63' },
+  { src: img3, alt: 'Campus marketplace image 3' },
+  { src: img4, alt: 'Campus marketplace image 4' },
+  { src: img5, alt: 'Campus marketplace image 5' },
+]
+
+/* ---- Carousel motion settings ---- */
+const STEP_SECONDS = 3 // how long each image rests in the center
+const SLIDE_SECONDS = 1.2 // how long the glide to the next image takes
+const TRAVEL = 210 // xPercent each card travels from (+) to (-); controls neighbour spacing
+
+/**
+ * Auto-sliding, seamlessly looping carousel (no controls).
+ *
+ * Based on the GSAP "infinite cards" loop: every card flies across the track
+ * while scaling/fading in and out (yoyo), staggered so the card in the middle
+ * is biggest and its neighbours shrink away on each side. Instead of a
+ * ScrollTrigger, a single `pos` value is eased from slide to slide, and every
+ * card's pass is rendered from that value, so the loop never has a seam.
+ */
+function LoginCarousel({ images }: { images: { src: string; alt: string }[] }) {
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+
+    const ctx = gsap.context(() => {
+      const cards = gsap.utils.toArray<HTMLElement>('.login-carousel-card')
+      const n = cards.length
+      if (n === 0) return
+
+      // One paused "pass" timeline per card: scale/opacity/grayscale peak in the
+      // middle (yoyo) while the card travels right â†’ left in a straight line.
+      const passes = cards.map((card) =>
+        gsap
+          .timeline({ paused: true })
+          .fromTo(
+            card,
+            { scale: 0 },
+            { scale: 1, duration: 0.5, yoyo: true, repeat: 1, ease: 'power1.in' },
+            0
+          )
+          .fromTo(
+            card,
+            { opacity: 0, filter: 'grayscale(60%)' },
+            { opacity: 1, filter: 'grayscale(0%)', duration: 0.5, yoyo: true, repeat: 1, ease: 'sine.in' },
+            0
+          )
+          .fromTo(card, { xPercent: TRAVEL }, { xPercent: -TRAVEL, duration: 1, ease: 'none' }, 0)
+      )
+
+      const wrap = gsap.utils.wrap(0, 1)
+      const state = { pos: 0 } // card `i` is centered whenever pos === i (mod n)
+
+      const render = () => {
+        passes.forEach((pass, i) => {
+          const progress = wrap(0.5 + (state.pos - i) / n)
+          pass.progress(progress)
+          // keep the centered card on top (z-index must be an integer)
+          cards[i].style.zIndex = String(Math.round((1 - Math.abs(progress - 0.5) * 2) * 100))
+        })
+      }
+      render()
+
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+      let target = 0
+      const advance = () => {
+        target += 1
+        gsap.to(state, {
+          pos: target,
+          duration: SLIDE_SECONDS,
+          ease: 'power3.inOut',
+          overwrite: true,
+          onUpdate: render,
+        })
+      }
+
+      // slide on a steady beat, forever
+      gsap
+        .timeline({ repeat: -1, delay: STEP_SECONDS })
+        .call(advance)
+        .to({}, { duration: STEP_SECONDS })
+    }, root)
+
+    return () => ctx.revert()
+  }, [images.length])
+
+  return (
+    <div className="login-carousel" ref={rootRef} aria-roledescription="carousel" aria-label="Campus marketplace images">
+      <div className="login-carousel-track">
+        {images.map(({ src, alt }) => (
+          <div className="login-carousel-card" key={src}>
+            <img src={src} alt={alt} draggable={false} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** The sign-in page. Matches the prototype layout: split panel with info on the left, form on the right. */
+export function LoginPage() {
+  const { login } = useAuth()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [lock, setLock] = useState<{ kind: 'cooldown' | 'restricted'; until: number } | null>(null)
+  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null)
+  const [nextPenalty, setNextPenalty] = useState<string | null>(null)
+  const [popup, setPopup] = useState<'guidelines' | 'policy' | null>(null)
+  const loginStartRef = useRef<number>(0)
+  const lockTimerRef = useRef<number>(0)
+
+  // Always scroll down when entering the sign-in page
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // ---- Lockout / cooldown timer ----
+  // Remaining time is always computed from `until - Date.now()` so a throttled
+  // background tab does not drift. Changing the computer clock only changes the
+  // display; the server enforces the real block.
+  const clearLockTimer = useCallback(() => {
+    if (lockTimerRef.current) {
+      window.clearInterval(lockTimerRef.current)
+      lockTimerRef.current = 0
+    }
+  }, [])
+
+  const tickLock = useCallback(() => {
+    if (!lock) return
+    const remaining = Math.max(0, lock.until - Date.now())
+    if (remaining <= 0) {
+      clearLockTimer()
+      setLock(null)
+      setAttemptsLeft(null)
+      setNextPenalty(null)
+      // Confirm with the server now that the lock should be gone.
+      const savedEmail = sessionStorage.getItem(LAST_LOGIN_EMAIL_KEY)
+      if (savedEmail) {
+        void apiFetch<{ locked: boolean; code: string | null; retry_after: number }>('/auth/login-status/', {
+          method: 'POST',
+          body: { email: savedEmail },
+        }).then(({ locked, code, retry_after }) => {
+          if (!locked) {
+            // Server says the lock is gone; the form is re-enabled.
+            return
+          }
+          // Server still locked: restore from its answer.
+          setLock({ kind: code === 'login_restricted' ? 'restricted' : 'cooldown', until: Date.now() + retry_after * 1000 })
+        })
+      }
+      return
+    }
+  }, [lock, clearLockTimer])
+
+  // ---- On mount: restore any in-progress lock from sessionStorage ----
+  useEffect(() => {
+    const savedEmail = sessionStorage.getItem(LAST_LOGIN_EMAIL_KEY)
+    if (!savedEmail) return
+
+    void apiFetch<{ locked: boolean; code: string | null; retry_after: number }>('/auth/login-status/', {
+      method: 'POST',
+      body: { email: savedEmail },
+    }).then(({ locked, code, retry_after }) => {
+      if (locked && retry_after > 0) {
+        setLock({ kind: code === 'login_restricted' ? 'restricted' : 'cooldown', until: Date.now() + retry_after * 1000 })
+        lockTimerRef.current = window.setInterval(tickLock, 1000)
+      }
+    })
+
+    return () => {
+      clearLockTimer()
+    }
+  }, [tickLock, clearLockTimer])
+
+  // Whenever the email field loses focus, check the server for the current lock state.
+  const checkLockStatus = (email: string) => {
+    const trimmed = email.trim().toLowerCase()
+    if (!trimmed) return
+    sessionStorage.setItem(LAST_LOGIN_EMAIL_KEY, trimmed)
+    void apiFetch<{ locked: boolean; code: string | null; retry_after: number }>('/auth/login-status/', {
+      method: 'POST',
+      body: { email: trimmed },
+    }).then(({ locked, code, retry_after }) => {
+      if (locked && retry_after > 0) {
+        setLock({ kind: code === 'login_restricted' ? 'restricted' : 'cooldown', until: Date.now() + retry_after * 1000 })
+        setAttemptsLeft(null)
+        setNextPenalty(null)
+        lockTimerRef.current = window.setInterval(tickLock, 1000)
+      } else {
+        setLock(null)
+        setAttemptsLeft(null)
+        setNextPenalty(null)
+        clearLockTimer()
+      }
+    })
+  }
+
+  const handleLogin = async ({ email, password }: LoginCredentials) => {
+    loginStartRef.current = Date.now()
+    setIsLoading(true)
+    setError(null)
+    setAttemptsLeft(null)
+    setNextPenalty(null)
+    try {
+      await login(email, password)
+      // Successful login: AppRoutes detects the new user and redirects via redirectTo.
+      // BrandLoader is shown during that transition via isTransitioning in AuthContext.
+      sessionStorage.removeItem(LAST_LOGIN_EMAIL_KEY)
+      clearLockTimer()
+      setLock(null)
+    } catch (err) {
+      if (err instanceof ApiRequestError) {
+        if (err.retryAfter !== undefined) {
+          // A lock (cooldown or restriction) was imposed.
+          setLock({ kind: err.code === 'login_restricted' ? 'restricted' : 'cooldown', until: Date.now() + err.retryAfter * 1000 })
+          sessionStorage.setItem(LAST_LOGIN_EMAIL_KEY, email.trim().toLowerCase())
+          lockTimerRef.current = window.setInterval(tickLock, 1000)
+          if (err.attemptsLeft !== undefined) {
+            setAttemptsLeft(err.attemptsLeft)
+            setNextPenalty(err.nextPenalty ?? null)
+          }
+          setError(err.code === 'login_restricted'
+            ? `Your login access is temporarily restricted for security reasons. Try again in ${formatTime(err.retryAfter)}.`
+            : `Too many failed attempts. You can try again in ${formatTime(err.retryAfter)}.`)
+          return
+        }
+        if (err.attemptsLeft !== undefined) {
+          setAttemptsLeft(err.attemptsLeft)
+          setNextPenalty(err.nextPenalty ?? null)
+        }
+      }
+      setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleForgotPassword = () => {
+    navigate('forgot-password')
+  }
+
+  const handleGuidelines = () => {
+    setPopup('guidelines')
+  }
+
+  // Remaining seconds for the active lock (0 when none).
+  const remainingSeconds = lock ? Math.max(0, Math.ceil((lock.until - Date.now()) / 1000)) : 0
+  const defaultEmail = sessionStorage.getItem(LAST_LOGIN_EMAIL_KEY) || ''
+
+  return (
+    <div className="login-page">
+      <div className="split">
+        {/* Left info panel (navy background, from prototype) */}
+        <div className="l" style={{ position: 'relative' }}>
+          <Banderitas variant="canopy" opacity={0.88} />
+          <button className="logo" type="button" onClick={() => navigate('/')} style={{ position: 'relative', zIndex: 2 }}>
+            <img className="logo-img" src={logoImg} alt="RTU Tindahan Campus Marketplace" />
+          </button>
+          <LoginCarousel images={CAROUSEL_IMAGES} />
+          <div className="info-panel" style={{ position: 'relative', zIndex: 2 }}>
+            <h1 className="hero-h">Your campus marketplace, made for everyday student life.</h1>
+            <p>
+              Buy merienda, find pre-loved books, book student services, and request official RTU items from verified students and personnel at Pasig Campus.
+            </p>
+            <div className="row wrap small" style={{ opacity: 0.9, gap: 16, justifyContent: 'center' }}>
+              <span className="row" style={{ gap: 6 }}>
+                <Icon name="shield" size="sm" /> Verified RTU accounts
+              </span>
+              <span className="row" style={{ gap: 6 }}>
+                <Icon name="pin" size="sm" /> Campus meetup only
+              </span>
+              <span className="row" style={{ gap: 6 }}>
+                <Icon name="bag" size="sm" /> Cash or e-wallet
+              </span>
+            </div>
+            <div className="note blue">
+              <Icon name="info" />
+              <span>
+                Access is restricted to verified RTU students and personnel. Never share your password or other sign-in details.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right form panel */}
+        <div className="r">
+          <div className="row between" style={{ width: '100%', maxWidth: '400px', marginBottom: 18 }}>
+            <button type="button" className="link" onClick={() => navigate('/verify')}>
+              Need help verifying?
+            </button>
+            <button type="button" className="link" onClick={handleGuidelines}>
+              View guidelines
+            </button>
+          </div>
+
+          <LoginForm
+            onSubmit={handleLogin}
+            isLoading={isLoading}
+            error={error}
+            onForgotPassword={handleForgotPassword}
+            lock={lock}
+            attemptsLeft={attemptsLeft}
+            nextPenalty={nextPenalty}
+            defaultEmail={defaultEmail}
+            onEmailBlur={checkLockStatus}
+            remainingSeconds={remainingSeconds}
+          />
+        </div>
+      </div>
+
+      {/* Popup: Community Guidelines â€” same as LandingPage */}
+      {popup === 'guidelines' && (
+        <div className="popup-overlay" onClick={() => setPopup(null)}>
+          <div className="popup-box" onClick={(e) => e.stopPropagation()}>
+            <div className="row" style={{ gap: 8, marginBottom: 16 }}>
+              <Icon name="note" size="sm" />
+              <span style={{ fontWeight: 600, color: 'var(--ink)' }}>Community Guidelines</span>
+            </div>
+            <ul className="small muted" style={{ lineHeight: 1.55, marginBottom: 20, paddingLeft: 20 }}>
+              <li>Be honest about what you sell, including its condition.</li>
+              <li>Meet only at visible spots inside Pasig Campus.</li>
+              <li>Pay in person. RTU Tindahan never handles money or delivery.</li>
+              <li>No exam answers, vaping products, medicines, resale tickets or weapons.</li>
+              <li>Treat every student and staff member with respect.</li>
+            </ul>
+            <div style={{ display: 'flex', flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" className="btn" onClick={() => setPopup(null)}>
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Format seconds as m:ss. */
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+=== C:\Users\Lian Andrew\Desktop\RTU_Tindahan_Capstone\RTU_Tindahan_Final\RTU_Tindahan\frontend\src\features\authentication\AuthContext.tsx ===
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { apiFetch, getToken, setToken } from '@/common/api/client'
+import type { User } from '@/common/types'
+
+/**
+ * AUTH CONTEXT â€” the Django backend is the source of truth
+ * ------------------------------------------------------------
+ * Replaced the prototype's offline authentication. Now:
+ *
+ *   Sign up   1. details  -> POST /auth/register/  (creates a visitor account
+ *                           and emails a 6-digit code)
+ *             2. code     -> POST /auth/verify-code/ (activates the account and
+ *                           returns a token, so the user is signed in)
+ *   Sign in                -> POST /auth/login/  (token, or an error code such
+ *                           as "email_not_verified")
+ *   Reload                 -> GET /auth/me/ with the stored token
+ *   Sign out               -> POST /auth/logout/ deletes the token server-side
+ *
+ * The token lives in localStorage under `rtu_token` (see common/api/client.ts)
+ * and is sent as `Authorization: Token <key>`.
+ */
+
+const STUDENT_EMAIL = /^\d{4}-\d{6}@rtu\.edu\.ph$/i
+const LOGIN_EMAIL = /^[^@\s]+@rtu\.edu\.ph$/i
+
+/** What the sign-up screen collects before the code is sent. */
+export interface RegisterInput {
+  first: string
+  last: string
+  email: string
+  pass: string
+  prog: string
+  year: number | null
+  consent: boolean
+}
+
+interface OtpState {
+  /** Where the code was sent. Drives the "we emailed you" screen. */
+  to: string
+  /** When it was requested, so the screen can show a resend countdown. */
+  sentAt: number
+}
+
+interface AuthValue {
+  user: User | null
+  /** true while restoring the session on first load */
+  isLoading: boolean
+  /** true while the login() API call is in flight (drives the local submit button spinner) */
+  isSigningIn: boolean
+  /** true after a successful login, drives the BrandLoader transition into the marketplace */
+  isTransitioning: boolean
+  /** Clears isTransitioning so BrandLoader can exit after the transition */
+  clearTransitioning: () => void
+  /** The pending sign-up code request (null before one has been sent) */
+  otp: OtpState | null
+  /** Clear the pending code request (used when starting over on step 1). */
+  clearOtp: () => void
+  login: (email: string, password: string) => Promise<void>
+  /** Step 2 of sign up: create the account and email a 6-digit code. */
+  register: (input: RegisterInput) => Promise<void>
+  /** Ask for another 6-digit code (30-second cooldown server-side). */
+  resendCode: (email: string) => Promise<void>
+  /** Step 3 of sign up: check the code and sign in. */
+  confirmCode: (email: string, code: string) => Promise<void>
+  logout: () => Promise<void>
+}
+
+const AuthContext = createContext<AuthValue | null>(null)
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isSigningIn, setIsSigningIn] = useState<boolean>(false)
+  const [isTransitioning, setIsTransitioning] = useState<boolean>(false)
+  const [otp, setOtp] = useState<OtpState | null>(null)
+
+  // -----------------------------------------------------------------------
+  // On first load: if a token is stored, ask the server who it belongs to.
+  // A rejected token is dropped so the user simply appears signed out.
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    let cancelled = false
+    const restore = async () => {
+      if (!getToken()) {
+        setIsLoading(false)
+        return
+      }
+      try {
+        const me = await apiFetch<User>('/auth/me/')
+        if (!cancelled) setUser(me)
+      } catch {
+        setToken(null)
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+    void restore()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // -----------------------------------------------------------------------
+  // Sign in
+  // -----------------------------------------------------------------------
+  const login = useCallback(async (email: string, password: string) => {
+    const address = email.trim().toLowerCase()
+    if (!LOGIN_EMAIL.test(address)) {
+      throw new Error('Use your RTU email, like 2024-123456@rtu.edu.ph.')
+    }
+    if (!password) throw new Error('Enter your password.')
+
+    setIsSigningIn(true)
+    try {
+      const data = await apiFetch<{ token: string; user: User }>('/auth/login/', {
+        method: 'POST',
+        body: { email: address, password },
+      })
+      setToken(data.token)
+      setUser(data.user)
+      setIsTransitioning(true)
+    } finally {
+      setIsSigningIn(false)
+    }
+  }, [])
+
+  // -----------------------------------------------------------------------
+  // Sign up, step 1 -> 2: create the account, then email the code
+  // -----------------------------------------------------------------------
+  const register = useCallback(async (input: RegisterInput) => {
+    const address = input.email.trim().toLowerCase()
+    if (!STUDENT_EMAIL.test(address)) {
+      throw new Error('Your RTU email must look like 2024-123456@rtu.edu.ph.')
+    }
+    if (!input.consent) {
+      throw new Error('Accept the privacy notice to create your account.')
+    }
+
+    const displayName = `${input.first.trim()} ${input.last.trim()}`.trim()
+    await apiFetch<{ detail: string; email: string }>('/auth/register/', {
+      method: 'POST',
+      body: {
+        email: address,
+        display_name: displayName,
+        password: input.pass,
+        password_confirm: input.pass,
+        member_type: 'student',
+        college: input.prog,
+        ...(input.year ? { year_level: input.year } : {}),
+        privacy_consent: input.consent,
+      },
+    })
+
+    setOtp({ to: address, sentAt: Date.now() })
+  }, [])
+
+  const resendCode = useCallback(async (email: string) => {
+    const address = email.trim().toLowerCase()
+    await apiFetch<{ detail: string }>('/auth/resend-code/', {
+      method: 'POST',
+      body: { email: address },
+    })
+    setOtp({ to: address, sentAt: Date.now() })
+  }, [])
+
+  // -----------------------------------------------------------------------
+  // Sign up, step 3: the code activates the account and signs the user in
+  // -----------------------------------------------------------------------
+  const confirmCode = useCallback(async (email: string, code: string) => {
+    const address = email.trim().toLowerCase()
+    const digits = String(code).replace(/\s/g, '')
+    if (!/^\d{6}$/.test(digits)) {
+      throw new Error('Enter the 6 digits from the email.')
+    }
+
+    const data = await apiFetch<{ token: string; user: User }>(
+      '/auth/verify-code/',
+      { method: 'POST', body: { email: address, code: digits } },
+    )
+    setToken(data.token)
+    setUser(data.user)
+    setOtp(null)
+  }, [])
+
+  // Clear the pending code request so starting over on step 1 does not
+  // auto-resume on the code screen.
+  const clearOtp = useCallback(() => {
+    setOtp(null)
+  }, [])
+
+  const clearTransitioning = useCallback(() => {
+    setIsTransitioning(false)
+  }, [])
+
+  // -----------------------------------------------------------------------
+  // Sign out
+  // -----------------------------------------------------------------------
+  const logout = useCallback(async () => {
+    try {
+      await apiFetch('/auth/logout/', { method: 'POST' })
+    } catch {
+      /* the token may already be gone; local state still has to clear */
+    }
+    setToken(null)
+    setUser(null)
+    setOtp(null)
+  }, [])
+
+  const value = useMemo(
+    () => ({
+      user,
+      isLoading,
+      isSigningIn,
+      isTransitioning,
+      otp,
+      clearOtp,
+      clearTransitioning,
+      login,
+      register,
+      resendCode,
+      confirmCode,
+      logout,
+    }),
+    [user, isLoading, isSigningIn, isTransitioning, otp, clearOtp, clearTransitioning, login, register, resendCode, confirmCode, logout],
+  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useAuth(): AuthValue {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>')
+  return ctx
+}
+
+=== C:\Users\Lian Andrew\Desktop\RTU_Tindahan_Capstone\RTU_Tindahan_Final\RTU_Tindahan\frontend\src\App.tsx ===
+import { AuthProvider } from '@/features/authentication'
+import { AppRoutes } from '@/features/core/AppRoutes'
+import { TindahanProvider } from '@/features/marketplace/context/TindahanContext'
+
+/** Root component: gives every page access to the signed-in user and marketplace state, then shows the right page. */
+export default function App() {
+  return (
+    <AuthProvider>
+      <TindahanProvider>
+        <AppRoutes />
+      </TindahanProvider>
+    </AuthProvider>
+  )
+}
+

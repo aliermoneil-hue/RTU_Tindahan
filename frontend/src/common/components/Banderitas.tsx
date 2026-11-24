@@ -8,6 +8,7 @@ export type BanderitasVariant =
   | 'canopy'
   | 'garland'
   | 'mini'
+  | 'header'
 
 interface BanderitasProps {
   variant?: BanderitasVariant
@@ -21,6 +22,29 @@ interface BanderitasProps {
 const DARK_SURFACE_COLORS = ['#f4b63a', '#c84b4b', '#2563eb', '#fffaf0']
 /** Brand colors for light/white surfaces — navy flag replaces cream so no white-on-white. */
 const LIGHT_SURFACE_COLORS = ['#f4b63a', '#c84b4b', '#2563eb', '#1a2f57']
+
+/** Irregular header strands: 1400px tile rendered twice for a 2800px repeat.
+ * Each strand starts/ends at y 0-6 along the header edge; deepest flag tip stays at or above y=40.
+ */
+const HEADER_STRANDS: {
+  p0: [number, number]
+  p1: [number, number]
+  p2: [number, number]
+  count: number
+  flagWidth: number
+  flagHeight: number
+  opacity?: number
+}[] = [
+  { p0: [-10, 0], p1: [80, 44], p2: [175, 2], count: 6, flagWidth: 14, flagHeight: 15, opacity: 1 },
+  { p0: [165, 2], p1: [228, 22], p2: [292, 0], count: 4, flagWidth: 12, flagHeight: 13, opacity: 0.95 },
+  { p0: [330, 0], p1: [372, 18], p2: [412, 0], count: 3, flagWidth: 11, flagHeight: 12, opacity: 0.9 },
+  { p0: [470, 0], p1: [585, 50], p2: [700, 0], count: 8, flagWidth: 14, flagHeight: 15, opacity: 1 },
+  { p0: [650, 1], p1: [715, 28], p2: [780, 3], count: 4, flagWidth: 12, flagHeight: 13, opacity: 0.8 },
+  { p0: [860, 0], p1: [905, 20], p2: [950, 0], count: 3, flagWidth: 11, flagHeight: 12, opacity: 0.9 },
+  { p0: [1010, 0], p1: [1100, 46], p2: [1195, 2], count: 6, flagWidth: 14, flagHeight: 14, opacity: 1 },
+  { p0: [1180, 2], p1: [1245, 24], p2: [1310, 0], count: 4, flagWidth: 12, flagHeight: 13, opacity: 0.85 },
+  { p0: [1290, 0], p1: [1345, 36], p2: [1410, 6], count: 4, flagWidth: 13, flagHeight: 14, opacity: 0.9 },
+]
 
 /** Build pennant polygons whose top edge sits flush on a quadratic Bezier curve. */
 function buildPennants(
@@ -292,6 +316,28 @@ export function Banderitas({
         <Strand p0={[0, 2]} p1={[200, 24]} p2={[400, 4]} count={11} flagWidth={22} flagHeight={18} colors={colors} glowId={glowId} />
         <Strand p0={[400, 4]} p1={[600, 24]} p2={[800, 4]} count={11} flagWidth={22} flagHeight={18} colors={colors} glowId={glowId} />
         <Strand p0={[800, 4]} p1={[1000, 24]} p2={[1200, 2]} count={11} flagWidth={22} flagHeight={18} colors={colors} glowId={glowId} />
+      </svg>
+    )
+  }
+
+  // header: irregular strands hanging from the top bar edge, repeated to 2800px
+  if (variant === 'header') {
+    return (
+      <svg
+        className={cls}
+        aria-hidden="true"
+        style={{ opacity: s }}
+        viewBox="0 0 2800 44"
+      >
+        {defs}
+        {HEADER_STRANDS.map((strand, i) => (
+          <Strand key={`s-${i}`} {...strand} colors={colors} glowId={glowId} compact />
+        ))}
+        <g transform="translate(1400 0)">
+          {HEADER_STRANDS.map((strand, i) => (
+            <Strand key={`r-${i}`} {...strand} colors={colors} glowId={glowId} compact />
+          ))}
+        </g>
       </svg>
     )
   }
