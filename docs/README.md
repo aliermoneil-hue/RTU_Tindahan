@@ -23,6 +23,9 @@ Suggested contents, copied from the CapStone folder:
 - `POSTGRES.md` — the approved database, the switch in settings, and the
   proof that migrations and the full suite pass on PostgreSQL 16.
 - `INTEGRATION-SETUP.md` — connecting the React app to the Django API.
+- `BACKUP.md` — the nightly verified database copy, the restore procedure,
+  what the copy does not cover (media files, offsite), and the drill that
+  proved a copy by reading it back through the ORM.
 
 Rules:
 

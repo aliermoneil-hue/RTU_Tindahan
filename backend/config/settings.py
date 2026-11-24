@@ -387,6 +387,15 @@ SMALL_SELLER_MAX_LISTINGS = int(os.getenv("SMALL_SELLER_MAX_LISTINGS", "3"))
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ---------------------------------------------------------------------------
+# Nightly database copies (manage.py backup_database, docs/BACKUP.md)
+#
+# Outside the repository on purpose: a backup inside the working tree gets
+# committed, copied into the deploy, or wiped by the next `git clean`.
+# ---------------------------------------------------------------------------
+BACKUP_DIR = os.getenv("BACKUP_DIR", "~/backups/tindahan")
+BACKUP_KEEP = int(os.getenv("BACKUP_KEEP", "14"))
+
+# ---------------------------------------------------------------------------
 # Production hardening (only active when DEBUG is off)
 # ---------------------------------------------------------------------------
 

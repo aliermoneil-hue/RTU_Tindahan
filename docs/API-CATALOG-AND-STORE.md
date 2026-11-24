@@ -405,7 +405,8 @@ audit log. On a PostgreSQL deployment the endpoint answers `501` and points at
 `pg_dump` instead of pretending.
 
 **Restore is deliberately not an endpoint.** Replacing a live database from
-inside the running process is how a demo loses its data. The host procedure:
+inside the running process is how a demo loses its data. `docs/BACKUP.md` keeps
+a verified nightly copy and documents the full procedure; the short version:
 
     1. systemctl --user stop rtu-tindahan
     2. cp db.sqlite3 db.sqlite3.before-restore
