@@ -330,7 +330,7 @@ export function VerifyForm({ onStep3Complete, onStepChange }: VerifyFormProps) {
                 }}
               >
                 {PROGRAMS.map((o) => (
-                  <option key={o} value={o} selected={step1.prog === o}>
+                  <option key={o} value={o}>
                     {o}
                   </option>
                 ))}
