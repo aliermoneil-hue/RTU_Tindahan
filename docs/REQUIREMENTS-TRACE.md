@@ -5,11 +5,12 @@ each requirement ID that this repository actually cites to the file that
 enforces it, the surface a person can touch, and the test that would fail if it
 stopped being true.
 
-Read it with one warning: the SRS itself is not in this repository (see
-`docs/README.md` — it lives in the CapStone folder). The wording column is how
-this codebase states each requirement, not a quotation from the SRS. IDs the
-code never cites are not listed here; if the SRS has requirements with no row,
-that is the place to look before the defence.
+Read it with one warning: this file lists only the IDs the code itself cites,
+and a few of those citations drifted from the SRS's meaning. The authoritative
+view — every requirement in the SRS, against what the running system does — is
+`docs/SRS-STATUS.md`, generated from the SRS now kept in
+`docs/reference/SRS-v1.3-FIXED.md`. Use this file for "where is it in the
+code"; use that one for "is it done".
 
 Proof column legend: `test` is an automated test, `live` is a step in
 `docs/DEMO-RUNBOOK.md`.
