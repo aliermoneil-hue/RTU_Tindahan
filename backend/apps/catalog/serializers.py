@@ -113,7 +113,11 @@ class ListingVariantSerializer(serializers.ModelSerializer):
 
 class ListingReadSerializer(serializers.ModelSerializer):
     seller_name = serializers.CharField(source="seller.display_name", read_only=True)
-    seller_email = serializers.CharField(source="seller.email", read_only=True)
+    # A student's RTU address *is* their student number (AV-04), so publishing it on
+    # a listing publishes an identifier to anyone scraping the marketplace. Members
+    # need it to build their order, review and favourite keys; a guest does not, and
+    # gets null.
+    seller_email = serializers.SerializerMethodField()
     category_name = serializers.CharField(source="category.name", read_only=True)
     category_slug = serializers.CharField(source="category.slug", read_only=True)
     photos = ListingPhotoSerializer(many=True, read_only=True)
@@ -169,6 +173,12 @@ class ListingReadSerializer(serializers.ModelSerializer):
             "is_small_seller",
         )
         read_only_fields = fields
+
+    def get_seller_email(self, obj: Listing):
+        request = self.context.get("request")
+        if request is None or not getattr(request.user, "is_authenticated", False):
+            return None
+        return obj.seller.email
 
     def get_screening(self, obj: Listing):
         """Latest screening verdict, for staff only (AI-03)."""

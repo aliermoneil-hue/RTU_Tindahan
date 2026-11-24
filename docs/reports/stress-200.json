@@ -1,0 +1,185 @@
+{
+  "base": "http://127.0.0.1:8000",
+  "users": 200,
+  "seconds": 41.1,
+  "requests": 2464,
+  "failed": 93,
+  "throughput_rps": 60.0,
+  "p50_ms": 1993.4,
+  "p95_ms": 8794.2,
+  "p99_ms": 11814.8,
+  "errors": [],
+  "scenarios": [
+    {
+      "scenario": "browse page 1",
+      "requests": 405,
+      "ok": 405,
+      "failed": 0,
+      "p50_ms": 1984.1,
+      "p95_ms": 9978.1,
+      "p99_ms": 11814.8,
+      "max_ms": 11986.2,
+      "statuses": {
+        "200": 405
+      }
+    },
+    {
+      "scenario": "browse page 2",
+      "requests": 163,
+      "ok": 163,
+      "failed": 0,
+      "p50_ms": 1930.5,
+      "p95_ms": 8738.9,
+      "p99_ms": 10998.8,
+      "max_ms": 11971.6,
+      "statuses": {
+        "200": 163
+      }
+    },
+    {
+      "scenario": "listing detail",
+      "requests": 275,
+      "ok": 275,
+      "failed": 0,
+      "p50_ms": 1908.5,
+      "p95_ms": 8946.1,
+      "p99_ms": 11444.9,
+      "max_ms": 11798.8,
+      "statuses": {
+        "200": 275
+      }
+    },
+    {
+      "scenario": "search",
+      "requests": 224,
+      "ok": 224,
+      "failed": 0,
+      "p50_ms": 2045.2,
+      "p95_ms": 7655.6,
+      "p99_ms": 10970.0,
+      "max_ms": 11369.6,
+      "statuses": {
+        "200": 224
+      }
+    },
+    {
+      "scenario": "category filter",
+      "requests": 180,
+      "ok": 180,
+      "failed": 0,
+      "p50_ms": 1840.8,
+      "p95_ms": 7347.5,
+      "p99_ms": 10925.1,
+      "max_ms": 11942.8,
+      "statuses": {
+        "200": 180
+      }
+    },
+    {
+      "scenario": "forum list",
+      "requests": 116,
+      "ok": 116,
+      "failed": 0,
+      "p50_ms": 2212.3,
+      "p95_ms": 9396.0,
+      "p99_ms": 11203.4,
+      "max_ms": 11685.2,
+      "statuses": {
+        "200": 116
+      }
+    },
+    {
+      "scenario": "sign in",
+      "requests": 133,
+      "ok": 45,
+      "failed": 88,
+      "p50_ms": 1972.3,
+      "p95_ms": 8852.9,
+      "p99_ms": 12487.1,
+      "max_ms": 12814.5,
+      "statuses": {
+        "429": 88,
+        "200": 45
+      }
+    },
+    {
+      "scenario": "create listing",
+      "requests": 254,
+      "ok": 254,
+      "failed": 0,
+      "p50_ms": 2289.1,
+      "p95_ms": 8819.6,
+      "p99_ms": 12327.0,
+      "max_ms": 13689.2,
+      "statuses": {
+        "201": 254
+      }
+    },
+    {
+      "scenario": "order request",
+      "requests": 259,
+      "ok": 254,
+      "failed": 5,
+      "p50_ms": 1879.3,
+      "p95_ms": 8800.9,
+      "p99_ms": 11950.6,
+      "max_ms": 11983.8,
+      "statuses": {
+        "201": 254,
+        "400": 5
+      }
+    },
+    {
+      "scenario": "conversations",
+      "requests": 190,
+      "ok": 190,
+      "failed": 0,
+      "p50_ms": 2009.8,
+      "p95_ms": 7636.5,
+      "p99_ms": 10916.1,
+      "max_ms": 11901.0,
+      "statuses": {
+        "200": 190
+      }
+    },
+    {
+      "scenario": "favorites toggle",
+      "requests": 121,
+      "ok": 121,
+      "failed": 0,
+      "p50_ms": 2126.6,
+      "p95_ms": 6942.0,
+      "p99_ms": 11967.8,
+      "max_ms": 11993.7,
+      "statuses": {
+        "200": 121
+      }
+    },
+    {
+      "scenario": "moderation queue",
+      "requests": 79,
+      "ok": 79,
+      "failed": 0,
+      "p50_ms": 1698.4,
+      "p95_ms": 7090.7,
+      "p99_ms": 10939.8,
+      "max_ms": 11845.9,
+      "statuses": {
+        "200": 79
+      }
+    },
+    {
+      "scenario": "my listings",
+      "requests": 65,
+      "ok": 65,
+      "failed": 0,
+      "p50_ms": 2092.6,
+      "p95_ms": 8794.2,
+      "p99_ms": 11166.1,
+      "max_ms": 11907.1,
+      "statuses": {
+        "200": 65
+      }
+    }
+  ]
+}

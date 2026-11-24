@@ -1,0 +1,36 @@
+
+security sweep against http://127.0.0.1:8000
+
+authentication
+  PASS  guests cannot reach acting endpoints — all returned 401/403
+
+role boundaries
+  PASS  a student cannot reach staff endpoints — all refused
+
+cross-account access (IDOR)
+  PASS  another student cannot open an order that is not theirs — GET as the other student → 404
+  PASS  the order hides the other side's contact until acceptance — status=requested, seller_contact=None
+  PASS  another student cannot read a conversation that is not theirs — GET as the other student → 404
+
+what a guest can see
+  PASS  public listings do not leak student numbers — none found
+  PASS  public listings do not leak mobile numbers — none found
+
+account policy
+  PASS  a weak password is refused — register with 'password' → 400
+  PASS  a failed sign-in does not say whether the account exists — → 400: {"detail":"email or password is incorrect.","attempts_left":4,"next_penalty":"co
+
+error handling
+  PASS  a malformed request does not return a stack trace — → 400
+
+transport and headers
+  PASS  clickjacking is refused — X-Frame-Options: DENY
+  PASS  the browser will not sniff a different content type — X-Content-Type-Options: nosniff
+  WARN  a content security policy is sent — Content-Security-Policy: missing
+  WARN  HSTS is sent on an HTTPS origin — Strict-Transport-Security: missing
+  PASS  the API does not set a session cookie for token auth — Set-Cookie: none
+
+rate limiting
+  PASS  repeated wrong passwords are throttled or locked — statuses [400, 400, 400, 400, 429, 429, 429]
+
+16 checks: 14 pass, 2 warn, 0 fail

@@ -8,7 +8,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.catalog.models import Listing
@@ -30,9 +30,30 @@ SELLER_ACTIONS = {Order.Status.ACCEPTED, Order.Status.DECLINED, Order.Status.COM
 
 
 def _next_reference(day):
+    """The next free number for the day.
+
+    Counting the rows and adding one was wrong twice over: a deleted order handed
+    its number to the next writer, and two orders created at the same moment read
+    the same count and collided on the unique reference — which surfaced as a 500
+    for one of them under load. Taking the highest number in use makes the sequence
+    stable across deletions; `place_order` still retries, because two writers can
+    read the same highest number at the same instant and only the retry can settle
+    that.
+    """
     prefix = f"ORD-{day:%y%m%d}-"
-    today = Order.objects.filter(reference__startswith=prefix).count() + 1
-    return f"{prefix}{today:03d}"
+    latest = (
+        Order.objects.filter(reference__startswith=prefix)
+        .order_by("-reference")
+        .values_list("reference", flat=True)
+        .first()
+    )
+    number = 1
+    if latest:
+        try:
+            number = int(latest.rsplit("-", 1)[1]) + 1
+        except (IndexError, ValueError):  # a hand-edited reference: start after it
+            number = Order.objects.filter(reference__startswith=prefix).count() + 1
+    return f"{prefix}{number:03d}"
 
 
 def _expiry_for(moment):
@@ -123,29 +144,42 @@ def place_order(
         if listing.listing_type == Listing.Type.PRODUCT and quantity > listing.quantity:
             raise ValidationError(f"Only {listing.quantity} of {listing.title} left.")
 
-    with transaction.atomic():
-        order = Order.objects.create(
-            reference=_next_reference(timezone.localdate()),
-            buyer=buyer,
-            seller_id=seller_id,
-            fulfillment=fulfillment,
-            meetup_place=meetup_place[:200],
-            meetup_date=meetup_date,
-            meetup_time=meetup_time[:40],
-            note=note,
-            payment_method=payment_method or Order.Payment.CASH,
-            payment_set_by=buyer,
-            expires_at=_expiry_for(timezone.now()),
-        )
-        for row in lines:
-            listing = row["listing"]
-            OrderLine.objects.create(
-                order=order,
-                listing=listing,
-                title=listing.title,
-                quantity=int(row["quantity"]),
-                unit_price=listing.price,
-            )
+    # Two buyers can compute the same next number in the same instant. The loser
+    # of that race gets a fresh number rather than a database error.
+    order = None
+    for attempt in range(5):
+        try:
+            with transaction.atomic():
+                order = Order.objects.create(
+                    reference=_next_reference(timezone.localdate()),
+                    buyer=buyer,
+                    seller_id=seller_id,
+                    fulfillment=fulfillment,
+                    meetup_place=meetup_place[:200],
+                    meetup_date=meetup_date,
+                    meetup_time=meetup_time[:40],
+                    note=note,
+                    payment_method=payment_method or Order.Payment.CASH,
+                    payment_set_by=buyer,
+                    expires_at=_expiry_for(timezone.now()),
+                )
+                for row in lines:
+                    listing = row["listing"]
+                    OrderLine.objects.create(
+                        order=order,
+                        listing=listing,
+                        title=listing.title,
+                        quantity=int(row["quantity"]),
+                        unit_price=listing.price,
+                    )
+            break
+        except IntegrityError as exc:
+            if "reference" not in str(exc).lower() or attempt == 4:
+                raise
+            order = None
+            continue
+    if order is None:  # five collisions in a row: a real problem, not a race
+        raise ValidationError("Could not allocate a reference for the request. Try again.")
     first = order.lines.first()
     notify(
         order.seller,

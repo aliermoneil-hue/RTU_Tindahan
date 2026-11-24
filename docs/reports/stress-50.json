@@ -1,0 +1,184 @@
+{
+  "base": "http://127.0.0.1:8000",
+  "users": 50,
+  "seconds": 27.2,
+  "requests": 1177,
+  "failed": 5,
+  "throughput_rps": 43.3,
+  "p50_ms": 42.4,
+  "p95_ms": 752.6,
+  "p99_ms": 1588.0,
+  "errors": [],
+  "scenarios": [
+    {
+      "scenario": "browse page 1",
+      "requests": 193,
+      "ok": 193,
+      "failed": 0,
+      "p50_ms": 49.1,
+      "p95_ms": 336.4,
+      "p99_ms": 1442.7,
+      "max_ms": 1469.2,
+      "statuses": {
+        "200": 193
+      }
+    },
+    {
+      "scenario": "browse page 2",
+      "requests": 88,
+      "ok": 88,
+      "failed": 0,
+      "p50_ms": 45.7,
+      "p95_ms": 291.1,
+      "p99_ms": 397.2,
+      "max_ms": 899.5,
+      "statuses": {
+        "200": 88
+      }
+    },
+    {
+      "scenario": "listing detail",
+      "requests": 155,
+      "ok": 155,
+      "failed": 0,
+      "p50_ms": 37.0,
+      "p95_ms": 468.0,
+      "p99_ms": 1136.0,
+      "max_ms": 1463.7,
+      "statuses": {
+        "200": 155
+      }
+    },
+    {
+      "scenario": "search",
+      "requests": 96,
+      "ok": 96,
+      "failed": 0,
+      "p50_ms": 35.7,
+      "p95_ms": 456.7,
+      "p99_ms": 1382.6,
+      "max_ms": 1588.0,
+      "statuses": {
+        "200": 96
+      }
+    },
+    {
+      "scenario": "category filter",
+      "requests": 95,
+      "ok": 95,
+      "failed": 0,
+      "p50_ms": 21.4,
+      "p95_ms": 593.5,
+      "p99_ms": 1058.4,
+      "max_ms": 1552.1,
+      "statuses": {
+        "200": 95
+      }
+    },
+    {
+      "scenario": "forum list",
+      "requests": 62,
+      "ok": 62,
+      "failed": 0,
+      "p50_ms": 121.7,
+      "p95_ms": 285.3,
+      "p99_ms": 1130.4,
+      "max_ms": 1584.7,
+      "statuses": {
+        "200": 62
+      }
+    },
+    {
+      "scenario": "sign in",
+      "requests": 13,
+      "ok": 13,
+      "failed": 0,
+      "p50_ms": 742.5,
+      "p95_ms": 1388.1,
+      "p99_ms": 1689.5,
+      "max_ms": 1689.5,
+      "statuses": {
+        "200": 13
+      }
+    },
+    {
+      "scenario": "create listing",
+      "requests": 105,
+      "ok": 105,
+      "failed": 0,
+      "p50_ms": 412.5,
+      "p95_ms": 1991.9,
+      "p99_ms": 5629.1,
+      "max_ms": 6100.0,
+      "statuses": {
+        "201": 105
+      }
+    },
+    {
+      "scenario": "order request",
+      "requests": 106,
+      "ok": 101,
+      "failed": 5,
+      "p50_ms": 24.8,
+      "p95_ms": 399.0,
+      "p99_ms": 1479.7,
+      "max_ms": 1536.6,
+      "statuses": {
+        "201": 101,
+        "400": 5
+      }
+    },
+    {
+      "scenario": "conversations",
+      "requests": 109,
+      "ok": 109,
+      "failed": 0,
+      "p50_ms": 13.1,
+      "p95_ms": 694.1,
+      "p99_ms": 1544.8,
+      "max_ms": 1553.8,
+      "statuses": {
+        "200": 109
+      }
+    },
+    {
+      "scenario": "favorites toggle",
+      "requests": 68,
+      "ok": 68,
+      "failed": 0,
+      "p50_ms": 10.7,
+      "p95_ms": 332.6,
+      "p99_ms": 1056.2,
+      "max_ms": 1594.7,
+      "statuses": {
+        "200": 68
+      }
+    },
+    {
+      "scenario": "moderation queue",
+      "requests": 40,
+      "ok": 40,
+      "failed": 0,
+      "p50_ms": 26.2,
+      "p95_ms": 256.0,
+      "p99_ms": 907.5,
+      "max_ms": 907.5,
+      "statuses": {
+        "200": 40
+      }
+    },
+    {
+      "scenario": "my listings",
+      "requests": 47,
+      "ok": 47,
+      "failed": 0,
+      "p50_ms": 62.8,
+      "p95_ms": 421.4,
+      "p99_ms": 618.8,
+      "max_ms": 618.8,
+      "statuses": {
+        "200": 47
+      }
+    }
+  ]
+}

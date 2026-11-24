@@ -1075,3 +1075,53 @@ class FeedOrderingTests(APITestCase):
         first_page = self.titles("?page_size=2")
 
         self.assertEqual(first_page[0], "Late popular")
+
+class SellerEmailPrivacyTests(APITestCase):
+    """A student's address is their student number, so a guest does not get one."""
+
+    def setUp(self):
+        self.seller = User.objects.create_user(
+            email="2024-777777@rtu.edu.ph",
+            display_name="Seller",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.seller.verify()
+        self.viewer = User.objects.create_user(
+            email="2024-777778@rtu.edu.ph",
+            display_name="Viewer",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.viewer.verify()
+        self.category = Category.objects.create(name="School Supplies")
+        self.listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Textbook",
+            description="Used once.",
+            price=100,
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+        )
+
+    def test_a_guest_never_sees_the_sellers_student_number(self):
+        response = self.client.get("/api/v1/listings/")
+        self.assertEqual(response.status_code, 200)
+        row = response.json()["results"][0]
+        self.assertIsNone(row.get("seller_email"), "a guest must not receive the seller's address")
+        self.assertNotIn("2024-777777", response.content.decode())
+
+    def test_a_member_still_sees_it_because_their_order_needs_it(self):
+        self.client.force_authenticate(self.viewer)
+        response = self.client.get("/api/v1/listings/")
+        self.assertEqual(response.json()["results"][0]["seller_email"], "2024-777777@rtu.edu.ph")
+
+    def test_the_seller_sees_their_own_address(self):
+        self.client.force_authenticate(self.seller)
+        detail = self.client.get(f"/api/v1/listings/{self.listing.slug}/")
+        self.assertEqual(detail.json()["seller_email"], "2024-777777@rtu.edu.ph")

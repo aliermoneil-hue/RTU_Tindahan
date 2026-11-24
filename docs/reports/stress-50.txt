@@ -1,0 +1,27 @@
+base        http://127.0.0.1:8000
+crowd       50 virtual users for 25s, think 1.0s
+writes      on
+reference   20 listing slug(s), 20 listing id(s), 18 category slug(s)
+signing in the crowd…
+            20 seller token(s), 1 moderator token
+
+scenario                req  fail      p50      p95      p99      max
+browse page 1           193     0     49.1    336.4   1442.7   1469.2
+browse page 2            88     0     45.7    291.1    397.2    899.5
+listing detail          155     0     37.0    468.0   1136.0   1463.7
+search                   96     0     35.7    456.7   1382.6   1588.0
+category filter          95     0     21.4    593.5   1058.4   1552.1
+forum list               62     0    121.7    285.3   1130.4   1584.7
+sign in                  13     0    742.5   1388.1   1689.5   1689.5
+create listing          105     0    412.5   1991.9   5629.1   6100.0
+order request           106     5     24.8    399.0   1479.7   1536.6
+conversations           109     0     13.1    694.1   1544.8   1553.8
+favorites toggle         68     0     10.7    332.6   1056.2   1594.7
+moderation queue         40     0     26.2    256.0    907.5    907.5
+my listings              47     0     62.8    421.4    618.8    618.8
+
+1177 requests in 27.2s (43.3/s), 5 failed
+p50 42.4 ms · p95 752.6 ms · p99 1588.0 ms
+
+wrote docs/reports/stress-50.json
+wrote docs/reports/stress-50.md

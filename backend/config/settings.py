@@ -147,6 +147,14 @@ else:
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
+            # IMMEDIATE takes the write lock when the transaction opens instead of
+            # when it first writes. Without it, a transaction that reads first (our
+            # order-reference lookup) and writes second can find, at write time,
+            # that another connection committed in between — SQLite answers
+            # SQLITE_BUSY at once, busy_timeout does not apply, and the request
+            # becomes a 500. Measured: 14 of 24 simultaneous order requests failed
+            # that way. With IMMEDIATE the second writer waits its turn.
+            "OPTIONS": {"transaction_mode": "IMMEDIATE", "timeout": 20},
         }
     }
 
