@@ -224,6 +224,11 @@ AUTH_TOKEN_TTL_DAYS = int(os.getenv("AUTH_TOKEN_TTL_DAYS", "14") or 0)
 # PR-05: how long a finished record is kept. Two years is the working default;
 # the SRS (Appendix B.2) leaves the number to the University, so it is a setting
 # and not a constant. 0 disables the purge entirely.
+# OT-12: how long an unanswered request waits before it cancels itself. The
+# seller is not obliged to sit on a request, and the buyer should not be left
+# holding one that nobody answered.
+ORDER_REQUEST_TTL_HOURS = int(os.getenv("ORDER_REQUEST_TTL_HOURS", "48") or 0)
+
 DATA_RETENTION_DAYS = int(os.getenv("DATA_RETENTION_DAYS", "730") or 0)
 # Read notifications are housekeeping, not records: they go after a quarter.
 NOTIFICATION_RETENTION_DAYS = int(os.getenv("NOTIFICATION_RETENTION_DAYS", "90") or 0)

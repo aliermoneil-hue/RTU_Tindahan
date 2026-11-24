@@ -21,7 +21,7 @@ from .serializers import (
     OrderTransitionSerializer,
     details,
 )
-from .services import change_order_status, set_payment_method
+from .services import change_order_status, expire_overdue_requests, set_payment_method
 
 
 class OrderViewSet(
@@ -33,6 +33,10 @@ class OrderViewSet(
     lookup_field = "reference"
 
     def get_queryset(self):
+        # OT-12: sweep before answering, so a lapsed request is never shown as
+        # if it were still waiting. Cheap: one indexed query on an empty set.
+        if self.action in ("list", "retrieve", "export"):
+            expire_overdue_requests()
         user = self.request.user
         queryset = Order.objects.select_related("buyer", "seller").prefetch_related(
             "lines"

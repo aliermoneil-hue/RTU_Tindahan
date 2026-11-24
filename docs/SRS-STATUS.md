@@ -11,10 +11,10 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 58 |
+| Implemented, verified | 59 |
 | Implemented | 79 |
 | Partial | 26 |
-| Not implemented | 4 |
+| Not implemented | 3 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
 | **total** | **174** |
@@ -148,7 +148,7 @@ browser or the tests in this repository.
 | OT-09 | The system shall record the mutually agreed campus meet-up location and scheduled time for every transaction. | Built | Implemented | `apps/orders`, `apps/messaging` |
 | OT-10 | The system shall mark an order Completed only after both the buyer and the seller confirm that the meet-up took place. | Partly | Partial | the seller completes; there is no second confirmation from the buyer |
 | OT-11 | The system shall hold the ordered quantity when the seller accepts an order, and shall not let a seller accept more than the quantity available. Th... | Partly | Implemented, verified | accept moves stock; a decline or cancel returns it |
-| OT-12 | The system shall cancel a Pending order that the seller has not answered within a set time, and shall tell the buyer and the seller. | Not yet | Not implemented | a pending order is never auto-cancelled on a timer |
+| OT-12 | The system shall cancel a Pending order that the seller has not answered within a set time, and shall tell the buyer and the seller. | Not yet | Implemented, verified | ORDER_REQUEST_TTL_HOURS (48) stamps expires_at; swept on read and by cron at 04:00, both parties notified |
 
 ## Messaging (MS)
 
@@ -325,7 +325,6 @@ with the reason:
 
 | ID | Requirement | Why it is open |
 | --- | --- | --- |
-| OT-12 | The system shall cancel a Pending order that the seller has not answered within a set time, and shall tell the buyer and | a pending order is never auto-cancelled on a timer |
 | MS-04 | The system shall allow a participant to formally report a conversation thread for policy violations (refer to Section 3. | no report action on a conversation |
 | MS-05 | The system shall let a moderator see only the messages in a conversation that has been reported. | moderators cannot read a reported conversation |
 | RR-04 | The system shall hold review text for AI screening before it is published. | reviews are not screened on purpose: `docs/SCREENING.md` §6 |

@@ -2,7 +2,10 @@
 
 from datetime import timedelta
 from decimal import Decimal
+from io import StringIO
 
+from django.core.management import call_command
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -562,3 +565,135 @@ class PaymentMethodTests(APITestCase):
         )
 
         self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class RequestExpiryTests(APITestCase):
+    """OT-12: an unanswered request cancels itself, and both parties hear about it."""
+
+    def setUp(self):
+        self.seller = make_user("2024-111001@rtu.edu.ph")
+        self.buyer = make_user("2024-111002@rtu.edu.ph")
+        self.category = Category.objects.create(name="Uniforms")
+        self.listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="PE shirt",
+            description="Size L.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price=Decimal("150.00"),
+            quantity=3,
+            meetup_place="Main lobby",
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+        )
+
+    def request_order(self):
+        self.client.force_authenticate(self.buyer)
+        response = self.client.post(
+            "/api/v1/orders/",
+            {
+                "lines": [{"listing": self.listing.id, "quantity": 1}],
+                "fulfillment": "pickup",
+                "meetup_place": "Main lobby",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.json())
+        return response.json()
+
+    def age(self, reference, hours):
+        stamp = timezone.now() - timedelta(hours=hours)
+        Order.objects.filter(reference=reference).update(
+            created_at=stamp, expires_at=stamp + timedelta(hours=48)
+        )
+
+    def test_a_new_request_carries_a_deadline_48_hours_out(self):
+        body = self.request_order()
+
+        self.assertIsNotNone(body["expires_at"])
+        created = timezone.datetime.fromisoformat(body["created_at"].replace("Z", "+00:00"))
+        expires = timezone.datetime.fromisoformat(body["expires_at"].replace("Z", "+00:00"))
+        self.assertAlmostEqual((expires - created).total_seconds() / 3600, 48, delta=0.1)
+
+    def test_a_request_past_its_deadline_is_cancelled_and_both_are_told(self):
+        reference = self.request_order()["reference"]
+        self.age(reference, hours=49)
+
+        self.client.force_authenticate(self.buyer)
+        body = self.client.get(f"/api/v1/orders/{reference}/").json()
+
+        self.assertEqual(body["status"], "cancelled")
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.buyer, text__contains="expired"
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.seller, text__contains="expired unanswered"
+            ).exists()
+        )
+
+    def test_a_request_inside_the_window_is_left_alone(self):
+        reference = self.request_order()["reference"]
+        self.age(reference, hours=47)
+
+        self.client.force_authenticate(self.buyer)
+        body = self.client.get(f"/api/v1/orders/{reference}/").json()
+
+        self.assertEqual(body["status"], "requested")
+
+    def test_an_accepted_order_is_never_swept(self):
+        reference = self.request_order()["reference"]
+        self.client.force_authenticate(self.seller)
+        self.client.post(
+            f"/api/v1/orders/{reference}/transition/", {"status": "accepted"}, format="json"
+        )
+        self.age(reference, hours=200)
+
+        self.client.force_authenticate(self.seller)
+        body = self.client.get(f"/api/v1/orders/{reference}/").json()
+
+        self.assertEqual(body["status"], "accepted")
+
+    def test_the_sweep_is_idempotent_and_notifies_once(self):
+        reference = self.request_order()["reference"]
+        self.age(reference, hours=60)
+
+        self.client.force_authenticate(self.buyer)
+        self.client.get("/api/v1/orders/")
+        self.client.get("/api/v1/orders/")
+
+        self.assertEqual(
+            Notification.objects.filter(user=self.buyer, text__contains="expired").count(), 1
+        )
+
+    def test_the_command_reports_and_cancels(self):
+        reference = self.request_order()["reference"]
+        self.age(reference, hours=49)
+
+        out = StringIO()
+        call_command("expire_order_requests", stdout=out)
+
+        self.assertIn("cancelled 1 unanswered request", out.getvalue())
+        self.assertEqual(Order.objects.get(reference=reference).status, "cancelled")
+
+    def test_the_command_can_be_asked_without_changing_anything(self):
+        reference = self.request_order()["reference"]
+        self.age(reference, hours=49)
+
+        out = StringIO()
+        call_command("expire_order_requests", "--dry-run", stdout=out)
+
+        self.assertIn("would cancel 1 request", out.getvalue())
+        self.assertEqual(Order.objects.get(reference=reference).status, "requested")
+
+    @override_settings(ORDER_REQUEST_TTL_HOURS=0)
+    def test_a_zero_clock_means_requests_never_expire(self):
+        body = self.request_order()
+
+        self.assertIsNone(body["expires_at"])
+        out = StringIO()
+        call_command("expire_order_requests", stdout=out)
+        self.assertIn("never expire", out.getvalue())

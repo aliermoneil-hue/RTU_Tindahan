@@ -52,6 +52,9 @@ class Order(models.Model):
     meetup_time = models.CharField(max_length=40, blank=True)
     note = models.TextField(blank=True)
     decided_at = models.DateTimeField(null=True, blank=True)
+    # OT-12: when this request stops waiting for an answer. Set at creation from
+    # ORDER_REQUEST_TTL_HOURS; null means the clock is switched off.
+    expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

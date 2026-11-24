@@ -4,6 +4,9 @@ Everything that decides whether a request may exist, or may move, lives here so
 the HTTP layer stays thin and the tests can call the rules directly.
 """
 
+from datetime import timedelta
+
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -30,6 +33,58 @@ def _next_reference(day):
     prefix = f"ORD-{day:%y%m%d}-"
     today = Order.objects.filter(reference__startswith=prefix).count() + 1
     return f"{prefix}{today:03d}"
+
+
+def _expiry_for(moment):
+    """OT-12: when a request stops waiting. 0 hours switches the clock off."""
+    hours = getattr(settings, "ORDER_REQUEST_TTL_HOURS", 0) or 0
+    if hours <= 0:
+        return None
+    return moment + timedelta(hours=hours)
+
+
+def expire_overdue_requests(*, now=None):
+    """Cancel every request whose clock has run out, and tell both sides.
+
+    Run from cron so the database settles quietly, and again on every read of
+    the orders list so a buyer never sees a request the seller can no longer
+    answer. Each order is locked and re-checked, so a seller who accepts at the
+    same moment as the sweep wins rather than being cancelled under their hand.
+    """
+    moment = now or timezone.now()
+    overdue = Order.objects.filter(
+        status=Order.Status.REQUESTED, expires_at__isnull=False, expires_at__lte=moment
+    )
+    expired = []
+    for order in overdue.iterator():
+        with transaction.atomic():
+            locked = Order.objects.select_for_update().get(pk=order.pk)
+            if locked.status != Order.Status.REQUESTED or locked.expires_at > moment:
+                continue
+            locked.status = Order.Status.CANCELLED
+            locked.save(update_fields=["status", "updated_at"])
+            notify(
+                locked.buyer,
+                (
+                    f"Request {locked.reference} expired: the seller did not answer in time. "
+                    "Send it again if you still want the item."
+                ),
+                kind="order",
+                link_kind="order",
+                link_id=locked.reference,
+            )
+            notify(
+                locked.seller,
+                (
+                    f"Request {locked.reference} expired unanswered and was cancelled. "
+                    "The item is back on your shelf."
+                ),
+                kind="order",
+                link_kind="shop",
+                link_id=locked.reference,
+            )
+            expired.append(locked.reference)
+    return expired
 
 
 def place_order(
@@ -80,6 +135,7 @@ def place_order(
             note=note,
             payment_method=payment_method or Order.Payment.CASH,
             payment_set_by=buyer,
+            expires_at=_expiry_for(timezone.now()),
         )
         for row in lines:
             listing = row["listing"]

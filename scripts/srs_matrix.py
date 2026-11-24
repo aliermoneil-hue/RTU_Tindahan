@@ -95,7 +95,7 @@ DECIDED = {
     "OT-07": ("verified", "order payload shares the other party's number only while Accepted"),
     "OT-10": ("partial", "the seller completes; there is no second confirmation from the buyer"),
     "OT-11": ("verified", "accept moves stock; a decline or cancel returns it"),
-    "OT-12": ("open", "a pending order is never auto-cancelled on a timer"),
+    "OT-12": ("verified", "ORDER_REQUEST_TTL_HOURS (48) stamps expires_at; swept on read and by cron at 04:00, both parties notified"),
     "MS-01": ("verified", "threads tied to a listing, unread counts, polls"),
     "MS-04": ("open", "no report action on a conversation"),
     "MS-05": ("open", "moderators cannot read a reported conversation"),

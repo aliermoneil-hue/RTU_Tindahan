@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ExpiryNote } from '../components/ExpiryNote'
 import { Icon } from '@/common/components/Icon'
 import type { IconName } from '@/common/components/icons'
 import { navigate } from '@/common/router/router'
@@ -268,6 +269,7 @@ export function OrdersPage() {
                   >
                     {order.status_display}
                   </span>
+                  {order.is_open && <ExpiryNote expiresAt={order.expires_at} />}
                   {order.is_open ? (
                     <select
                       className="input"

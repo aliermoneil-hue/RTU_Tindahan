@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { ExpiryNote } from '../components/ExpiryNote'
 import { Icon } from '@/common/components/Icon'
 import { apiDownload } from '@/common/api/client'
 import { navigate } from '@/common/router/router'
@@ -803,6 +804,7 @@ export function MyShopPage() {
                   >
                     Decline
                   </button>
+                  {order.is_open && <ExpiryNote expiresAt={order.expires_at} />}
                   {order.is_open ? (
                     <select
                       className="input"

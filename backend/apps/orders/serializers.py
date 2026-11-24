@@ -53,6 +53,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "buyer_contact",
             "payment_method",
             "payment_method_display",
+            "expires_at",
             "seller",
             "seller_name",
             "seller_email",

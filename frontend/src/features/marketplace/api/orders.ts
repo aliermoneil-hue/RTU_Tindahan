@@ -46,6 +46,8 @@ export interface ApiOrder {
   /** OT-06: cash at the meet-up, or a transfer between the two students. */
   payment_method: 'cash' | 'p2p'
   payment_method_display: string
+  /** OT-12: when an unanswered request cancels itself; null when the clock is off. */
+  expires_at: string | null
   fulfillment: 'pickup' | 'delivery' | 'both'
   meetup_place: string
   meetup_date: string | null

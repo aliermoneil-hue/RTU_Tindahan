@@ -288,6 +288,15 @@ a listing title cannot become a formula in someone's spreadsheet. The seller
 dashboard renders the filters over the rows it already holds and asks the server
 for the same window when downloading, so screen and file cannot disagree.
 
+**Request expiry (OT-12).** An unanswered request carries `expires_at`, set at
+creation from `ORDER_REQUEST_TTL_HOURS` (default 48). The orders list, a single
+order and the CSV export sweep before they answer, so a lapsed request is never
+shown as still waiting; `manage.py expire_order_requests` does the same on cron
+at 04:00 and notifies both parties — the buyer that the seller did not answer,
+the seller that the item is back on their shelf. The sweep locks each row and
+re-checks it, so a seller accepting at the same moment wins. `0` hours switches
+the clock off and `expires_at` stays null.
+
 **Payment method (OT-06).** The platform records *how* money will move and never
 moves any. Two choices only: `cash` — "Cash at the campus meet-up" — and `p2p` —
 "Person-to-person transfer (GCash, Maya or bank)". The buyer picks one when
