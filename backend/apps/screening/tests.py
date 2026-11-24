@@ -1023,7 +1023,13 @@ class ScreeningAuditRowTests(APITestCase):
             price=Decimal("500.00"),
         )
 
-        with override_settings(SCREENING_PROVIDER="gemini", LLM_API_KEY=""):
+        # The provider is made to fail outright rather than configured to, because
+        # `get_provider` is cached for the process: a test that relies on settings
+        # inherits whatever provider an earlier test put in that cache.
+        with patch(
+            "apps.screening.services.get_provider",
+            side_effect=RuntimeError("the provider is down"),
+        ):
             result = run_screening(listing)
 
         self.assertTrue(result.screened_text)

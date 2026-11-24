@@ -5,6 +5,9 @@
     POST /api/v1/admin/users/<id>/status/    administrators only
     POST /api/v1/admin/users/<id>/role/      administrators only
     GET  /api/v1/admin/backup/               administrators only; SQLite copy
+    GET  /api/v1/admin/backup/json/          administrators only; content as JSON
+    POST /api/v1/admin/backup/import/        administrators only; confirm "IMPORT"
+    POST /api/v1/admin/backup/reset/         administrators only; confirm "RESET"
 
 Suspending or banning deletes the account's token, so the session ends now
 rather than at the next request, and their listings stop appearing in the
@@ -21,6 +24,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -287,3 +291,125 @@ class DatabaseBackupView(APIView):
         )
         response["X-Backup-Bytes"] = str(len(payload))
         return response
+
+
+class JsonBackupView(APIView):
+    """PX-06: download every content row as JSON.
+
+    Content only. Accounts appear as references so a restored listing still has a
+    seller, but no password hash is in this file; credentials travel in the
+    SQLite backup from `GET /admin/backup/`.
+    """
+
+    permission_classes = [IsAdministrator]
+
+    def get(self, request):
+        from .json_backup import as_download, export_payload
+
+        payload = export_payload()
+        total = sum(payload["counts"].values())
+        record(
+            request.user,
+            "download json backup",
+            target_type="system",
+            target_id="json-backup",
+            note=f"{total} rows across {len(payload['counts'])} tables",
+        )
+        response = HttpResponse(as_download(payload), content_type="application/json")
+        stamp = timezone.localtime().strftime("%Y%m%d-%H%M%S")
+        response["Content-Disposition"] = (
+            f'attachment; filename="tindahan-backup-{stamp}.json"'
+        )
+        return response
+
+
+class JsonRestoreView(APIView):
+    """PX-06: import a JSON backup.
+
+    It writes the rows in the file over the rows with the same key and deletes
+    nothing, so a partial or mistaken import cannot remove today's work. The
+    confirmation word is not ceremony: this endpoint can overwrite a live demo.
+    """
+
+    permission_classes = [IsAdministrator]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def post(self, request):
+        from .json_backup import ImportRefused, import_payload, parse_payload
+
+        if (request.data.get("confirm") or "").strip().upper() != "IMPORT":
+            return Response(
+                {
+                    "detail": 'Type IMPORT to confirm. This writes over rows that share a key.'
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        upload = request.FILES.get("file")
+        if upload is None:
+            return Response(
+                {"detail": "Attach the .json file produced by Download JSON backup."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if upload.size > 40 * 1024 * 1024:
+            return Response(
+                {"detail": "That file is larger than 40 MB, which is not a backup of this site."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            data = parse_payload(upload.read())
+            written = import_payload(data)
+        except ImportRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        total = sum(written.values())
+        record(
+            request.user,
+            "import json backup",
+            target_type="system",
+            target_id="json-backup",
+            note=f"{total} rows written from a {data['version']} file",
+        )
+        return Response({"written": written, "total": total})
+
+
+class JsonResetView(APIView):
+    """PX-06: clear what members made, keep the seeded source, and say what went."""
+
+    permission_classes = [IsAdministrator]
+
+    def post(self, request):
+        from .json_backup import reset_content
+
+        if (request.data.get("confirm") or "").strip().upper() != "RESET":
+            return Response(
+                {
+                    "detail": (
+                        "Type RESET to confirm. Every listing, order, thread, review, "
+                        "report and ticket that members created will be cleared."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        cleared = reset_content()
+        total = sum(cleared.values())
+        record(
+            request.user,
+            "reset content",
+            target_type="system",
+            target_id="reset",
+            note=f"{total} rows cleared; accounts, categories and the official store kept",
+        )
+        return Response(
+            {
+                "cleared": cleared,
+                "total": total,
+                "kept": [
+                    "accounts and their credentials",
+                    "marketplace categories",
+                    "screening rules",
+                    "store settings",
+                    "the official store catalogue",
+                    "the audit log",
+                ],
+            }
+        )

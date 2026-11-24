@@ -12,7 +12,7 @@
  * account and not only the ones that sold something in this browser.
  */
 
-import { apiDownload, apiFetch } from '@/common/api/client'
+import { apiDownload, apiFetch, apiUpload } from '@/common/api/client'
 import { mkAcct } from '../constants'
 import type { AuditLogEntry, PrototypeAccount } from '../types'
 
@@ -141,4 +141,46 @@ export function auditEntryFromApi(row: ApiAuditEntry): AuditLogEntry {
  */
 export function downloadDatabaseBackup() {
   return apiDownload('/admin/backup/')
+}
+
+/* ---------------------------------------------------------------- PX-06 ---
+ * The JSON backup, an import of one, and the reset. Three administrator-only
+ * calls; two of them can overwrite a live demo, so each carries the word the
+ * server demands rather than a bare click.
+ */
+
+export interface ApiJsonBackupCounts {
+  [table: string]: number
+}
+
+export interface ApiImportResult {
+  written: ApiJsonBackupCounts
+  total: number
+}
+
+export interface ApiResetResult {
+  cleared: ApiJsonBackupCounts
+  total: number
+  kept: string[]
+}
+
+/** The content as JSON. Accounts travel as references; credentials do not. */
+export function downloadJsonBackupPath(): string {
+  return '/admin/backup/json/'
+}
+
+/** Write a backup's rows over the rows that share a key. Deletes nothing. */
+export function importJsonBackup(file: File, confirm: string): Promise<ApiImportResult> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('confirm', confirm)
+  return apiUpload<ApiImportResult>('/admin/backup/import/', form)
+}
+
+/** Clear what members made; keep accounts, categories and the official store. */
+export function resetContent(confirm: string): Promise<ApiResetResult> {
+  return apiFetch<ApiResetResult>('/admin/backup/reset/', {
+    method: 'POST',
+    body: { confirm },
+  })
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Icon } from '@/common/components/Icon'
 import { navigate } from '@/common/router/router'
 import { monthYear } from '../../constants'
+import { JsonBackupCard } from '../../components/JsonBackupCard'
 import { useTindahan } from '../../context/TindahanContext'
 import './StaffToolsPage.css'
 
@@ -230,14 +231,16 @@ export function StaffToolsPage() {
             </div>
           </div>
 
+          <JsonBackupCard isAdmin={isAdminUser} />
+
           <div
             className="card stack"
             style={{ background: 'var(--red-bg)', borderColor: 'transparent' }}
           >
-            <b>Reset the prototype</b>
+            <b>Reset this browser's copy</b>
             <p className="small">
-              Deletes every account, listing, order, request and announcement saved in this
-              browser. Use it before a presentation to start clean.
+              Deletes the demo snapshot saved in this browser only — it does not touch the
+              server. The server-side reset is in the card above.
             </p>
             <button
               type="button"

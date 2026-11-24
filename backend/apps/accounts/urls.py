@@ -1,6 +1,12 @@
 from django.urls import path
 
-from .admin_api import AdminUserViewSet, DatabaseBackupView
+from .admin_api import (
+    AdminUserViewSet,
+    DatabaseBackupView,
+    JsonBackupView,
+    JsonResetView,
+    JsonRestoreView,
+)
 from .views import (
     CollegeListView,
     ChangePasswordView,
@@ -81,6 +87,10 @@ urlpatterns = [
         DatabaseBackupView.as_view(),
         name="admin-backup",
     ),
+    # PX-06: the content as JSON, an import of one, and a reset to the seed.
+    path("admin/backup/json/", JsonBackupView.as_view(), name="admin-backup-json"),
+    path("admin/backup/import/", JsonRestoreView.as_view(), name="admin-backup-import"),
+    path("admin/backup/reset/", JsonResetView.as_view(), name="admin-backup-reset"),
     # The signed-in member's own account: change the password, or delete.
     path(
         "auth/change-password/", ChangePasswordView.as_view(), name="change-password"

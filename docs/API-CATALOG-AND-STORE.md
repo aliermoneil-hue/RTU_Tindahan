@@ -591,6 +591,57 @@ for staff, at startup and after a status change.
 
 ### Backups
 
+Two kinds, for two different jobs, and neither is a substitute for the other.
+
+**The database itself (SQLite).** `GET /api/v1/admin/backup/` streams a consistent
+copy taken through SQLite's own backup API while the site is serving. It holds
+every row, including account credentials, so it is administrator-only and its
+restore is a host procedure: stop the service, swap `db.sqlite3`, start it.
+
+**The content as JSON (PX-06).**
+
+| Method | Path | Body | Who |
+| --- | --- | --- | --- |
+| GET | `/api/v1/admin/backup/json/` | — | administrator |
+| POST | `/api/v1/admin/backup/import/` | `file` (the .json) and `confirm=IMPORT` | administrator |
+| POST | `/api/v1/admin/backup/reset/` | `confirm=RESET` | administrator |
+
+The JSON file holds every content row — listings, photos, variants, threads,
+comments, reports, orders, conversations, messages, reviews, favourites,
+notifications, screening rules and results, store settings, tickets, stock
+movements, the outbox and appeals — about 330 rows on the demo data, across 26
+tables, with a per-table count so a restore can be checked against the file.
+
+Two boundaries, both deliberate and both stated on the screen:
+
+* **Accounts are references, not credentials.** Rows carry `seller_id`,
+  `buyer_id` and so on so a restored listing keeps its owner, but no password hash
+  is in the file and the import never writes an account. A JSON file that could
+  overwrite an account would be an account-takeover tool wearing a backup's
+  clothes. Credentials travel in the SQLite copy.
+* **Import never deletes.** It writes the file's rows over rows with the same
+  primary key and leaves everything else alone, so a mistaken import cannot erase
+  the day's work. Those who want nothing left use `reset`, which asks for the word.
+
+`reset` clears what *members* made and keeps the source the prototype is seeded
+from: accounts, the category taxonomy, the screening rules, the store settings,
+the official store catalogue, and the audit log. It re-runs the category and
+official-store seeders afterwards so the system is demonstrable immediately, and
+it writes an audit row saying how many rows went.
+
+Proved live, and in the only order that proves all three: download (329 rows, 26
+tables, no `pbkdf2` anywhere in the file) → `reset` refused with `confirm: "yes"`
+→ `reset` accepted (216 rows cleared: 8 member listings gone, the 2 official ones
+kept, 18 categories kept, 4 posts and 4 orders gone) → `import` of that same file
+(329 rows written) → the site back to 10 listings, 18 categories, 4 posts, 4
+orders, 6 variants and 9 accounts. In the browser, Staff tools → the same three
+controls, the reset button disabled until RESET is typed, and the download
+confirming with "Accounts travel as references in this file, not as credentials."
+
+---
+
+
+
 `GET /api/v1/admin/backup/` streams the database itself, not the browser
 snapshot: the view asks sqlite3's backup API for a consistent copy through the
 connection Django is already using, so the copy is valid while the site keeps

@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 87 |
+| Implemented, verified | 88 |
 | Implemented | 79 |
-| Partial | 5 |
+| Partial | 4 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 1 |
@@ -254,7 +254,7 @@ browser or the tests in this repository.
 | PX-03 | The system shall require confirmation before processing critical state changes and destructive database operations such as cancelling an order, del... | Built | Implemented, verified | confirm dialogs on destructive staff and member actions |
 | PX-04 | The system must provide staff with a Transactions page where every request has a unique TXN id, items saved at the time, quantity, total, buyer, se... | Built | Implemented | favorites, profile, staff tools |
 | PX-05 | The system must provide staff with a user and audit page to manage accounts, remove or restore student listings, hide official items, and read the... | Built | Implemented | favorites, profile, staff tools |
-| PX-06 | The system shall let staff download all data as a JSON backup, import a backup, and reset everything from its source.. | Built | Partial | a consistent SQLite download exists; no JSON import or reset |
+| PX-06 | The system shall let staff download all data as a JSON backup, import a backup, and reset everything from its source.. | Built | Implemented, verified | GET /admin/backup/json/ exports every content table, POST /admin/backup/import/ restores one without deleting, and POST /admin/backup/reset/ returns the site to its seeded source; the two destructive calls need a typed word |
 | PX-07 | The system shall offer a light theme and a dark theme for users to have a choice. | Built | Implemented, verified | appearance popover: System, Light, Dark |
 
 ## Performance (PF)

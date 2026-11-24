@@ -153,7 +153,7 @@ DECIDED = {
     "AD-05": ("verified", "`createsuperuser`; docs/TEAM-SETUP.md"),
     # --- favourites, profile, staff tools ----------------------------------
     "PX-03": ("verified", "confirm dialogs on destructive staff and member actions"),
-    "PX-06": ("partial", "a consistent SQLite download exists; no JSON import or reset"),
+    "PX-06": ("verified", "GET /admin/backup/json/ exports every content table, POST /admin/backup/import/ restores one without deleting, and POST /admin/backup/reset/ returns the site to its seeded source; the two destructive calls need a typed word"),
     "PX-07": ("verified", "appearance popover: System, Light, Dark"),
     # --- non-functional -----------------------------------------------------
     "PF-03": ("verified", "screening answered in ~1 s live; a member sees the item pending meanwhile"),
