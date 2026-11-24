@@ -26,6 +26,11 @@ Suggested contents, copied from the CapStone folder:
 - `BACKUP.md` — the nightly verified database copy (database plus uploads),
   the restore procedure, and the drill that proved a copy by reading it back
   through the ORM.
+- `PRIVACY.md` — PR-01: the privacy notice itself — what is collected and why,
+  who sees it, how long it is kept, the rights and where each is exercised, and
+  what is verified by tests rather than asserted.
+- `UX-360.md` — UX-01: the measurement of every page at 360 px, the two wide
+  elements that are intentional scroll containers, and the one cosmetic note.
 - `SCREENING-RULES.md` — AI-10: the two kinds of screening phrase, the seed and
   the code floor, what an edit reaches (queue and language model), and who may
   change it.

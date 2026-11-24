@@ -439,8 +439,17 @@ export function VerifyForm({ onStep3Complete, onStepChange }: VerifyFormProps) {
               style={{ marginTop: 3 }}
             />
             <span className="small">
-              I accept the privacy notice. My RTU email, program, and year level are used only to
-              run the marketplace (RA 10173).
+              I accept the{' '}
+              <button
+                type="button"
+                className="link"
+                style={{ display: 'inline', padding: 0 }}
+                onClick={() => navigate('privacy')}
+              >
+                privacy notice
+              </button>
+              . My RTU email, program, and year level are used only to run the marketplace
+              (RA 10173).
             </span>
           </label>
           <ScreeningNotice tone="auth" />

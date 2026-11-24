@@ -13,6 +13,7 @@ import {
   ForumPostPage,
   AppealPage,
   MessageReportsPage,
+  PrivacyPage,
   ReportPage,
   ScreeningRulesPage,
   AppealsPage,
@@ -173,6 +174,8 @@ function renderActiveRoute(path: string, user: { email: string; role: string } |
       case 'help':
       case 'help-center':
         return <HelpCenterPage />
+      case 'privacy':
+        return <PrivacyPage />
       case 'post':
         return <ForumPostPage />
       case 'messages':
@@ -247,6 +250,13 @@ function renderActiveRoute(path: string, user: { email: string; role: string } |
       </div>
     )
   }
+  if (path === 'privacy') {
+    return (
+      <div className="g-wrap" style={{ padding: '24px 16px' }}>
+        <PrivacyPage />
+      </div>
+    )
+  }
   return <LandingPage />
 }
 
@@ -270,7 +280,11 @@ export function AppRoutes() {
     path === 'student-sellers' ||
     path === 'store' ||
     path === 'help' ||
-    path === 'help-center'
+    path === 'help-center' ||
+    // PR-01: the privacy notice must be readable before anyone signs up, and
+    // an appeal for a suspended account is read by someone who cannot sign in.
+    path === 'privacy' ||
+    path === 'appeal'
 
   const redirectTo =
     !authLoading &&

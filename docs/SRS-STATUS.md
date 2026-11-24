@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 70 |
+| Implemented, verified | 72 |
 | Implemented | 79 |
-| Partial | 18 |
+| Partial | 16 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
@@ -283,7 +283,7 @@ browser or the tests in this repository.
 
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
-| PR-01 | The system shall follow the Data Privacy Act of 2012 (RA 10173) and collect only the personal data it needs. | Partly | Partial | privacy behaviour exists; formal statements do not |
+| PR-01 | The system shall follow the Data Privacy Act of 2012 (RA 10173) and collect only the personal data it needs. | Partly | Implemented, verified | the notice is in the app and docs/PRIVACY.md; behaviour traced to tests |
 | PR-02 | The system shall show a privacy notice and get the user's consent when the user registers. The notice shall say what data is collected and why, tha... | Not yet | Implemented, verified | privacy consent recorded at registration |
 | PR-03 | The system shall let a user view and correct their personal data and request deletion of their account. Deletion follows PR-06. | Partly | Implemented, verified | profile edit and account deletion |
 | PR-04 | The system shall restrict internal access to personal user data based on administrative roles, ensuring moderators can view private content only wh... | Partly | Implemented | admin endpoints are role-gated; personal data is not exposed to members |
@@ -294,7 +294,7 @@ browser or the tests in this repository.
 
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
-| UX-01 | Every function shall be usable on phone browsers with screen widths of 360 pixels, with no sideways scrolling of the page. | Partly | Partial | the layout is responsive by design; no 360 px test was run |
+| UX-01 | Every function shall be usable on phone browsers with screen widths of 360 pixels, with no sideways scrolling of the page. | Partly | Implemented, verified | twenty-five routes measured at 360 px with no page-level sideways scrolling; docs/UX-360.md |
 | UX-02 | In a test with 10 new users, at least 8 shall post a listing within 5 minutes without instructions. | Not yet | Not measured | no usability or contrast measurement was run |
 | UX-03 | The interface shall be in plain English. Listings, posts, and messages may be written in English, Filipino, or a mix of both. | Built | Implemented | the interface is in English throughout |
 | UX-04 | The system shall display clear, human-readable error messages whenever an exception occurs and guide the user on corrective next steps. | Built | Implemented, verified | API errors carry a human-readable message that the client shows |

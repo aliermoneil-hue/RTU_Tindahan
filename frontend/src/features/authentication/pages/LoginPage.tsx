@@ -331,6 +331,12 @@ export function LoginPage() {
             </button>
           </div>
 
+          <p className="small muted" style={{ textAlign: 'center', marginTop: 8 }}>
+            <button type="button" className="link" onClick={() => navigate('privacy')}>
+              Privacy notice
+            </button>
+            {' '}— what Tindahan keeps, and why.
+          </p>
           <LoginForm
             onSubmit={handleLogin}
             isLoading={isLoading}
