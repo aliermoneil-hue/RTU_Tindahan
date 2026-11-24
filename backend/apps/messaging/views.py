@@ -155,7 +155,13 @@ class ConversationReportViewSet(
         if not user.is_moderator:
             queryset = queryset.filter(reporter=user)
         if wanted := self.request.query_params.get("status"):
-            queryset = queryset.filter(status=wanted)
+            from apps.forum.report_status import LEGACY_RESOLUTION, normalize_status
+
+            queryset = queryset.filter(status=normalize_status(wanted))
+            if legacy := LEGACY_RESOLUTION.get(wanted):
+                queryset = queryset.filter(resolution=legacy)
+        if resolution := self.request.query_params.get("resolution"):
+            queryset = queryset.filter(resolution=resolution)
         return queryset
 
     @action(detail=True, methods=["post"])

@@ -409,6 +409,52 @@ else, labelled **Listing** or **Member**.
 On screen: **Report listing** and **Report seller** beside the seller card on a
 product page, both opening `#/report?type=…`.
 
+## 8a3. Report statuses and member history (RM-02, RM-04, RM-06)
+
+**RM-02 — three statuses, and the outcome kept apart.** Every report — forum,
+message, listing, member, order, review — carries one of:
+
+| status | Means |
+| --- | --- |
+| `received` | filed, nobody has opened it |
+| `under_review` | claimed by a moderator; `handled_by` says who |
+| `resolved` | decided; `resolution` says how |
+
+`resolution` is `actioned` or `dismissed` when the report is resolved, and empty
+otherwise. It lives beside the status rather than inside it so that "Resolved"
+stays one word and RM-04 can still tell a reporter which way it went.
+
+`POST /forum/reports/<id>/resolve/` takes `{"status": "under_review"}` to claim a
+report and `{"status": "resolved", "resolution": "actioned" | "dismissed",
+"action": "hide|restore|delete|warn", "note": "..."}` to finish it. Resolving
+without a resolution is refused with a sentence saying what is missing. Reopening
+(`received`) clears the outcome.
+
+The four words this platform used before — `open`, `reviewed`, `dismissed`,
+`actioned` — are translated on the way in, both in the resolve body and in
+`?status=`, so a bookmark or an older client keeps working:
+`open → received`, `reviewed → under_review`, and the last two resolve with the
+matching outcome. `?resolution=dismissed` filters the resolved ones by outcome.
+
+**RM-06 — the history beside the report.** `GET /api/v1/forum/reports/member-history/?email=<address>`
+(moderator or administrator) returns what staff have seen from that member
+before: every report linked to them (author of the reported post or comment,
+seller of the reported listing, author of the reported review, party to the
+reported order, or named in a member report), newest first and capped at 50, plus
+the audit rows for those reports and for the account itself — warnings,
+suspensions — and counts of total, unresolved, actioned and dismissed.
+
+The reporter's identity is not in the payload and the address used to look
+someone up is the *reported* member's. The queue's rows carry `target_email` for
+staff only, so the screen can offer "Member history" without exposing who filed
+what (RM-07); a reporter reading their own report sees `target_email: null`.
+
+In the panel the queue now reads **Received / Under Review / Resolved**, each row
+shows "Resolved — action taken" or "Resolved — no action taken", and **Member
+history** opens the panel in place.
+
+---
+
 ## 8b. Appeals API (AI-06, RM-08)
 
 `GET /appeals/?status=` lists a member's own appeals, or the whole queue for

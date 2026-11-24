@@ -92,9 +92,15 @@ class ConversationReport(models.Model):
         OTHER = "other", "Something else"
 
     class Status(models.TextChoices):
-        OPEN = "open", "Waiting for review"
-        DISMISSED = "dismissed", "Dismissed"
+        """RM-02: the same three states the forum reports use."""
+
+        RECEIVED = "received", "Received"
+        UNDER_REVIEW = "under_review", "Under Review"
+        RESOLVED = "resolved", "Resolved"
+
+    class Resolution(models.TextChoices):
         ACTIONED = "actioned", "Action taken"
+        DISMISSED = "dismissed", "No action taken"
 
     class Action(models.TextChoices):
         DISMISS = "dismiss", "No action"
@@ -128,9 +134,11 @@ class ConversationReport(models.Model):
     snapshot_body = models.TextField(blank=True)
     snapshot_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
-        max_length=10, choices=Status.choices, default=Status.OPEN, db_index=True
+        max_length=12, choices=Status.choices, default=Status.RECEIVED, db_index=True
     )
     action = models.CharField(max_length=10, choices=Action.choices, blank=True)
+    # RM-02: the outcome, kept apart from the status so "Resolved" stays one word.
+    resolution = models.CharField(max_length=12, choices=Resolution.choices, blank=True)
     handled_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

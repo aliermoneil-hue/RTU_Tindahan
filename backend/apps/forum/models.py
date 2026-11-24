@@ -192,10 +192,19 @@ class ForumReport(models.Model):
         REVIEW = "review", "Review"
 
     class Status(models.TextChoices):
-        OPEN = "open", "Open"
-        REVIEWED = "reviewed", "Reviewed"
-        DISMISSED = "dismissed", "Dismissed"
-        ACTIONED = "actioned", "Actioned"
+        """RM-02: the three states the SRS names, and only those three.
+
+        The outcome of a resolved report lives in `resolution`, so "Resolved" can
+        say whether something was done without inventing a fourth status.
+        """
+
+        RECEIVED = "received", "Received"
+        UNDER_REVIEW = "under_review", "Under Review"
+        RESOLVED = "resolved", "Resolved"
+
+    class Resolution(models.TextChoices):
+        ACTIONED = "actioned", "Action taken"
+        DISMISSED = "dismissed", "No action taken"
 
     type = models.CharField(max_length=10, choices=Type.choices)
     post = models.ForeignKey(
@@ -241,7 +250,9 @@ class ForumReport(models.Model):
     # content is later edited or deleted.
     snapshot_title = models.CharField(max_length=200, blank=True)
     snapshot_text = models.TextField(blank=True)
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.OPEN)
+    status = models.CharField(
+        max_length=12, choices=Status.choices, default=Status.RECEIVED
+    )
     handled_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -251,6 +262,8 @@ class ForumReport(models.Model):
     )
     handled_at = models.DateTimeField(null=True, blank=True)
     action = models.CharField(max_length=10, blank=True)
+    # RM-02/RM-04: how a resolved report ended. Blank while it is still open.
+    resolution = models.CharField(max_length=12, choices=Resolution.choices, blank=True)
     note = models.CharField(max_length=300, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

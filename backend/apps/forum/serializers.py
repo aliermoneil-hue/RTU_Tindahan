@@ -447,7 +447,7 @@ class ForumReportWriteSerializer(serializers.Serializer):
         if target_author == user.id:
             raise serializers.ValidationError("You cannot report your own content.")
         if ForumReport.objects.filter(
-            reporter=user, post=post, comment=comment, status=ForumReport.Status.OPEN
+            reporter=user, post=post, comment=comment, status=ForumReport.Status.RECEIVED
         ).exists():
             raise serializers.ValidationError("You already reported this.")
 
@@ -468,6 +468,10 @@ class ForumReportSerializer(serializers.ModelSerializer):
     reported_user = serializers.SerializerMethodField()
     review = serializers.SerializerMethodField()
     target_name = serializers.SerializerMethodField()
+    # RM-06: staff open a member's history from the row, so the row needs the
+    # address of the member it is about. It is the reported member's, never the
+    # reporter's, and it is withheld from everyone who is not staff (RM-07).
+    target_email = serializers.SerializerMethodField()
     handled_by_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -488,7 +492,11 @@ class ForumReportSerializer(serializers.ModelSerializer):
             "snapshot_title",
             "snapshot_text",
             "status",
+            # RM-02/RM-04: how a resolved report ended, so "Resolved" can say
+            # whether anything was done without a fourth status.
+            "resolution",
             "target_name",
+            "target_email",
             "handled_by_name",
             "handled_at",
             "action",
@@ -530,20 +538,88 @@ class ForumReportSerializer(serializers.ModelSerializer):
         target = obj.comment.author if obj.comment_id else (obj.post.author if obj.post_id else None)
         return short_name(target) if target else "RTU"
 
+    def get_target_email(self, obj):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated or not getattr(user, "is_moderator", False):
+            return None
+        if obj.reported_user_id:
+            return obj.reported_user.email
+        target = None
+        if obj.comment_id:
+            target = obj.comment.author
+        elif obj.post_id:
+            target = obj.post.author
+        elif obj.listing_id:
+            target = obj.listing.seller
+        elif obj.review_id:
+            target = obj.review.buyer
+        return target.email if target else None
+
     def get_handled_by_name(self, obj):
         return short_name(obj.handled_by) if obj.handled_by_id else None
 
 
 class ForumReportResolveSerializer(serializers.Serializer):
+    """RM-02: three statuses, and the outcome kept apart from them.
+
+    The four names this endpoint used before (open, reviewed, dismissed,
+    actioned) are still accepted and translated, so a client written against the
+    old vocabulary keeps working while the record reads the SRS's words.
+    """
+
+    STATUS_ALIASES = {
+        "open": ForumReport.Status.RECEIVED,
+        "reviewed": ForumReport.Status.UNDER_REVIEW,
+        "dismissed": ForumReport.Status.RESOLVED,
+        "actioned": ForumReport.Status.RESOLVED,
+    }
+
     status = serializers.ChoiceField(
         choices=(
-            ForumReport.Status.OPEN,
-            ForumReport.Status.REVIEWED,
-            ForumReport.Status.DISMISSED,
-            ForumReport.Status.ACTIONED,
+            ForumReport.Status.RECEIVED,
+            ForumReport.Status.UNDER_REVIEW,
+            ForumReport.Status.RESOLVED,
+            "open",
+            "reviewed",
+            "dismissed",
+            "actioned",
         )
+    )
+    resolution = serializers.ChoiceField(
+        choices=(
+            ForumReport.Resolution.ACTIONED,
+            ForumReport.Resolution.DISMISSED,
+            "",
+        ),
+        required=False,
+        allow_blank=True,
     )
     action = serializers.ChoiceField(
         choices=("hide", "restore", "delete", "warn"), required=False, allow_blank=True
     )
     note = serializers.CharField(max_length=300, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        raw = attrs["status"]
+        status = self.STATUS_ALIASES.get(raw, raw)
+        # A legacy resolution word carries its outcome with it.
+        resolution = attrs.get("resolution") or ""
+        if raw == "dismissed":
+            resolution = ForumReport.Resolution.DISMISSED
+        elif raw == "actioned":
+            resolution = ForumReport.Resolution.ACTIONED
+
+        if status == ForumReport.Status.RESOLVED and not resolution:
+            raise serializers.ValidationError(
+                {
+                    "resolution": "A resolved report says whether action was taken "
+                    "(`actioned`) or not (`dismissed`)."
+                }
+            )
+        if status != ForumReport.Status.RESOLVED:
+            resolution = ""
+
+        attrs["status"] = status
+        attrs["resolution"] = resolution
+        return attrs

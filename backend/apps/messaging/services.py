@@ -44,7 +44,7 @@ def report_conversation(*, reporter, conversation, reason, details="", message=N
         conversation=conversation,
         reporter=reporter,
         message=message,
-        status=ConversationReport.Status.OPEN,
+        status=ConversationReport.Status.RECEIVED,
     )
     if already.exists():
         raise ValidationError("You have already reported this; it is waiting for review.")
@@ -74,7 +74,7 @@ def report_conversation(*, reporter, conversation, reason, details="", message=N
 
 def resolve_report(*, report, by, action, note=""):
     """A moderator's decision on a report, with the action it carries."""
-    if report.status != ConversationReport.Status.OPEN:
+    if report.status == ConversationReport.Status.RESOLVED:
         raise ValidationError("That report has already been handled.")
     if action not in ConversationReport.Action.values:
         raise ValidationError("Choose what to do with the report.")
@@ -88,13 +88,22 @@ def resolve_report(*, report, by, action, note=""):
     report.handled_by = by
     report.handled_at = timezone.now()
     report.note = note[:600]
-    report.status = (
-        ConversationReport.Status.DISMISSED
+    # RM-02: the status says Resolved; the resolution says what that meant.
+    report.status = ConversationReport.Status.RESOLVED
+    report.resolution = (
+        ConversationReport.Resolution.DISMISSED
         if action == ConversationReport.Action.DISMISS
-        else ConversationReport.Status.ACTIONED
+        else ConversationReport.Resolution.ACTIONED
     )
     report.save(
-        update_fields=["action", "handled_by", "handled_at", "note", "status"]
+        update_fields=[
+            "action",
+            "handled_by",
+            "handled_at",
+            "note",
+            "status",
+            "resolution",
+        ]
     )
 
     if action == ConversationReport.Action.WARN:

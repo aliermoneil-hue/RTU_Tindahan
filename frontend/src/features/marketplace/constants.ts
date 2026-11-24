@@ -144,11 +144,22 @@ export const ORDER_REPORT_REASONS_BUYER = [
   'Other transaction problem',
 ]
 
+// RM-02: Received, Under Review, Resolved — plus what a resolved one meant.
 export const FR_STATUS: Record<string, string> = {
-  open: 'Open',
-  reviewed: 'Reviewed',
-  dismissed: 'Dismissed',
-  actioned: 'Action taken',
+  received: 'Received',
+  under_review: 'Under Review',
+  resolved: 'Resolved',
+}
+
+export const FR_RESOLUTION: Record<string, string> = {
+  actioned: 'action taken',
+  dismissed: 'no action taken',
+}
+
+/** The label a person reads: "Resolved — action taken". */
+export function reportStatusLabel(status: string, resolution?: string): string {
+  const base = FR_STATUS[status] || status
+  return resolution ? `${base} — ${FR_RESOLUTION[resolution] || resolution}` : base
 }
 
 export const FR_ACTIONS: Record<'hide' | 'restore' | 'delete' | 'warn', [string, string]> = {

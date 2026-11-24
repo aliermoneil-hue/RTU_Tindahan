@@ -15,7 +15,8 @@ import {
  */
 export function MessageReportsPage() {
   const [rows, setRows] = useState<ApiMessageReport[]>([])
-  const [status, setStatus] = useState<'open' | 'dismissed' | 'actioned'>('open')
+  // RM-02: the same three statuses the forum queue uses.
+  const [status, setStatus] = useState<'received' | 'under_review' | 'resolved'>('received')
   const [notes, setNotes] = useState<Record<number, string>>({})
   const [busyId, setBusyId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -66,16 +67,22 @@ export function MessageReportsPage() {
           </p>
         </div>
         <div className="tabs" role="tablist" aria-label="Report status">
-          {(['open', 'actioned', 'dismissed'] as const).map((s) => (
+          {(
+            [
+              ['received', 'Received'],
+              ['under_review', 'Under Review'],
+              ['resolved', 'Resolved'],
+            ] as const
+          ).map(([value, label]) => (
             <button
-              key={s}
+              key={value}
               type="button"
               role="tab"
-              aria-selected={status === s}
-              className={`tab ${status === s ? 'on' : ''}`.trim()}
-              onClick={() => setStatus(s)}
+              aria-selected={status === value}
+              className={`tab ${status === value ? 'on' : ''}`.trim()}
+              onClick={() => setStatus(value)}
             >
-              {s.charAt(0).toUpperCase() + s.slice(1)}
+              {label}
             </button>
           ))}
         </div>
@@ -105,14 +112,15 @@ export function MessageReportsPage() {
                   <span className="pill">{report.is_thread_report ? 'Whole thread' : 'One message'}</span>
                   <span
                     className={`pill ${
-                      report.status === 'actioned'
+                      report.status === 'resolved'
                         ? 'green'
-                        : report.status === 'dismissed'
-                          ? 'navy'
-                          : 'yellow'
+                        : report.status === 'under_review'
+                          ? 'yellow'
+                          : 'red'
                     }`}
                   >
                     {report.status_display}
+                    {report.resolution ? ` — ${report.resolution === 'actioned' ? 'action taken' : 'no action taken'}` : ''}
                   </span>
                 </span>
                 <span className="tiny muted">
@@ -155,7 +163,7 @@ export function MessageReportsPage() {
                 </p>
               )}
 
-              {report.status === 'open' ? (
+              {report.status !== 'resolved' ? (
                 <>
                   <input
                     className="input"

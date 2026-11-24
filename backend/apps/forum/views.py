@@ -48,6 +48,7 @@ from .serializers import (
     ForumReportSerializer,
     ForumReportWriteSerializer,
     save_images,
+    short_name,
 )
 
 
@@ -249,9 +250,12 @@ class ForumPostViewSet(
                 target_name=post.title or post.body[:60],
             )
             ForumReport.objects.filter(
-                status=ForumReport.Status.OPEN, post=post, comment__isnull=True
+                status__in=(ForumReport.Status.RECEIVED, ForumReport.Status.UNDER_REVIEW),
+                post=post,
+                comment__isnull=True
             ).update(
-                status=ForumReport.Status.ACTIONED,
+                status=ForumReport.Status.RESOLVED,
+                resolution=ForumReport.Resolution.ACTIONED,
                 action="delete",
                 handled_by=request.user,
                 handled_at=timezone.now(),
@@ -494,7 +498,14 @@ class ForumReportViewSet(
             queryset = queryset.filter(reporter=user)
         params = self.request.query_params
         if params.get("status"):
-            queryset = queryset.filter(status=params["status"])
+            # RM-02: open/reviewed/dismissed/actioned are translated, not refused.
+            from .report_status import LEGACY_RESOLUTION, normalize_status
+
+            queryset = queryset.filter(status=normalize_status(params["status"]))
+            if legacy := LEGACY_RESOLUTION.get(params["status"]):
+                queryset = queryset.filter(resolution=legacy)
+        if params.get("resolution"):
+            queryset = queryset.filter(resolution=params["resolution"])
         if params.get("type"):
             queryset = queryset.filter(type=params["type"])
         return queryset
@@ -529,6 +540,102 @@ class ForumReportViewSet(
             status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=False, methods=["get"], url_path="member-history")
+    def member_history(self, request):
+        """RM-06: what this member has been reported for before, and what staff did.
+
+        "Linked to a member" means every place a report can point at one: the
+        author of a reported post or comment, the seller of a reported listing,
+        the author of a reported review, a party to a reported order, and the
+        member named in a member report. The actions are the audit rows written
+        against those reports, plus anything recorded against the account
+        itself (a warning, a suspension), so a moderator sees the pattern and
+        not just the single report in front of them.
+        """
+        if not is_staff(request.user):
+            raise PermissionDenied("Only a moderator may read a member's report history.")
+
+        from apps.audit.models import AuditLog
+        from apps.accounts.models import User
+
+        email = (request.query_params.get("email") or "").strip()
+        member_id = request.query_params.get("user")
+        member = None
+        if email:
+            member = User.objects.filter(email__iexact=email).first()
+        elif member_id:
+            member = User.objects.filter(pk=member_id).first()
+        if member is None:
+            return Response(
+                {"detail": "Choose the member whose history you want to read."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        linked = ForumReport.objects.filter(
+            Q(reported_user=member)
+            | Q(post__author=member)
+            | Q(comment__author=member)
+            | Q(listing__seller=member)
+            | Q(review__buyer=member)
+            | Q(order__buyer=member)
+            | Q(order__seller=member)
+        ).select_related("handled_by", "reported_user", "post", "comment", "listing", "review")
+
+        reports = [
+            {
+                "id": report.pk,
+                "type": report.type,
+                "reason": report.reason,
+                "details": report.details,
+                "status": report.status,
+                "resolution": report.resolution,
+                "action": report.action,
+                "note": report.note,
+                "created_at": report.created_at,
+                "handled_at": report.handled_at,
+                "handled_by_name": short_name(report.handled_by) if report.handled_by_id else None,
+            }
+            for report in linked.order_by("-created_at")[:50]
+        ]
+
+        report_ids = [str(report.pk) for report in linked]
+        actions = AuditLog.objects.filter(
+            Q(target_type="forum report", target_id__in=report_ids)
+            | Q(target_type__in=("user", "member", "account"), target_name__icontains=member.email)
+            | Q(target_type__in=("user", "member", "account"), target_name__icontains=member.display_name)
+        ).select_related("actor")
+        action_rows = [
+            {
+                "action": row.action,
+                "target_type": row.target_type,
+                "target_id": row.target_id,
+                "note": row.note,
+                "by": short_name(row.actor) if row.actor_id else "RTU",
+                "created_at": row.created_at,
+            }
+            for row in actions.order_by("-created_at")[:50]
+        ]
+
+        resolved = [r for r in reports if r["status"] == "resolved"]
+        return Response(
+            {
+                "member": {
+                    "email": member.email,
+                    "name": short_name(member),
+                    "status": member.status,
+                    "role": member.role,
+                },
+                "counts": {
+                    "reports": len(reports),
+                    "unresolved": len([r for r in reports if r["status"] != "resolved"]),
+                    "actioned": len([r for r in resolved if r["resolution"] == "actioned"]),
+                    "dismissed": len([r for r in resolved if r["resolution"] == "dismissed"]),
+                },
+                "reports": reports,
+                "actions": action_rows,
+            }
+        )
+
     @action(detail=True, methods=["post"])
     def resolve(self, request, pk=None):
         if not is_staff(request.user):
@@ -540,13 +647,33 @@ class ForumReportViewSet(
         new_status = data["status"]
         act = data.get("action") or ""
 
-        if new_status == ForumReport.Status.OPEN:
+        resolution = data.get("resolution") or ""
+
+        if new_status in (ForumReport.Status.RECEIVED, ForumReport.Status.UNDER_REVIEW):
+            # Reopening or claiming the report clears the previous outcome.
             report.status = new_status
-            report.handled_by = None
-            report.handled_at = None
+            report.resolution = ""
+            report.handled_by = request.user if new_status == ForumReport.Status.UNDER_REVIEW else None
+            report.handled_at = timezone.now() if new_status == ForumReport.Status.UNDER_REVIEW else None
             report.action = ""
             report.note = ""
-            report.save(update_fields=["status", "handled_by", "handled_at", "action", "note"])
+            report.save(
+                update_fields=[
+                    "status",
+                    "resolution",
+                    "handled_by",
+                    "handled_at",
+                    "action",
+                    "note",
+                ]
+            )
+            if new_status == ForumReport.Status.UNDER_REVIEW and report.reporter_id != request.user.id:
+                notify(
+                    report.reporter,
+                    "Staff have started reviewing your report.",
+                    kind="report",
+                    actor=request.user,
+                )
             return Response(ForumReportSerializer(report, context=self.get_serializer_context()).data)
 
         if report.type != ForumReport.Type.ORDER and act:
@@ -567,12 +694,20 @@ class ForumReportViewSet(
                     report.post.delete()
 
         report.status = new_status
+        report.resolution = resolution
         report.handled_by = request.user
         report.handled_at = timezone.now()
         report.action = act
         report.note = (data.get("note") or "").strip()
         report.save(
-            update_fields=["status", "handled_by", "handled_at", "action", "note"]
+            update_fields=[
+                "status",
+                "resolution",
+                "handled_by",
+                "handled_at",
+                "action",
+                "note",
+            ]
         )
         record(
             request.user,
@@ -580,13 +715,14 @@ class ForumReportViewSet(
             target_type="forum report",
             target_id=report.pk,
             target_name=report.reason,
-            note=f"{report.status}" + (f" / {act}" if act else ""),
+            note=f"{report.status}" + (f" / {report.resolution}" if report.resolution else "") + (f" / {act}" if act else ""),
         )
         if report.reporter_id != request.user.id:
-            outcome = {
-                ForumReport.Status.DISMISSED: "Staff reviewed your report and did not find a problem.",
-                ForumReport.Status.ACTIONED: "Staff reviewed your report and took action.",
-                ForumReport.Status.REVIEWED: "Staff reviewed your report. Thank you.",
-            }.get(report.status, "Staff reviewed your report.")
+            if report.resolution == ForumReport.Resolution.ACTIONED:
+                outcome = "Staff reviewed your report and took action."
+            elif report.resolution == ForumReport.Resolution.DISMISSED:
+                outcome = "Staff reviewed your report and did not find a problem."
+            else:
+                outcome = "Staff reviewed your report. Thank you."
             notify(report.reporter, outcome, kind="report", actor=request.user)
         return Response(ForumReportSerializer(report, context=self.get_serializer_context()).data)

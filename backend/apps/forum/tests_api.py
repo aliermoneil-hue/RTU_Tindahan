@@ -345,7 +345,7 @@ class ForumApiTests(APITestCase):
             format="json",
         )
         self.assertEqual(report.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(report.json()["status"], "open")
+        self.assertEqual(report.json()["status"], "received")
         self.assertTrue(report.json()["is_mine"])
 
         again = self.client.post(
@@ -416,7 +416,8 @@ class ForumApiTests(APITestCase):
         )
 
         self.assertEqual(resolved.status_code, status.HTTP_200_OK)
-        self.assertEqual(resolved.json()["status"], "actioned")
+        self.assertEqual(resolved.json()["status"], "resolved")
+        self.assertEqual(resolved.json()["resolution"], "actioned")
         self.assertEqual(resolved.json()["action"], "hide")
         self.assertTrue(ForumPost.objects.get(pk=post_id).is_hidden)
 
@@ -971,3 +972,298 @@ class ReviewReportTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("your own review", str(response.json()))
+
+
+class ReportStatusVocabularyTests(APITestCase):
+    """RM-02 and RM-04: three statuses named by the SRS, with the outcome beside them."""
+
+    def setUp(self):
+        self.moderator = User.objects.create_user(
+            email="mod-status@rtu.edu.ph",
+            display_name="Mod",
+            password="SecurePass123!",
+            role=User.Role.MODERATOR,
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=3,
+        )
+        self.moderator.verify()
+        self.reporter = User.objects.create_user(
+            email="2024-880001@rtu.edu.ph",
+            display_name="Reporter",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.reporter.verify()
+        # The report is about someone else's post: you cannot report your own.
+        self.post = ForumPost.objects.create(
+            author=self.moderator, kind=ForumPost.Kind.NOTICE, title="Notice", body="Body"
+        )
+
+    def file_report(self):
+        self.client.force_authenticate(self.reporter)
+        created = self.client.post(
+            "/api/v1/forum/reports/",
+            {"type": "post", "post": self.post.pk, "reason": "Scam"},
+            format="json",
+        )
+        self.assertIn(created.status_code, (200, 201))
+        return ForumReport.objects.get(pk=created.json()["id"])
+
+    def resolve(self, report, **body):
+        self.client.force_authenticate(self.moderator)
+        return self.client.post(
+            f"/api/v1/forum/reports/{report.pk}/resolve/", body, format="json"
+        )
+
+    def test_a_new_report_is_received(self):
+        report = self.file_report()
+
+        self.assertEqual(report.status, ForumReport.Status.RECEIVED)
+        self.assertEqual(report.resolution, "")
+
+    def test_claiming_a_report_puts_it_under_review(self):
+        report = self.file_report()
+
+        claimed = self.resolve(report, status="under_review")
+
+        self.assertEqual(claimed.status_code, 200)
+        self.assertEqual(claimed.json()["status"], "under_review")
+        self.assertEqual(claimed.json()["handled_by_name"], "Mod")
+
+    def test_resolving_requires_saying_whether_action_was_taken(self):
+        report = self.file_report()
+
+        refused = self.resolve(report, status="resolved")
+
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("resolution", refused.json())
+
+    def test_resolved_with_action_taken_reads_as_actioned(self):
+        report = self.file_report()
+
+        done = self.resolve(report, status="resolved", resolution="actioned", action="hide")
+
+        self.assertEqual(done.json()["status"], "resolved")
+        self.assertEqual(done.json()["resolution"], "actioned")
+        self.assertEqual(report.__class__.objects.get(pk=report.pk).action, "hide")
+
+    def test_resolved_without_action_reads_as_dismissed_and_tells_the_reporter(self):
+        report = self.file_report()
+
+        done = self.resolve(report, status="resolved", resolution="dismissed")
+
+        self.assertEqual(done.json()["resolution"], "dismissed")
+        from apps.notifications.models import Notification
+
+        note = Notification.objects.filter(user=self.reporter, kind="report").last()
+        self.assertIsNotNone(note)
+        self.assertIn("did not find a problem", note.text)
+
+    def test_the_three_words_are_the_only_statuses_the_srs_names(self):
+        self.assertEqual(
+            [choice for choice, _ in ForumReport.Status.choices],
+            ["received", "under_review", "resolved"],
+        )
+
+    def test_the_old_words_still_work_and_land_on_the_new_ones(self):
+        report = self.file_report()
+
+        reopened = self.resolve(report, status="open")
+
+        self.assertEqual(reopened.json()["status"], "received")
+
+    def test_the_queue_can_be_filtered_by_status_and_by_outcome(self):
+        # One open report per target at a time, so the second is filed after the
+        # first is closed — which is also how a repeated problem arrives.
+        first = self.file_report()
+        self.resolve(first, status="resolved", resolution="dismissed")
+        second = self.file_report()
+        self.resolve(second, status="resolved", resolution="actioned", action="hide")
+
+        self.client.force_authenticate(self.moderator)
+        dismissed = self.client.get("/api/v1/forum/reports/?status=resolved&resolution=dismissed")
+        legacy = self.client.get("/api/v1/forum/reports/?status=actioned")
+
+        self.assertEqual(dismissed.json()["count"], 1)
+        self.assertEqual(dismissed.json()["results"][0]["id"], first.pk)
+        self.assertEqual(legacy.json()["count"], 1)
+        self.assertEqual(legacy.json()["results"][0]["id"], second.pk)
+
+
+class MemberReportHistoryTests(APITestCase):
+    """RM-06: a moderator sees what this member was reported for before."""
+
+    def setUp(self):
+        self.moderator = User.objects.create_user(
+            email="mod-history@rtu.edu.ph",
+            display_name="Moderator",
+            password="SecurePass123!",
+            role=User.Role.MODERATOR,
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=3,
+        )
+        self.moderator.verify()
+        self.reporter = User.objects.create_user(
+            email="2024-990001@rtu.edu.ph",
+            display_name="Reporter",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.reporter.verify()
+        self.suspect = User.objects.create_user(
+            email="2024-990002@rtu.edu.ph",
+            display_name="Suspect Member",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.suspect.verify()
+        self.post = ForumPost.objects.create(
+            author=self.suspect, kind=ForumPost.Kind.NOTICE, title="Deal", body="Cheap."
+        )
+
+    def file_and_resolve(self, reason="Scam", resolution="actioned"):
+        self.client.force_authenticate(self.reporter)
+        created = self.client.post(
+            "/api/v1/forum/reports/",
+            {"type": "post", "post": self.post.pk, "reason": reason, "details": "Asked for GCash first."},
+            format="json",
+        )
+        report = ForumReport.objects.get(pk=created.json()["id"])
+        self.client.force_authenticate(self.moderator)
+        self.client.post(
+            f"/api/v1/forum/reports/{report.pk}/resolve/",
+            {"status": "resolved", "resolution": resolution, "note": "Handled."},
+            format="json",
+        )
+        return report
+
+    def history(self, **params):
+        self.client.force_authenticate(self.moderator)
+        return self.client.get("/api/v1/forum/reports/member-history/", params)
+
+    def test_the_history_lists_past_reports_against_the_member(self):
+        self.file_and_resolve()
+
+        body = self.history(email=self.suspect.email).json()
+
+        self.assertEqual(body["member"]["email"], self.suspect.email)
+        self.assertEqual(body["counts"]["reports"], 1)
+        self.assertEqual(body["counts"]["actioned"], 1)
+        self.assertEqual(body["reports"][0]["reason"], "Scam")
+        self.assertEqual(body["reports"][0]["status"], "resolved")
+        self.assertEqual(body["reports"][0]["resolution"], "actioned")
+        self.assertEqual(body["reports"][0]["handled_by_name"], "Moderator")
+
+    def test_the_history_carries_the_actions_taken(self):
+        self.file_and_resolve()
+
+        body = self.history(email=self.suspect.email).json()
+
+        self.assertTrue(body["actions"], "the audit rows for the report should be there")
+        self.assertTrue(any("forum report" in row["target_type"] for row in body["actions"]))
+
+    def test_an_unresolved_report_is_counted_separately(self):
+        self.client.force_authenticate(self.reporter)
+        self.client.post(
+            "/api/v1/forum/reports/",
+            {"type": "post", "post": self.post.pk, "reason": "Inappropriate"},
+            format="json",
+        )
+
+        body = self.history(email=self.suspect.email).json()
+
+        self.assertEqual(body["counts"]["unresolved"], 1)
+        self.assertEqual(body["counts"]["actioned"], 0)
+
+    def test_a_member_with_no_reports_reads_as_empty_not_as_an_error(self):
+        body = self.history(email=self.reporter.email).json()
+
+        self.assertEqual(body["counts"]["reports"], 0)
+        self.assertEqual(body["reports"], [])
+        self.assertEqual(body["actions"], [])
+
+    def test_the_history_needs_a_member(self):
+        self.assertEqual(self.history().status_code, 400)
+
+    def test_a_student_cannot_read_anyone_history(self):
+        self.client.force_authenticate(self.reporter)
+
+        refused = self.client.get(
+            "/api/v1/forum/reports/member-history/", {"email": self.suspect.email}
+        )
+
+        self.assertEqual(refused.status_code, 403)
+
+    def test_the_reporter_identity_stays_out_of_the_history(self):
+        self.file_and_resolve()
+
+        body = self.history(email=self.suspect.email).json()
+
+        blob = repr(body)
+        self.assertNotIn(self.reporter.email, blob)
+        self.assertNotIn("2024-990001", blob)
+
+
+class ReportTargetEmailTests(APITestCase):
+    """RM-07: the row tells staff who the report is about, and tells nobody else."""
+
+    def setUp(self):
+        self.reporter = User.objects.create_user(
+            email="2024-991001@rtu.edu.ph",
+            display_name="Reporter",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.reporter.verify()
+        self.author = User.objects.create_user(
+            email="2024-991002@rtu.edu.ph",
+            display_name="Author",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.author.verify()
+        self.post = ForumPost.objects.create(
+            author=self.author, kind=ForumPost.Kind.NOTICE, title="Notice", body="Body"
+        )
+        self.client.force_authenticate(self.reporter)
+        created = self.client.post(
+            "/api/v1/forum/reports/",
+            {"type": "post", "post": self.post.pk, "reason": "Scam"},
+            format="json",
+        )
+        self.report_id = created.json()["id"]
+
+    def test_staff_see_whose_report_it_is(self):
+        staff = User.objects.create_user(
+            email="mod-email@rtu.edu.ph",
+            display_name="Mod",
+            password="SecurePass123!",
+            role=User.Role.MODERATOR,
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=3,
+        )
+        staff.verify()
+
+        self.client.force_authenticate(staff)
+        row = self.client.get(f"/api/v1/forum/reports/{self.report_id}/").json()
+
+        self.assertEqual(row["target_email"], self.author.email)
+
+    def test_a_reporter_does_not(self):
+        row = self.client.get(f"/api/v1/forum/reports/{self.report_id}/").json()
+
+        self.assertIsNone(row["target_email"])
+        self.assertNotIn(self.author.email, repr(row))

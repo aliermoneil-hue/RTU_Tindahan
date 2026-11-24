@@ -193,7 +193,9 @@ export interface ApiMessageReport {
   reason: MessageReportReason
   reason_display: string
   details: string
-  status: 'open' | 'dismissed' | 'actioned'
+  /** RM-02: the same three statuses as the forum reports. */
+  status: 'received' | 'under_review' | 'resolved'
+  resolution: '' | 'actioned' | 'dismissed'
   status_display: string
   action: 'dismiss' | 'warn' | 'suspend' | ''
   note: string
@@ -219,7 +221,7 @@ export function reportConversation(
 }
 
 export async function fetchMessageReports(
-  status?: 'open' | 'dismissed' | 'actioned',
+  status?: 'received' | 'under_review' | 'resolved',
 ): Promise<ApiMessageReport[]> {
   const path = `/message-reports/${status ? `?status=${status}` : ''}`
   const data = await apiFetch<

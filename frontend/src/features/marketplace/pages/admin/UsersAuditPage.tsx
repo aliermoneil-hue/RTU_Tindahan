@@ -70,7 +70,7 @@ export function UsersAuditPage() {
 
   const blocked = db.accounts.filter((a) => a.status && a.status !== 'active').length
   const held = db.userListings.filter((l) => l.modHold).length
-  const reports = db.freports.filter((r) => r.status === 'open').length
+  const reports = db.freports.filter((r) => r.status !== 'resolved').length
   const waiting = db.flags.filter((f) => f.state === 'open').length
 
   const filteredUsers = db.accounts

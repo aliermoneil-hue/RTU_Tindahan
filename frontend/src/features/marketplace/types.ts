@@ -368,7 +368,9 @@ export interface ForumReport {
     imgs: number
   }
   ts: string
-  status: 'open' | 'reviewed' | 'dismissed' | 'actioned'
+  /** RM-02: the three the SRS names; the outcome lives in `resolution`. */
+  status: 'received' | 'under_review' | 'resolved'
+  resolution?: '' | 'actioned' | 'dismissed'
   handledBy?: string
   handledAt?: string
   action?: 'hide' | 'restore' | 'delete' | 'warn'

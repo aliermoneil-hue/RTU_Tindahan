@@ -91,8 +91,12 @@ export interface ApiForumReport {
   details: string
   snapshot_title: string
   snapshot_text: string
-  status: 'open' | 'reviewed' | 'dismissed' | 'actioned'
+  /** RM-02: three statuses; the outcome rides in `resolution`. */
+  status: 'received' | 'under_review' | 'resolved'
+  resolution?: '' | 'actioned' | 'dismissed'
   target_name: string
+  /** RM-06: the reported member's address, staff only (null for everyone else). */
+  target_email: string | null
   handled_by_name: string | null
   handled_at: string | null
   action: string
@@ -244,7 +248,12 @@ export function submitForumReportApi(input: ForumReportInput): Promise<ApiForumR
 
 export function resolveForumReportApi(
   id: number,
-  body: { status: 'open' | 'reviewed' | 'dismissed' | 'actioned'; action?: string; note?: string },
+  body: {
+    status: 'received' | 'under_review' | 'resolved'
+    resolution?: 'actioned' | 'dismissed'
+    action?: string
+    note?: string
+  },
 ): Promise<ApiForumReport> {
   return apiFetch<ApiForumReport>(`/forum/reports/${id}/resolve/`, {
     method: 'POST',
@@ -330,8 +339,8 @@ export function forumReportFromApi(row: ApiForumReport, viewerEmail: string): Fo
     details: row.details,
     reporterEmail: row.is_mine ? viewerEmail : '',
     reporterName: row.reporter_name,
-    targetEmail: null,
     targetName: row.target_name,
+    targetEmail: row.target_email ?? null,
     snap: {
       title: row.snapshot_title,
       text: row.snapshot_text,
@@ -339,9 +348,43 @@ export function forumReportFromApi(row: ApiForumReport, viewerEmail: string): Fo
     },
     ts: row.created_at,
     status: row.status,
+    resolution: row.resolution ?? '',
     handledBy: row.handled_by_name ?? undefined,
     handledAt: row.handled_at ?? undefined,
     action: (row.action || undefined) as ForumReport['action'],
     note: row.note || undefined,
   }
+}
+
+/** RM-06: what staff have seen from this member before. */
+export interface ApiMemberHistory {
+  member: { email: string; name: string; status: string; role: string }
+  counts: { reports: number; unresolved: number; actioned: number; dismissed: number }
+  reports: Array<{
+    id: number
+    type: string
+    reason: string
+    details: string
+    status: 'received' | 'under_review' | 'resolved'
+    resolution: '' | 'actioned' | 'dismissed'
+    action: string
+    note: string
+    created_at: string
+    handled_at: string | null
+    handled_by_name: string | null
+  }>
+  actions: Array<{
+    action: string
+    target_type: string
+    target_id: string
+    note: string
+    by: string
+    created_at: string
+  }>
+}
+
+export function fetchMemberHistory(email: string): Promise<ApiMemberHistory> {
+  return apiFetch<ApiMemberHistory>(
+    `/forum/reports/member-history/?email=${encodeURIComponent(email)}`,
+  )
 }

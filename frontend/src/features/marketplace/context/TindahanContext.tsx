@@ -818,7 +818,11 @@ interface TindahanContextValue {
   toggleHideComment: (postId: string, commentId: string) => void
   submitForumReport: (postId: string, commentId: string | null, reason: string, details: string) => boolean
   submitOrderReport: (orderId: string, role: 'buyer' | 'seller', targetEmail: string | null, targetName: string, itemTitle: string, reason: string, details: string) => boolean
-  setForumReportStatus: (reportId: string, st: 'open' | 'reviewed' | 'dismissed') => void
+  setForumReportStatus: (
+    reportId: string,
+    st: 'received' | 'under_review' | 'resolved',
+    resolution?: 'actioned' | 'dismissed',
+  ) => void
   applyForumModerationAction: (reportId: string, act: 'hide' | 'restore' | 'delete' | 'warn', note: string) => boolean
 
   // Admin / Staff
@@ -5920,9 +5924,10 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
                 note: 'Post deleted by staff',
               })
               next.freports
-                .filter((r) => r.status === 'open' && r.postId === target.id)
+                .filter((r) => r.status === 'received' && r.postId === target.id)
                 .forEach((r) => {
-                  r.status = 'actioned'
+                  r.status = 'resolved'
+                  r.resolution = 'actioned'
                   r.action = 'delete'
                   r.handledBy = currentAccount.name
                   r.handledAt = now
@@ -6124,10 +6129,11 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         .filter(
           (r) =>
             r.id === repId ||
-            (r.status === 'open' && r.postId === postId && (r.commentId || null) === (cid || null)),
+            (r.status === 'received' && r.postId === postId && (r.commentId || null) === (cid || null)),
         )
         .forEach((r) => {
-          r.status = 'actioned'
+          r.status = 'resolved'
+          r.resolution = 'actioned'
           r.action = act
           r.note = note || ''
           r.handledBy = currentAccount.name
@@ -6498,7 +6504,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
             imgs: c ? 0 : (f.imgs || []).length,
           },
           ts: now,
-          status: 'open',
+          status: 'received',
         })
         next.accounts
           .filter((a) => a.role === 'moderator')
@@ -6557,17 +6563,31 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   )
 
   const setForumReportStatus = useCallback(
-    (reportId: string, st: 'open' | 'reviewed' | 'dismissed') => {
+    (
+      reportId: string,
+      st: 'received' | 'under_review' | 'resolved',
+      resolution?: 'actioned' | 'dismissed',
+    ) => {
       if (!currentAccount || !isStaffUser) {
         toast('Only RTU staff can do that.')
         return
       }
       const apiId = apiForumId(reportId)
       if (apiId !== null) {
-        void resolveForumReportApi(apiId, { status: st })
+        void resolveForumReportApi(apiId, { status: st, resolution })
           .then(async () => {
             await refreshForum()
-            toast('Report ' + (st === 'open' ? 'reopened' : 'marked ' + st) + '.')
+            toast(
+              'Report ' +
+                (st === 'received'
+                  ? 'reopened'
+                  : st === 'under_review'
+                    ? 'under review'
+                    : resolution === 'dismissed'
+                      ? 'resolved, no action taken'
+                      : 'resolved, action taken') +
+                '.',
+            )
           })
           .catch((err) =>
             toast(err instanceof ApiRequestError ? err.message : 'That decision could not be saved.'),
@@ -6580,7 +6600,8 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         const r = next.freports.find((x) => x.id === reportId)
         if (!r) return prev
         r.status = st
-        if (st === 'open') {
+        r.resolution = st === 'resolved' ? (resolution ?? '') : ''
+        if (st === 'received') {
           delete r.handledBy
           delete r.handledAt
           delete r.action
@@ -6588,13 +6609,15 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           r.handledBy = currentAccount.name
           r.handledAt = now
         }
-        const outcome = `Report ${st === 'open' ? 'reopened' : st}, content unchanged`
+        const outcome = `Report ${st === 'received' ? 'reopened' : st}${
+          st === 'resolved' && resolution ? ` (${resolution})` : ''
+        }, content unchanged`
         next.modlog.unshift({
           id: 'm' + uid(),
           ts: now,
           by: currentAccount.name,
           byEmail: currentAccount.email,
-          kind: st === 'open' ? 'reopened' : st,
+          kind: st === 'received' ? 'reopened' : st,
           type: r.type,
           postId: r.postId,
           commentId: r.commentId,
@@ -6608,20 +6631,22 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           ts: now,
           by: currentAccount.email,
           byName: currentAccount.name,
-          action: `forum report ${st === 'open' ? 'reopened' : st}`,
+          action: `forum report ${st === 'received' ? 'reopened' : st}`,
           targetType: 'forum report',
           targetId: r.id,
           targetName: r.targetName,
           note: outcome,
         })
-        if (st !== 'open') {
+        if (st !== 'received') {
           const ra = next.accounts.find((a) => a.email === r.reporterEmail)
           if (ra) {
             ra.notifs.unshift({
               t:
-                st === 'dismissed'
+                resolution === 'dismissed'
                   ? 'Staff reviewed your forum report and did not find a problem.'
-                  : 'Staff reviewed your forum report. Thank you.',
+                  : st === 'under_review'
+                    ? 'Staff have started reviewing your forum report.'
+                    : 'Staff reviewed your forum report. Thank you.',
               read: false,
               ts: nowT(),
               at: now,
@@ -6631,7 +6656,11 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         }
         return next
       })
-      toast('Report ' + (st === 'open' ? 'reopened' : 'marked ' + st) + '.')
+      toast(
+        'Report ' +
+          (st === 'received' ? 'reopened' : st === 'under_review' ? 'under review' : 'resolved') +
+          '.',
+      )
     },
     [currentAccount, isStaffUser, toast],
   )
@@ -6656,7 +6685,8 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       const apiId = apiForumId(reportId)
       if (apiId !== null) {
         void resolveForumReportApi(apiId, {
-          status: 'actioned',
+          status: 'resolved',
+          resolution: 'actioned',
           action: act,
           note: note.trim().slice(0, 300),
         })

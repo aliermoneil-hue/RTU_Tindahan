@@ -244,7 +244,7 @@ class ConversationReportTests(APITestCase):
         response = self.report(self.offending)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.json())
-        self.assertEqual(response.json()["status"], "open")
+        self.assertEqual(response.json()["status"], "received")
         self.assertEqual(response.json()["reason_display"], "Payment outside the platform")
 
     def test_a_non_participant_cannot_report(self):
@@ -334,7 +334,8 @@ class ConversationReportTests(APITestCase):
         )
 
         self.assertEqual(decided.status_code, status.HTTP_200_OK, decided.json())
-        self.assertEqual(decided.json()["status"], "actioned")
+        self.assertEqual(decided.json()["status"], "resolved")
+        self.assertEqual(decided.json()["resolution"], "actioned")
         self.assertTrue(
             AuditLog.objects.filter(action="conversation.report.warn").exists()
         )
@@ -351,7 +352,8 @@ class ConversationReportTests(APITestCase):
         )
 
         self.assertEqual(decided.status_code, status.HTTP_200_OK)
-        self.assertEqual(decided.json()["status"], "dismissed")
+        self.assertEqual(decided.json()["status"], "resolved")
+        self.assertEqual(decided.json()["resolution"], "dismissed")
         self.assertTrue(
             Notification.objects.filter(
                 user=self.buyer, text__contains="dismissed"

@@ -93,7 +93,7 @@ export function ForumPage() {
     )
   const shown = list.slice(0, fpLimit)
   const nOpenReports = isStaffUser
-    ? db.freports.filter((r) => r.status === 'open').length
+    ? db.freports.filter((r) => r.status !== 'resolved').length
     : 0
   const notice = isStaffUser && asNotice
 
@@ -347,7 +347,7 @@ export function ForumPage() {
             f.kind === 'notice' || f.kind === 'school' || author?.role === 'moderator'
           const by = f.kind === 'notice' ? 'Office of Student Affairs' : f.by || 'RTU'
           const nrep = isStaffUser
-            ? db.freports.filter((r) => r.status === 'open' && r.postId === f.id).length
+            ? db.freports.filter((r) => r.status !== 'resolved' && r.postId === f.id).length
             : 0
           const mine = f.authorEmail === currentAccount.email
           const reported = db.freports.some(

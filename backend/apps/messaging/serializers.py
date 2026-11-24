@@ -166,6 +166,7 @@ class ConversationReportSerializer(serializers.ModelSerializer):
             "details",
             "status",
             "status_display",
+            "resolution",
             "action",
             "note",
             "reporter_name",

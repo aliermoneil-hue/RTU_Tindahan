@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 82 |
-| Implemented | 80 |
-| Partial | 9 |
+| Implemented, verified | 85 |
+| Implemented | 79 |
+| Partial | 7 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 1 |
@@ -220,11 +220,11 @@ browser or the tests in this repository.
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
 | RM-01 | The system shall let a user report a listing, user, post, comment, review, or conversation and choose a reason: Misleading, Scam, Inappropriate, No... | Partly | Implemented, verified | listings, members, posts, comments, reviews and conversations are all reportable, with the SRS reason list and a snapshot |
-| RM-02 | The system shall place each report in the moderator queue with a status: Received, Under Review, or Resolved. | - | Partial | statuses are open, reviewed, dismissed, actioned |
+| RM-02 | The system shall place each report in the moderator queue with a status: Received, Under Review, or Resolved. | - | Implemented, verified | received, under_review, resolved with the outcome in a separate resolution field, on both report kinds; the old four words are translated, not refused |
 | RM-03 | The system shall let a moderator remove content, warn a user, or dismiss a report. A moderator may also recommend that a user be suspended. An Admi... | - | Implemented, verified | hide, restore, delete, dismiss; moderators only |
-| RM-04 | The system shall let the person who made a report see its status: Received, Under Review, or Resolved. A Resolved report shall show whether action... | - | Implemented | a reporter sees their own reports and each one's status |
+| RM-04 | The system shall let the person who made a report see its status: Received, Under Review, or Resolved. A Resolved report shall show whether action... | - | Implemented, verified | a reporter sees their own report's status and, once resolved, whether action was taken or it was dismissed |
 | RM-05 | The system shall record a comprehensive audit log entry for every moderation action executed on the platform. | - | Implemented, verified | `apps/audit/record()` on every staff moderation action |
-| RM-06 | The system shall show a moderator the past reports and actions linked to a user when the moderator reviews a report. | - | Partial | the audit trail names the member acted on; there is no per-user report history view |
+| RM-06 | The system shall show a moderator the past reports and actions linked to a user when the moderator reviews a report. | - | Implemented, verified | GET /forum/reports/member-history/?email= returns every report linked to the member, the audit rows for them and for the account, and counts; the queue opens it in place |
 | RM-07 | The system shall strictly conceal the identity of the reporting user from the individual who was reported. | - | Implemented, verified | the reported member never receives the reporter's identity |
 | RM-08 | The system shall let a user appeal a moderator's removal, warning, or suspension. An Administrator who did not make the original decision shall rev... | - | Implemented, verified | appeals for removals and suspensions; suspended accounts appeal from /appeals/suspension/, decided by someone who did not decide |
 
