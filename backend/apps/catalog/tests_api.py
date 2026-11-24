@@ -12,6 +12,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
+from apps.audit.models import AuditLog
 from apps.catalog.models import Category, Listing, ListingPhoto
 from apps.notifications.models import Notification
 from apps.screening.providers import Verdict
@@ -797,3 +798,142 @@ class ScreeningAuthorityTests(APITestCase):
             quantity=1,
             meetup_place="Main lobby",
         )
+
+
+class CategoryManagementTests(APITestCase):
+    """AD-03 and MN-02: categories are an administrator's to manage, not code."""
+
+    def setUp(self):
+        self.admin = make_user("2024-990001@rtu.edu.ph", role=User.Role.ADMINISTRATOR)
+        self.member = make_user("2024-990002@rtu.edu.ph")
+        self.moderator = make_user("2024-990003@rtu.edu.ph", role=User.Role.MODERATOR)
+        self.parent = Category.objects.create(name="Books", sort_order=1)
+
+    def as_admin(self):
+        self.client.force_authenticate(self.admin)
+
+    def test_an_administrator_creates_a_category(self):
+        self.as_admin()
+
+        created = self.client.post(
+            "/api/v1/categories/",
+            {"name": "Sports Equipment", "sort_order": 7},
+            format="json",
+        )
+
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.json())
+        self.assertEqual(created.json()["slug"], "sports-equipment")
+        self.assertTrue(Category.objects.filter(slug="sports-equipment").exists())
+        # AD-05: the change is in the audit log, with who did it.
+        self.assertTrue(
+            AuditLog.objects.filter(action__icontains="create category", actor=self.admin).exists()
+        )
+
+    def test_a_member_cannot_create_one(self):
+        self.client.force_authenticate(self.member)
+
+        refused = self.client.post("/api/v1/categories/", {"name": "Mine"}, format="json")
+
+        self.assertIn(refused.status_code, (403, 401))
+        self.assertFalse(Category.objects.filter(name="Mine").exists())
+
+    def test_a_moderator_cannot_create_one(self):
+        """Managing the taxonomy is administration, not moderation."""
+        self.client.force_authenticate(self.moderator)
+
+        refused = self.client.post("/api/v1/categories/", {"name": "Moderated"}, format="json")
+
+        self.assertEqual(refused.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_an_administrator_renames_and_reorders_one(self):
+        self.as_admin()
+
+        updated = self.client.patch(
+            f"/api/v1/categories/{self.parent.slug}/",
+            {"name": "Books and reviewers", "sort_order": 2},
+            format="json",
+        )
+
+        self.assertEqual(updated.status_code, status.HTTP_200_OK, updated.json())
+        self.parent.refresh_from_db()
+        self.assertEqual(self.parent.name, "Books and reviewers")
+        self.assertEqual(self.parent.sort_order, 2)
+        self.assertTrue(
+            AuditLog.objects.filter(action__icontains="edit category", actor=self.admin).exists()
+        )
+
+    def test_a_category_that_has_listings_cannot_be_deleted(self):
+        seller = make_user("2024-990004@rtu.edu.ph")
+        Listing.objects.create(
+            seller=seller,
+            category=self.parent,
+            title="Book",
+            description="A book, described at enough length to pass.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price=Decimal("100.00"),
+            quantity=1,
+            meetup_place="Main lobby",
+        )
+        self.as_admin()
+
+        refused = self.client.delete(f"/api/v1/categories/{self.parent.slug}/")
+
+        self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Turn it off instead", str(refused.json()))
+        self.assertTrue(Category.objects.filter(pk=self.parent.pk).exists())
+
+    def test_an_empty_category_can_be_deleted(self):
+        spare = Category.objects.create(name="Spare")
+        self.as_admin()
+
+        gone = self.client.delete(f"/api/v1/categories/{spare.slug}/")
+
+        self.assertEqual(gone.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Category.objects.filter(pk=spare.pk).exists())
+
+    def test_turning_one_off_hides_it_from_the_pickers(self):
+        self.as_admin()
+
+        before = self.client.get("/api/v1/categories/")
+        self.assertIn(self.parent.slug, [row["slug"] for row in before.json()])
+
+        self.client.patch(f"/api/v1/categories/{self.parent.slug}/", {"is_active": False}, format="json")
+
+        after = self.client.get("/api/v1/categories/")
+        self.assertNotIn(self.parent.slug, [row["slug"] for row in after.json()])
+        # The panel asks with ?all=1 and still sees it.
+        self.client.force_authenticate(self.admin)
+        panel = self.client.get("/api/v1/categories/?all=1")
+        self.assertIn(self.parent.slug, [row["slug"] for row in panel.json()])
+
+    def test_the_list_carries_how_many_listings_use_it(self):
+        seller = make_user("2024-990005@rtu.edu.ph")
+        Listing.objects.create(
+            seller=seller,
+            category=self.parent,
+            title="Reviewer",
+            description="Complete reviewer, no markings, used for one term.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price=Decimal("150.00"),
+            quantity=1,
+            meetup_place="Main lobby",
+        )
+
+        rows = self.client.get("/api/v1/categories/").json()
+
+        row = next(r for r in rows if r["slug"] == self.parent.slug)
+        self.assertEqual(row["listing_count"], 1)
+
+    def test_a_category_cannot_be_its_own_parent(self):
+        self.as_admin()
+
+        refused = self.client.patch(
+            f"/api/v1/categories/{self.parent.slug}/",
+            {"parent": self.parent.pk},
+            format="json",
+        )
+
+        self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("cannot sit inside itself", str(refused.json()))

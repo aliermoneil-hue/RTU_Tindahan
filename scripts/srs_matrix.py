@@ -148,7 +148,7 @@ DECIDED = {
     "NT-02": ("partial", "verification, reset and the password-changed notice are sent; store mail is not"),
     # --- administration -----------------------------------------------------
     "AD-02": ("verified", "`/admin/users/<id>/role/`, administrator only"),
-    "AD-03": ("partial", "administrators edit the screening rules; marketplace categories are still fixed in code"),
+    "AD-03": ("verified", "administrators create, rename, reorder, turn off and delete categories in the panel, and edit the screening rules"),
     "AD-04": ("verified", "Users and audit screen, read-only trail"),
     "AD-05": ("verified", "`createsuperuser`; docs/TEAM-SETUP.md"),
     # --- favourites, profile, staff tools ----------------------------------
@@ -171,7 +171,7 @@ DECIDED = {
     "RM-04": ("implemented", "a reporter sees their own reports and each one's status"),
     "RM-06": ("partial", "the audit trail names the member acted on; there is no per-user report history view"),
     "PR-04": ("implemented", "admin endpoints are role-gated; personal data is not exposed to members"),
-    "MN-02": ("partial", "screening rules are configurable in the panel; marketplace categories would still need a code change"),
+    "MN-02": ("verified", "categories and screening rules are both configurable in the panel without a deployment"),
     "UX-01": ("verified", "twenty-five routes measured at 360 px with no page-level sideways scrolling; docs/UX-360.md"),
     "UX-03": ("implemented", "the interface is in English throughout"),
     "UX-04": ("verified", "API errors carry a human-readable message that the client shows"),

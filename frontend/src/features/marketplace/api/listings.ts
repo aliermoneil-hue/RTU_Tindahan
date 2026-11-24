@@ -91,8 +91,11 @@ export interface ApiCategory {
   name: string
   slug: string
   parent: number | null
+  parent_name?: string | null
   sort_order: number
   is_active: boolean
+  /** AD-03: how many listings sit in it, for the panel. */
+  listing_count?: number
 }
 
 export interface ApiPage<T> {
@@ -276,6 +279,30 @@ export async function fetchListing(slug: string): Promise<ApiListing | undefined
   } catch {
     return undefined
   }
+}
+
+/** AD-03: the panel's list, including the categories that were turned off. */
+export async function fetchCategoriesAdmin(): Promise<ApiCategory[]> {
+  return apiFetch<ApiCategory[]>('/categories/?all=1')
+}
+
+export async function createCategory(input: {
+  name: string
+  parent?: number | null
+  sort_order?: number
+}): Promise<ApiCategory> {
+  return apiFetch<ApiCategory>('/categories/', { method: 'POST', body: input })
+}
+
+export async function updateCategory(
+  slug: string,
+  patch: Partial<Pick<ApiCategory, 'name' | 'parent' | 'sort_order' | 'is_active'>>,
+): Promise<ApiCategory> {
+  return apiFetch<ApiCategory>(`/categories/${slug}/`, { method: 'PATCH', body: patch })
+}
+
+export async function deleteCategory(slug: string): Promise<void> {
+  return apiFetch<void>(`/categories/${slug}/`, { method: 'DELETE' })
 }
 
 export async function fetchCategories(): Promise<ApiCategory[]> {

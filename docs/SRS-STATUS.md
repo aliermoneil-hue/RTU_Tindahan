@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 78 |
+| Implemented, verified | 80 |
 | Implemented | 80 |
-| Partial | 13 |
+| Partial | 11 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 1 |
@@ -241,7 +241,7 @@ browser or the tests in this repository.
 | --- | --- | --- | --- | --- |
 | AD-01 | The system shall let an Administrator activate, suspend, and reactivate accounts, including carrying out a suspension that a moderator recommended. | Built | Implemented | `apps/accounts/admin_api.py` |
 | AD-02 | The system shall allow an Administrator to assign and revoke Office Staff and Moderator role privileges. | Not yet | Implemented, verified | `/admin/users/<id>/role/`, administrator only |
-| AD-03 | The system shall allow an Administrator to create, edit, and manage marketplace categories and AI screening policy rules. | Partly | Partial | administrators edit the screening rules; marketplace categories are still fixed in code |
+| AD-03 | The system shall allow an Administrator to create, edit, and manage marketplace categories and AI screening policy rules. | Partly | Implemented, verified | administrators create, rename, reorder, turn off and delete categories in the panel, and edit the screening rules |
 | AD-04 | The system shall let an Administrator view the audit logs. The audit log shall record role changes, account state changes, screening rule changes,... | Partly | Implemented, verified | Users and audit screen, read-only trail |
 | AD-05 | The system shall have a first Administrator account created by the project team when the system is set up, and shall let an Administrator give the... | Partly | Implemented, verified | `createsuperuser`; docs/TEAM-SETUP.md |
 
@@ -315,7 +315,7 @@ browser or the tests in this repository.
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
 | MN-01 | Application source code shall be structured into modular components and accompanied by clear technical documentation to facilitate maintenance by f... | Built | Implemented | 11 apps, 30 models, docs/ set |
-| MN-02 | Marketplace product categories and AI screening policy rules shall be configurable directly through the Administrator Panel without requiring code... | Partly | Partial | screening rules are configurable in the panel; marketplace categories would still need a code change |
+| MN-02 | Marketplace product categories and AI screening policy rules shall be configurable directly through the Administrator Panel without requiring code... | Partly | Implemented, verified | categories and screening rules are both configurable in the panel without a deployment |
 | MN-03 | A software upgrade must change the saved data safely: it shall be repeatable, keep the TXN references and its history, and must not delete nothing. | Built | Implemented | 11 apps, 30 models, docs/ set |
 
 ## What is still open

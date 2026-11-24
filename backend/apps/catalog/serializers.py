@@ -44,10 +44,31 @@ class PhotoListField(serializers.ListField):
 
 
 class CategorySerializer(serializers.ModelSerializer):
+    listing_count = serializers.IntegerField(read_only=True)
+    parent_name = serializers.CharField(source="parent.name", read_only=True, default=None)
+
     class Meta:
         model = Category
-        fields = ("id", "name", "slug", "parent", "sort_order", "is_active")
+        fields = (
+            "id",
+            "name",
+            "slug",
+            "parent",
+            "parent_name",
+            "sort_order",
+            "is_active",
+            "listing_count",
+        )
         read_only_fields = ("slug",)
+
+    def validate_parent(self, parent):
+        # A category cannot be its own parent, and two levels are enough for the
+        # pickers this feeds. Anything deeper belongs in the name.
+        if parent is not None and self.instance is not None and parent.pk == self.instance.pk:
+            raise serializers.ValidationError("A category cannot sit inside itself.")
+        if parent is not None and parent.parent_id is not None:
+            raise serializers.ValidationError("Choose a top-level category as the parent.")
+        return parent
 
 
 class ListingPhotoSerializer(serializers.ModelSerializer):

@@ -20,7 +20,7 @@ from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from django.db.models import Avg, Case, Count, F, IntegerField, OuterRef, Q, Subquery, Value, When
 from django.db.models.functions import Coalesce
-from rest_framework import status, viewsets
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -28,7 +28,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.accounts.models import User
-from apps.accounts.permissions import IsModerator, IsVerifiedUser
+from apps.accounts.permissions import IsAdministrator, IsModerator, IsVerifiedUser
 from apps.audit.services import record
 from apps.notifications.services import notify
 from apps.screening.services import record_moderator_decision, run_screening
@@ -85,14 +85,85 @@ def price_bound(params, key):
     return value
 
 
-class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+class CategoryViewSet(viewsets.ModelViewSet):
+    """AD-03 and MN-02: an administrator edits the marketplace categories.
+
+    Reading is open — the browse screen and the listing form need the list — and
+    every write is administrator-only, audited, and refuses to break a listing
+    that already sits in the category. Deactivating is the safe way to retire a
+    category: the listings keep theirs, and it stops being offered for new ones.
+    """
+
     serializer_class = CategorySerializer
-    permission_classes = [AllowAny]
     lookup_field = "slug"
     pagination_class = None
 
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [AllowAny()]
+        return [IsAdministrator()]
+
     def get_queryset(self):
-        return Category.objects.filter(is_active=True)
+        queryset = Category.objects.select_related("parent").annotate(
+            listing_count=Count("listings", distinct=True)
+        )
+        # The pickers ask for what is offered; the panel asks for everything.
+        wants_all = self.request.query_params.get("all") in {"1", "true", "yes"}
+        user = getattr(self.request, "user", None)
+        staff = bool(user and user.is_authenticated and user.is_moderator)
+        if self.action in ("list", "retrieve") and not (wants_all and staff):
+            queryset = queryset.filter(is_active=True)
+        return queryset
+
+    def perform_create(self, serializer):
+        category = serializer.save()
+        record(
+            self.request.user,
+            "create category",
+            target_type="category",
+            target_id=category.slug,
+            target_name=category.name,
+        )
+
+    def perform_update(self, serializer):
+        before = serializer.instance
+        changes = {
+            field: getattr(before, field)
+            for field in ("name", "parent_id", "sort_order", "is_active")
+        }
+        category = serializer.save()
+        after = {
+            field: getattr(category, field)
+            for field in ("name", "parent_id", "sort_order", "is_active")
+        }
+        diff = {k: (changes[k], after[k]) for k in changes if changes[k] != after[k]}
+        record(
+            self.request.user,
+            "edit category",
+            target_type="category",
+            target_id=category.slug,
+            target_name=category.name,
+            note=str(diff)[:300],
+        )
+
+    def perform_destroy(self, instance):
+        """Refuse a delete that would orphan listings; deactivate instead."""
+        if instance.listings.exists() or instance.children.exists():
+            raise serializers.ValidationError(
+                {
+                    "detail": "This category still has listings or sub-categories. "
+                    "Turn it off instead, so nothing loses its place."
+                }
+            )
+        name, slug = instance.name, instance.slug
+        instance.delete()
+        record(
+            self.request.user,
+            "delete category",
+            target_type="category",
+            target_id=slug,
+            target_name=name,
+        )
 
 
 class ListingViewSet(viewsets.ModelViewSet):

@@ -61,6 +61,11 @@ export const ForumPage = lazy(() =>
 export const ForumPostPage = lazy(() =>
   import('@/features/marketplace/pages/ForumPostPage').then((m) => ({ default: m.ForumPostPage })),
 )
+export const CategoriesPage = lazy(() =>
+  import('@/features/marketplace/pages/admin/CategoriesPage').then((m) => ({
+    default: m.CategoriesPage,
+  })),
+)
 export const PrivacyPage = lazy(() =>
   import('@/features/core/pages/PrivacyPage').then((m) => ({ default: m.PrivacyPage })),
 )
