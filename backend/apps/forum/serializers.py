@@ -109,6 +109,7 @@ class ForumPostSerializer(serializers.ModelSerializer):
     is_mine = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
     hidden = serializers.SerializerMethodField()
+    screening = serializers.SerializerMethodField()
     comments = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     react_counts = serializers.SerializerMethodField()
@@ -128,6 +129,8 @@ class ForumPostSerializer(serializers.ModelSerializer):
             "images",
             "pinned",
             "hidden",
+            "moderation_status",
+            "screening",
             "comments",
             "comment_count",
             "react_counts",
@@ -165,6 +168,30 @@ class ForumPostSerializer(serializers.ModelSerializer):
         return ForumCommentSerializer(
             obj.comments.select_related("author", "hidden_by"), many=True, context=self.context
         ).data
+
+    def get_screening(self, obj):
+        """Latest screening verdict, for staff only (AI-03).
+
+        The author learns the outcome from `moderation_status` and from their
+        inbox, never from the reasons: a flagged post's reasons are written for
+        a moderator and can name exactly which rule was tripped.
+        """
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not (user and user.is_authenticated and getattr(user, "is_moderator", False)):
+            return None
+
+        latest = next(iter(obj.screening_results.all()), None)
+        if latest is None:
+            return None
+        return {
+            "verdict": latest.verdict,
+            "score": latest.score,
+            "reasons": latest.reasons,
+            "provider": latest.provider,
+            "model": latest.model_name,
+            "at": latest.created_at,
+        }
 
     def get_comment_count(self, obj):
         return sum(1 for c in obj.comments.all() if not c.is_deleted and not c.is_hidden)

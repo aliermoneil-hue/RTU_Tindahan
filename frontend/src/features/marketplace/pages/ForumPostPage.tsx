@@ -57,7 +57,7 @@ export function ForumPostPage() {
   const postId = params.get('id') || selectedPostId
   const f = postId ? db.feed.find((x) => x.id === postId) : undefined
   const fpVisible =
-    f && (!f.hidden || isStaffUser || f.authorEmail === currentAccount.email)
+    f && ((!f.hidden && !f.held) || isStaffUser || f.authorEmail === currentAccount.email)
 
   if (!f || !fpVisible) {
     return (
@@ -410,7 +410,7 @@ export function ForumPostPage() {
 
       <article
         className={`card stack fpost ${f.pinned ? 'pinned' : ''} ${
-          f.hidden ? 'is-hidden' : ''
+          f.hidden || f.held ? 'is-hidden' : ''
         }`.trim()}
         id={`post-${f.id}`}
         style={{ gap: 12 }}
@@ -435,6 +435,7 @@ export function ForumPostPage() {
               {f.topic && f.kind === 'post' && <span className="pill">{f.topic}</span>}
               {f.pinned && <span className="pill yellow">Pinned</span>}
               {f.hidden && <span className="pill red">Hidden by staff</span>}
+              {f.held && <span className="pill red">Held for review</span>}
               {nrep > 0 && (
                 <button
                   type="button"
@@ -534,7 +535,7 @@ export function ForumPostPage() {
                     }}
                   >
                     <Icon name="eye" size="sm" />
-                    <span>{f.hidden ? 'Restore post' : 'Hide post'}</span>
+                    <span>{f.hidden ? 'Restore post' : f.held ? 'Release post' : 'Hide post'}</span>
                   </button>
                 )}
                 {(mine || isStaffUser) && (

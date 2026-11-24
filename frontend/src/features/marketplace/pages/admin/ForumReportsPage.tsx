@@ -26,6 +26,8 @@ export function ForumReportsPage() {
     openPost,
     setForumReportStatus,
     openModal,
+    toggleHidePost,
+    deleteForumPost,
   } = useTindahan()
 
   const [frTab, setFrTab] = useState<'open' | 'reviewed' | 'dismissed' | 'actioned' | 'all'>('open')
@@ -49,6 +51,9 @@ export function ForumReportsPage() {
   const cnt = (k: string) =>
     db.freports.filter((r) => k === 'all' || r.status === k).length
   const list = db.freports.filter((r) => frTab === 'all' || r.status === frTab)
+  // Screening holds a post before anyone reports it, so these rows have no
+  // report behind them: the queue has to read the feed itself (AI-03).
+  const held = db.feed.filter((f) => f.held)
 
   return (
     <div className="fcol wide">
@@ -75,6 +80,51 @@ export function ForumReportsPage() {
           </button>
         ))}
       </div>
+
+      {held.length ? (
+        <section className="card stack" style={{ gap: 10 }} aria-label="Held by screening">
+          <div className="row between wrap" style={{ gap: 8 }}>
+            <b>Held by screening ({held.length})</b>
+            <span className="tiny muted">
+              Automatic screening held these. Nobody else can see them until a moderator releases
+              or deletes them.
+            </span>
+          </div>
+          {held.map((f) => (
+            <div key={f.id} className="card stack" style={{ gap: 6, padding: 10 }}>
+              <div className="row between wrap" style={{ gap: 8 }}>
+                <div className="row wrap grow" style={{ gap: 6 }}>
+                  <span className="pill red">Held</span>
+                  <b>{postTitle(f)}</b>
+                  <span className="tiny muted">
+                    by {f.by} · {stamp(f.ts)}
+                  </span>
+                </div>
+                <div className="row" style={{ gap: 6 }}>
+                  <button type="button" className="btn ghost sm" onClick={() => openPost(f.id)}>
+                    Open
+                  </button>
+                  <button type="button" className="btn sm" onClick={() => toggleHidePost(f.id)}>
+                    Release
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={() => deleteForumPost(f.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+              {f.screening?.reasons?.length ? (
+                <p className="small muted" style={{ margin: 0, overflowWrap: 'anywhere' }}>
+                  {f.screening.reasons.join(' ')}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </section>
+      ) : null}
 
       {list.length ? (
         list.map((r) => {

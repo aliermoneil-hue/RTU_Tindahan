@@ -11,8 +11,18 @@ class ForumCommentInline(admin.TabularInline):
 
 @admin.register(ForumPost)
 class ForumPostAdmin(admin.ModelAdmin):
-    list_display = ("id", "title", "kind", "topic", "author", "pinned", "hidden_at", "created_at")
-    list_filter = ("kind", "pinned", "hidden_at", "topic")
+    list_display = (
+        "id",
+        "title",
+        "kind",
+        "topic",
+        "author",
+        "moderation_status",
+        "pinned",
+        "hidden_at",
+        "created_at",
+    )
+    list_filter = ("kind", "moderation_status", "pinned", "hidden_at", "topic")
     search_fields = ("title", "body", "author__email")
     raw_id_fields = ("author", "hidden_by")
     inlines = [ForumCommentInline]

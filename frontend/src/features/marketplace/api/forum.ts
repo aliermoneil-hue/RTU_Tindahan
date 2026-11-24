@@ -42,6 +42,15 @@ export interface ApiForumComment {
   edited_at: string | null
 }
 
+export interface ApiForumScreening {
+  verdict: 'clean' | 'flagged'
+  score: number | null
+  reasons: string[]
+  provider: string
+  model: string
+  at: string
+}
+
 export interface ApiForumPost {
   id: number
   kind: 'post' | 'student' | 'school' | 'notice'
@@ -54,6 +63,8 @@ export interface ApiForumPost {
   images: string[]
   pinned: boolean
   hidden: { by: string; ts: string } | null
+  moderation_status: 'visible' | 'needs_review'
+  screening: ApiForumScreening | null
   comments: ApiForumComment[]
   comment_count: number
   react_counts: Record<string, number>
@@ -279,6 +290,8 @@ export function forumPostFromApi(row: ApiForumPost, viewerEmail: string): ForumP
     edited: row.edited_at ?? undefined,
     pinned: row.pinned,
     hidden: row.hidden ?? undefined,
+    held: row.moderation_status === 'needs_review',
+    screening: row.screening ?? undefined,
     imgs: row.images,
     reacts: reactionsFor(row, viewerEmail),
     comments: row.comments.map((c) => commentFromApi(c, viewerEmail)),

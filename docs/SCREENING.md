@@ -1,8 +1,9 @@
 # Content screening (AI-01 to AI-16)
 
-Every listing passes a screening step before a moderator can publish it. This
-file explains where that step lives, how to test it today, and how to put a
-real language model behind it later without touching the rest of the system.
+Every listing — and now every forum post — passes a screening step before it
+can be seen by the public. This file explains where that step lives, how to
+test it today, and how to put a real language model behind it later without
+touching the rest of the system.
 
 ---
 
@@ -36,6 +37,44 @@ keeps the approval decision where the SRS puts it.
 
 A listing is screened again when the seller edits it, because an edit changes
 the words a moderator would have judged.
+
+### Forum posts
+
+A post has no "pending" state to leave alone: it is live the moment it is
+written. So the gate inverts, and the safe default stays safe.
+
+    member POSTs /api/v1/forum/posts/
+              |
+              v
+      ForumPost created as  visible
+              |
+              v
+      apps.screening.services.run_post_screening(post)
+              |
+              +--> clean    -> stays visible, and is in the feed at once
+              +--> flagged  -> moderation_status = needs_review ("held")
+                               + the author is notified, once
+                               + every moderator is notified into the forum
+                                 report queue
+              +--> provider fails -> fallback answers; with LLM_FALLBACK off
+                                     the post is held unscreened
+
+    moderator: GET /api/v1/forum/posts/?moderation=needs_review
+               POST /api/v1/forum/posts/<id>/moderate/  {"action": "restore"}
+               -> back in the public feed, hold cleared
+
+A held post is **not hidden**: it keeps its row, its author still sees it (so
+it does not vanish without explanation), staff see it, and nobody else does.
+Hiding is a separate human decision on top of the hold. An edit re-screens the
+post, because an edit changes the words a moderator would have judged; a clean
+re-screening does **not** release a held post, because releasing is a
+moderator's decision. A held notice never fans out to the campus: the
+announcement notification is only sent when screening leaves the post visible.
+
+Posts are judged by the prohibited-content rules only. Links, phone numbers,
+"message me on Facebook" and one-line replies are ordinary in a conversation,
+and flagging them would bury the queue; the price, description-length, link
+and all-caps rules apply to listings.
 
 ---
 
@@ -154,8 +193,9 @@ Pass the transport into the constructor when you write tests — both providers
 accept one — so the suite answers from a fixture instead of the network.
 
 Keep provider calls inside the `LLM_TIMEOUT`. A hung request in
-`run_screening` hangs the seller's POST, because screening runs inline. If that
-becomes a real problem the fix is a background job, not a longer timeout.
+`run_screening` hangs the seller's POST, and in `run_post_screening` it hangs
+the member's post, because screening runs inline. If that becomes a real
+problem the fix is a background job, not a longer timeout.
 
 ---
 
@@ -170,6 +210,15 @@ Moderators see every status, so one request covers the whole queue. Statuses
 are comma-separated, and an unknown value returns `400` listing the valid
 ones. Visitors cannot use `status` to see anything they could not already see,
 because visibility is applied first.
+
+Posts use the same shape on the forum endpoint:
+
+    GET /api/v1/forum/posts/?moderation=needs_review
+
+The frontend queue is **Staff → Forum reports**, which lists held posts at the
+top under "Held by screening", with the moderator's reason, an *Open* link, and
+*Release* / *Delete*. Release calls the existing `moderate` action with
+`{"action": "restore"}`.
 
 Each listing in that response carries, for moderators only:
 
@@ -188,12 +237,14 @@ Each listing in that response carries, for moderators only:
 
 ## 6. What is not done
 
-- **Only listings are screened.** Forum posts and comments rely on reporting
-  and moderator action instead of a screening pass; if that changes, the
-  provider needs an entry point that takes plain text rather than a `Listing`.
+- **Comments and reviews are not screened.** Posts and listings are; a forum
+  comment or a review still relies on reporting and moderator action. The
+  entry point is ready for them — `run_post_screening` takes a `TextSubject`,
+  so a comment only needs an adapter and a `ScreeningResult` target.
 - **Nothing publishes automatically.** A clean verdict still waits for a
-  moderator. Auto-publishing would be a deliberate change to `run_screening`
-  plus its tests — not a side effect.
+  moderator on a listing, and a flagged post is held rather than deleted.
+  Auto-publishing would be a deliberate change to `run_screening` plus its
+  tests — not a side effect.
 - **The keyword list is high-precision, not exhaustive.** It cannot read
   intent, and the model is what handles semantic cases; see the calibration
   below.
@@ -216,10 +267,31 @@ curl -X POST http://localhost:8000/api/v1/listings/ \
 # the queue, as a moderator
 curl "http://localhost:8000/api/v1/listings/?status=pending_screening,needs_review" \
   -H "Authorization: Token <moderator token>"
+
+# a forum post that should be held
+curl -X POST http://localhost:8000/api/v1/forum/posts/ \
+  -H "Authorization: Token ***" \
+  -H "Content-Type: application/json" \
+  -d '{"kind":"post","topic":"General","title":"Selling answer keys",
+       "body":"Complete exam answers for the midterm, cheap."}'
+
+# expect "moderation_status": "needs_review", and an empty public feed:
+curl http://localhost:8000/api/v1/forum/posts/
+
+# the held queue and the release, as a moderator
+curl "http://localhost:8000/api/v1/forum/posts/?moderation=needs_review" \
+  -H "Authorization: Token ***"
+curl -X POST http://localhost:8000/api/v1/forum/posts/<id>/moderate/ \
+  -H "Authorization: Token ***" -H "Content-Type: application/json" \
+  -d '{"action":"restore"}'
 ```
 
-The audit trail is in Django admin under **Screening results**: listing,
-verdict, score, reasons, provider, and when it ran.
+The audit trail is in Django admin under **Screening results**: target
+(listing or post), verdict, score, reasons, provider, and when it ran.
+
+Tests: `python manage.py test apps.screening` (provider boundary, both
+targets) and `python manage.py test apps.forum` (the feed, the hold, the
+queue filter, the release, the re-screen on edit).
 
 ---
 

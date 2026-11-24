@@ -23,13 +23,14 @@ from django.db.models import Q
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.accounts.permissions import IsVerifiedUser
 from apps.audit.services import record
 from apps.notifications.services import notify, notify_staff
+from apps.screening.services import run_post_screening
 
 from .models import ForumComment, ForumPost, ForumReaction, ForumReport
 from .serializers import (
@@ -102,18 +103,29 @@ class ForumPostViewSet(
     def get_queryset(self):
         queryset = (
             ForumPost.objects.select_related("author", "hidden_by")
-            .prefetch_related("comments__author", "comments__hidden_by", "reactions")
+            .prefetch_related(
+                "comments__author",
+                "comments__hidden_by",
+                "reactions",
+                "screening_results",
+            )
         )
         user = self.request.user
         params = self.request.query_params
 
         # A hidden post is gone from the public feed, but its author can still
-        # open it to see why, and staff need it for the report queue.
+        # open it to see why, and staff need it for the report queue. A post
+        # held by screening is the same: out of the feed, readable by the
+        # author (so it is not a silent disappearance) and by staff.
+        public = Q(
+            hidden_at__isnull=True,
+            moderation_status=ForumPost.ModerationStatus.VISIBLE,
+        )
         if not is_staff(user):
             if user and user.is_authenticated:
-                queryset = queryset.filter(Q(hidden_at__isnull=True) | Q(author=user))
+                queryset = queryset.filter(public | Q(author=user))
             else:
-                queryset = queryset.filter(hidden_at__isnull=True)
+                queryset = queryset.filter(public)
 
         if params.get("topic"):
             queryset = queryset.filter(topic=params["topic"])
@@ -121,6 +133,18 @@ class ForumPostViewSet(
             queryset = queryset.filter(kind=params["kind"])
         if params.get("author") == "me" and user and user.is_authenticated:
             queryset = queryset.filter(author=user)
+        if raw := params.get("moderation"):
+            asked = [value.strip().lower() for value in raw.split(",") if value.strip()]
+            valid = {value for value, _ in ForumPost.ModerationStatus.choices}
+            unknown = [value for value in asked if value not in valid]
+            if unknown:
+                raise ValidationError(
+                    {
+                        "moderation": f"Unknown moderation status: {', '.join(unknown)}. "
+                        f"Valid values: {', '.join(sorted(valid))}."
+                    }
+                )
+            queryset = queryset.filter(moderation_status__in=asked)
         return queryset
 
     def get_serializer_class(self):
@@ -144,7 +168,10 @@ class ForumPostViewSet(
             author=request.user,
             images=save_images(data.get("images"), request),
         )
-        if kind == ForumPost.Kind.NOTICE:
+        # Screen before anyone is told about it: a notice that screening holds
+        # must not fan out to the whole campus first.
+        result = run_post_screening(post)
+        if kind == ForumPost.Kind.NOTICE and not result.is_flagged:
             # A notice is an announcement: every verified member hears it once.
             from apps.accounts.models import User
 
@@ -184,6 +211,11 @@ class ForumPostViewSet(
             post.images = save_images(data["images"], request)
         post.edited_at = timezone.now()
         post.save()
+        if any(field in data for field in ("title", "body", "topic")):
+            # An edit changes the words a moderator judged: re-screen it. A
+            # flagged edit holds the post again; a clean edit leaves the
+            # status alone, because releasing is a moderator's decision.
+            run_post_screening(post)
         return Response(ForumPostSerializer(post, context=self.get_serializer_context()).data)
 
     def destroy(self, request, *args, **kwargs):
@@ -294,7 +326,10 @@ class ForumPostViewSet(
         if act == "hide":
             hide_post(post, request.user)
         elif act == "restore":
+            # Restoring means "this is fit to be seen": it puts the post back
+            # in the feed and clears a hold that screening left on it.
             restore_post(post)
+            post.release_from_review()
         elif act == "pin":
             post.pinned = True
             post.save(update_fields=["pinned"])

@@ -54,7 +54,7 @@ export function ForumPage() {
   if (!currentAccount) return null
 
   const fpVisible = (f: ForumPost) =>
-    !f.hidden || isStaffUser || f.authorEmail === currentAccount.email
+    (!f.hidden && !f.held) || isStaffUser || f.authorEmail === currentAccount.email
   const cmLive = (c: { deleted?: boolean; hidden?: unknown }) => !c.deleted && !c.hidden
   const cmCount = (f: ForumPost) => (f.comments || []).filter(cmLive).length
   const popScore = (f: ForumPost) => Object.keys(f.reacts || {}).length + cmCount(f)
@@ -282,7 +282,7 @@ export function ForumPage() {
             <article
               key={f.id}
               className={`card fpost ${f.pinned ? 'pinned' : ''} ${
-                f.hidden ? 'is-hidden' : ''
+                f.hidden || f.held ? 'is-hidden' : ''
               }`.trim()}
               id={`post-${f.id}`}
             >
@@ -306,6 +306,12 @@ export function ForumPage() {
                     {f.topic && f.kind === 'post' && <span className="pill">{f.topic}</span>}
                     {f.pinned && <span className="pill yellow">Pinned</span>}
                     {f.hidden && <span className="pill red">Hidden by staff</span>}
+                    {f.held && <span className="pill red">Held for review</span>}
+                    {isStaffUser && f.held && f.screening?.reasons?.length ? (
+                      <span className="tiny muted" title={f.screening.reasons.join(' ')}>
+                        {f.screening.reasons[0]}
+                      </span>
+                    ) : null}
                     {nrep > 0 && (
                       <button
                         type="button"
@@ -405,7 +411,7 @@ export function ForumPage() {
                           }}
                         >
                           <Icon name="eye" size="sm" />
-                          <span>{f.hidden ? 'Restore post' : 'Hide post'}</span>
+                          <span>{f.hidden ? 'Restore post' : f.held ? 'Release post' : 'Hide post'}</span>
                         </button>
                       )}
                       {(mine || isStaffUser) && (

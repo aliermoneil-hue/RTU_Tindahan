@@ -163,6 +163,19 @@ Ordinary second-hand goods, food, uniforms, school supplies and services are cle
 Score 0-100: 0 certainly harmless, 100 certainly prohibited. 50 or above means flagged.
 Give at most three short reasons, each one sentence, written for a moderator."""
 
+GEMINI_POST_INSTRUCTION = """You screen forum posts for RTU Tindahan, a university campus marketplace in the Philippines.
+Decide whether a post may stay on the public forum. Flag only content the posting guideline forbids:
+- offers of counterfeit, fake, replica or pirated goods, including fake official RTU merchandise;
+- exam answers, answer keys, leaked exams, or help that is academic cheating;
+- weapons or ammunition; illegal drugs; gambling or betting;
+- vapes, e-cigarettes, tobacco or alcohol offered for sale;
+- medicines, prescription or not, offered for sale; stolen goods; another person's ID or personal details; resold event tickets without permission;
+- sexual content, harassment, threats or hate directed at a person or group.
+An ordinary conversation is clean: a question, a review, a lost-and-found notice, a shared link, a phone number,
+a meetup arrangement, criticism of a class or a policy, and short replies are all allowed.
+Score 0-100: 0 certainly harmless, 100 certainly prohibited. 50 or above means flagged.
+Give at most three short reasons, each one sentence, written for a moderator."""
+
 GEMINI_SCHEMA = {
     "type": "object",
     "properties": {
@@ -186,6 +199,53 @@ class Verdict:
     raw: dict = field(default_factory=dict)
 
 
+@dataclass
+class TextSubject:
+    """The words a provider is allowed to read, and nothing else.
+
+    Listings and forum posts both arrive here, so no provider ever learns a
+    Django model. `kind` decides which signals make sense: an asking price, a
+    thin description, a link or "contact me at" say something about a listing
+    and nothing about a conversation, so those rules are skipped for posts.
+    """
+
+    title: str
+    description: str
+    price: str | None = None
+    kind: str = "listing"
+
+    @classmethod
+    def for_listing(cls, listing):
+        return cls(
+            title=listing.title or "",
+            description=listing.description or "",
+            price="" if listing.price is None else str(listing.price),
+            kind="listing",
+        )
+
+    @classmethod
+    def for_post(cls, post):
+        return cls(
+            title=post.title or "",
+            description=post.body or "",
+            price=None,
+            kind="post",
+        )
+
+
+def as_subject(item) -> TextSubject:
+    """Accept a `TextSubject`, or a listing/post model for convenience.
+
+    The service always passes a `TextSubject`; this exists so a test or a
+    shell session can hand the provider the object it just created.
+    """
+    if isinstance(item, TextSubject):
+        return item
+    if hasattr(item, "description"):
+        return TextSubject.for_listing(item)
+    return TextSubject.for_post(item)
+
+
 def _mentions(text: str, term: str) -> bool:
     """Match a term the way a person reading the listing would.
 
@@ -204,29 +264,38 @@ class StubProvider:
     It reads the same fields a model would: the title, the description, and
     the asking price. Each rule that fires adds a reason and raises the score;
     the highest score wins, so one serious hit is enough to flag.
+
+    A forum post is judged by the prohibited-content rules only. A
+    conversation legitimately carries links, phone numbers, "message me on
+    Facebook" and one-line replies; flagging those would bury the moderator
+    queue in noise, and a queue nobody reads is worse than no queue.
     """
 
     name = "stub"
     model_name = "rules-v1"
 
-    def screen(self, listing) -> Verdict:
-        text = f"{listing.title} {listing.description}".lower()
+    def screen(self, item) -> Verdict:
+        subject = as_subject(item)
+        is_listing = subject.kind == "listing"
+        text = f"{subject.title} {subject.description}".lower()
         reasons: list[str] = []
         score = 0
 
         # The price may arrive as a Decimal (from a database row) or as the
         # string a caller assigned before saving, so normalise before comparing.
-        try:
-            price = Decimal(str(listing.price)) if listing.price is not None else None
-        except (InvalidOperation, ValueError):
-            price = None
+        price = None
+        if is_listing and subject.price not in (None, ""):
+            try:
+                price = Decimal(str(subject.price))
+            except (InvalidOperation, ValueError):
+                price = None
 
         hits = [term for term in PROHIBITED_TERMS if _mentions(text, term)]
         if hits:
             reasons.append("Mentions a prohibited item: " + ", ".join(sorted(hits)) + ".")
             score = max(score, 90)
 
-        if len((listing.description or "").strip()) < MIN_DESCRIPTION:
+        if is_listing and len(subject.description.strip()) < MIN_DESCRIPTION:
             reasons.append("The description is too short to judge whether the item is allowed.")
             score = max(score, 55)
 
@@ -236,27 +305,28 @@ class StubProvider:
             )
             score = max(score, 55)
 
-        title = listing.title or ""
-        if title.isupper() and len(title) > 12:
-            # A spam shape, not a violation: on its own this stays below the
-            # flag threshold, as the guideline says.
-            reasons.append("The title is all capitals, a common spam pattern.")
-            score = max(score, 40)
+        if is_listing:
+            title = subject.title
+            if title.isupper() and len(title) > 12:
+                # A spam shape, not a violation: on its own this stays below the
+                # flag threshold, as the guideline says.
+                reasons.append("The title is all capitals, a common spam pattern.")
+                score = max(score, 40)
 
-        if "http://" in text or "https://" in text or "www." in text:
-            reasons.append("The text contains a link, which listings must not have.")
-            score = max(score, 60)
+            if "http://" in text or "https://" in text or "www." in text:
+                reasons.append("The text contains a link, which listings must not have.")
+                score = max(score, 60)
 
-        scams = [term for term in SCAM_PATTERNS if _mentions(text, term)]
-        if PHONE_RE.search(text):
-            scams.append("a phone number")
-        if scams:
-            reasons.append(
-                "Looks like a pay-first or off-app contact pattern: "
-                + ", ".join(sorted(set(scams)))
-                + "."
-            )
-            score = max(score, 85)
+            scams = [term for term in SCAM_PATTERNS if _mentions(text, term)]
+            if PHONE_RE.search(text):
+                scams.append("a phone number")
+            if scams:
+                reasons.append(
+                    "Looks like a pay-first or off-app contact pattern: "
+                    + ", ".join(sorted(set(scams)))
+                    + "."
+                )
+                score = max(score, 85)
 
         return Verdict(
             verdict="flagged" if score >= FLAG_THRESHOLD else "clean",
@@ -305,21 +375,23 @@ class GeminiProvider:
                 "Either set it or put LLM_PROVIDER back to stub."
             )
 
-    def _payload(self, listing) -> dict:
+    def _payload(self, subject) -> dict:
+        instruction = (
+            GEMINI_POST_INSTRUCTION if subject.kind == "post" else GEMINI_INSTRUCTION
+        )
+        text = f"Title: {subject.title}\nText: {subject.description}"
+        if subject.kind == "listing":
+            text = (
+                f"Title: {subject.title}\n"
+                f"Description: {subject.description}\n"
+                f"Price: {subject.price}"
+            )
         return {
-            "systemInstruction": {"parts": [{"text": GEMINI_INSTRUCTION}]},
+            "systemInstruction": {"parts": [{"text": instruction}]},
             "contents": [
                 {
                     "role": "user",
-                    "parts": [
-                        {
-                            "text": (
-                                f"Title: {listing.title}\n"
-                                f"Description: {listing.description}\n"
-                                f"Price: {listing.price}"
-                            )
-                        }
-                    ],
+                    "parts": [{"text": text}],
                 }
             ],
             "generationConfig": {
@@ -330,10 +402,11 @@ class GeminiProvider:
             },
         }
 
-    def screen(self, listing) -> Verdict:
+    def screen(self, item) -> Verdict:
+        subject = as_subject(item)
         data = self.transport(
             GEMINI_ENDPOINT.format(model=self.model),
-            self._payload(listing),
+            self._payload(subject),
             {"x-goog-api-key": self.api_key, "Content-Type": "application/json"},
             self.timeout,
         )

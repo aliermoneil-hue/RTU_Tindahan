@@ -283,16 +283,16 @@ carry the backend listing id, so an item stays rateable after it sells out.
 
 | Method | Path | Who | Notes |
 | --- | --- | --- | --- |
-| GET | `/api/v1/forum/posts/` | public | Hidden posts are excluded; `?topic=`, `?kind=`, `?author=me` |
-| POST | `/api/v1/forum/posts/` | verified members | `{kind, topic, title, body, images}`; `kind=notice` is staff-only |
-| GET | `/api/v1/forum/posts/<id>/` | public | Includes comments, react counts and the caller's own reaction |
-| PATCH | `/api/v1/forum/posts/<id>/` | the author | Blocked while staff have the post hidden |
+| GET | `/api/v1/forum/posts/` | public | Hidden and screening-held posts are excluded for everyone except their author and staff; `?topic=`, `?kind=`, `?author=me`, `?moderation=visible,needs_review` |
+| POST | `/api/v1/forum/posts/` | verified members | `{kind, topic, title, body, images}`; `kind=notice` is staff-only; the post is screened and a flagged one comes back `moderation_status=needs_review` (held), not deleted |
+| GET | `/api/v1/forum/posts/<id>/` | public | Includes comments, react counts and the caller's own reaction; `screening` is populated for moderators only |
+| PATCH | `/api/v1/forum/posts/<id>/` | the author | Blocked while staff have the post hidden; a title/body/topic edit is re-screened |
 | DELETE | `/api/v1/forum/posts/<id>/` | author or moderator | Staff deletion closes open reports on it |
 | POST | `/api/v1/forum/posts/<id>/comments/` | verified members | `{text, parent}`; a reply must belong to the same post |
 | PATCH | `/api/v1/forum/comments/<id>/` | the author | |
 | DELETE | `/api/v1/forum/comments/<id>/` | author or moderator | A comment with replies is soft-deleted into a tombstone |
 | POST | `/api/v1/forum/posts/<id>/react/` | verified members | `{key}` from like/love/haha/wow/sad; same key removes |
-| POST | `/api/v1/forum/posts/<id>/moderate/` | moderators | `hide`, `restore`, `pin`, `unpin`, `delete` |
+| POST | `/api/v1/forum/posts/<id>/moderate/` | moderators | `hide`, `restore` (also clears a screening hold), `pin`, `unpin`, `delete` |
 | POST | `/api/v1/forum/comments/<id>/moderate/` | moderators | `hide`, `restore`, `delete` |
 | POST | `/api/v1/forum/reports/` | verified members | `{type: post|comment|order, post, comment, order, reason, details}` |
 | GET | `/api/v1/forum/reports/` | staff see all; a member sees their own | `?status=`, `?type=` |

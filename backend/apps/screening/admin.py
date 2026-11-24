@@ -7,12 +7,13 @@ from .models import ScreeningResult
 
 @admin.register(ScreeningResult)
 class ScreeningResultAdmin(admin.ModelAdmin):
-    list_display = ("listing", "verdict", "score", "provider", "created_at")
+    list_display = ("id", "target_label", "verdict", "score", "provider", "created_at")
     list_filter = ("verdict", "provider")
-    search_fields = ("listing__title", "listing__slug")
+    search_fields = ("listing__title", "listing__slug", "post__title", "post__body")
     date_hierarchy = "created_at"
     readonly_fields = (
         "listing",
+        "post",
         "verdict",
         "score",
         "reasons",

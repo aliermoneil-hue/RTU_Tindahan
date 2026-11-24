@@ -309,6 +309,17 @@ export interface ForumPost {
   edited?: string
   pinned?: boolean
   hidden?: { by: string; ts: string }
+  /** Held by automatic screening (AI-03): out of the public feed until a
+   *  moderator releases it. The author and staff still see the row. */
+  held?: boolean
+  /** Latest screening verdict; only staff receive it from the API. */
+  screening?: {
+    verdict: 'clean' | 'flagged'
+    score: number | null
+    reasons: string[]
+    provider: string
+    model: string
+  }
   imgs?: string[]
   pid?: string
   price?: number

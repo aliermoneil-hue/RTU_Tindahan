@@ -17,7 +17,20 @@ class ForumPost(models.Model):
         SCHOOL = "school", "School post"
         NOTICE = "notice", "Announcement"
 
+    class ModerationStatus(models.TextChoices):
+        VISIBLE = "visible", "Visible"
+        NEEDS_REVIEW = "needs_review", "Held for review"
+
     kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.POST)
+    # A post used to go live the moment it was written with nothing in front of
+    # it. Screening now has a say: a flagged post is held here and waits for a
+    # moderator (AI-03). Hiding is a separate, human decision on top of this.
+    moderation_status = models.CharField(
+        max_length=16,
+        choices=ModerationStatus.choices,
+        default=ModerationStatus.VISIBLE,
+        db_index=True,
+    )
     topic = models.CharField(max_length=40, blank=True)
     title = models.CharField(max_length=120, blank=True)
     body = models.TextField(blank=True)
@@ -52,6 +65,18 @@ class ForumPost(models.Model):
     @property
     def is_hidden(self):
         return self.hidden_at is not None
+
+    @property
+    def is_held(self):
+        return self.moderation_status == self.ModerationStatus.NEEDS_REVIEW
+
+    def hold_for_review(self):
+        self.moderation_status = self.ModerationStatus.NEEDS_REVIEW
+        self.save(update_fields=["moderation_status"])
+
+    def release_from_review(self):
+        self.moderation_status = self.ModerationStatus.VISIBLE
+        self.save(update_fields=["moderation_status"])
 
     def __str__(self):
         return self.title or self.body[:40] or f"Post {self.pk}"

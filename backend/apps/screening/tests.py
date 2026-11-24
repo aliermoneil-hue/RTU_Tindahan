@@ -369,3 +369,172 @@ class GeminiFallbackTests(TestCase):
         self.assertEqual(result.provider, "gemini")
         self.assertEqual(result.score, 88)
         self.assertEqual(listing.moderation_status, Listing.ModerationStatus.NEEDS_REVIEW)
+
+
+def make_post(author=None, **overrides):
+    from apps.forum.models import ForumPost
+
+    author = author or User.objects.create_user(
+        email="2024-654321@rtu.edu.ph",
+        display_name="Poster",
+        password="SecurePass123!",
+        member_type=User.MemberType.STUDENT,
+        college="College of ICT",
+        year_level=2,
+    )
+    author.verify()
+    data = {
+        "kind": ForumPost.Kind.POST,
+        "topic": "General",
+        "title": "Study group for ITP311",
+        "body": "We meet at the library every Friday after class. Anyone is welcome.",
+        "author": author,
+    }
+    data.update(overrides)
+    return ForumPost.objects.create(**data)
+
+
+@override_settings(SCREENING_PROVIDER="stub", SCREENING_FALLBACK=True)
+class ForumPostScreeningTests(TestCase):
+    """AI-03 on the forum: a flagged post is held, never silently published."""
+
+    def setUp(self):
+        self.author = User.objects.create_user(
+            email="2024-777777@rtu.edu.ph",
+            display_name="Poster",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.author.verify()
+        self.moderator = User.objects.create_user(
+            email="2024-888888@rtu.edu.ph",
+            display_name="Moderator",
+            password="SecurePass123!",
+            role=User.Role.MODERATOR,
+        )
+        self.moderator.verify()
+
+    def test_a_prohibited_post_is_held_with_its_reasons(self):
+        from apps.forum.models import ForumPost
+        from apps.notifications.models import Notification
+        from apps.screening.services import run_post_screening
+
+        post = make_post(
+            author=self.author,
+            title="Selling answer keys",
+            body="Complete exam answers for the midterm, cheap. Message me.",
+        )
+
+        result = run_post_screening(post)
+
+        post.refresh_from_db()
+        self.assertEqual(result.verdict, "flagged")
+        self.assertEqual(result.post_id, post.pk)
+        self.assertIsNone(result.listing_id)
+        self.assertTrue(any("prohibited item" in r for r in result.reasons))
+        self.assertEqual(post.moderation_status, ForumPost.ModerationStatus.NEEDS_REVIEW)
+        # The author is told, and the moderator queue hears about it.
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.author, kind=Notification.Kind.SYSTEM, link_id=str(post.pk)
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.moderator, link_kind="freports", link_id=str(post.pk)
+            ).exists()
+        )
+
+    def test_an_ordinary_post_stays_visible(self):
+        from apps.forum.models import ForumPost
+        from apps.screening.services import run_post_screening
+
+        post = make_post(author=self.author)
+
+        result = run_post_screening(post)
+
+        post.refresh_from_db()
+        self.assertEqual(result.verdict, "clean")
+        self.assertEqual(result.reasons, [])
+        self.assertEqual(post.moderation_status, ForumPost.ModerationStatus.VISIBLE)
+
+    def test_a_post_is_not_judged_by_listing_signals(self):
+        """Links, phone numbers and one-line replies are ordinary in a thread."""
+        from apps.screening.services import run_post_screening
+
+        post = make_post(
+            author=self.author,
+            title="Reviewer link",
+            body="Here is the reviewer everyone asked for: https://example.test/notes "
+            "DM me at 09171234567 if the link dies.",
+        )
+
+        result = run_post_screening(post)
+
+        self.assertEqual(result.verdict, "clean")
+        self.assertEqual(result.score, 0)
+
+    def test_two_runs_agree_and_only_the_first_holds(self):
+        from apps.screening.services import run_post_screening
+
+        post = make_post(
+            author=self.author,
+            title="Cheap vape",
+            body="Selling my vape, barely used, meet at the gate.",
+        )
+
+        first = run_post_screening(post)
+        second = run_post_screening(post)
+
+        self.assertEqual(first.verdict, second.verdict)
+        self.assertEqual(ScreeningResult.objects.filter(post=post).count(), 2)
+
+    def test_a_clean_re_screen_does_not_release_a_held_post(self):
+        from apps.forum.models import ForumPost
+        from apps.screening.services import run_post_screening
+
+        post = make_post(
+            author=self.author,
+            title="Cheap vape",
+            body="Selling my vape, barely used, meet at the gate.",
+        )
+        run_post_screening(post)
+        post.refresh_from_db()
+        self.assertEqual(post.moderation_status, ForumPost.ModerationStatus.NEEDS_REVIEW)
+
+        post.body = "Selling my old calculator instead."
+        post.save(update_fields=["body"])
+        run_post_screening(post)
+
+        post.refresh_from_db()
+        self.assertEqual(post.moderation_status, ForumPost.ModerationStatus.NEEDS_REVIEW)
+
+    @override_settings(
+        SCREENING_PROVIDER="gemini", SCREENING_API_KEY="***", SCREENING_FALLBACK=False
+    )
+    def test_a_dead_provider_holds_the_post_when_the_fallback_is_off(self):
+        from apps.forum.models import ForumPost
+        from apps.screening.services import run_post_screening
+
+        post = make_post(author=self.author)
+
+        with patch(
+            "apps.screening.providers.post_json", side_effect=TimeoutError("slow")
+        ):
+            result = run_post_screening(post)
+
+        post.refresh_from_db()
+        self.assertEqual(result.provider, "error")
+        self.assertEqual(result.verdict, "flagged")
+        self.assertEqual(post.moderation_status, ForumPost.ModerationStatus.NEEDS_REVIEW)
+
+    def test_a_result_row_names_exactly_one_target(self):
+        from django.db import IntegrityError, transaction
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                ScreeningResult.objects.create(
+                    verdict=ScreeningResult.Verdict.CLEAN, provider="stub"
+                )

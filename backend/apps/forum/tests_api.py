@@ -57,7 +57,15 @@ def pixel_data_url():
     return "data:image/png;base64," + base64.b64encode(raw).decode()
 
 
-@override_settings(MEDIA_ROOT=MEDIA_ROOT)
+# Pin the provider: `load_dotenv()` puts the machine's `LLM_PROVIDER` into
+# settings, and a live model in the proxy would make every post here wait on
+# the network — or come back held — so the suite would answer differently on
+# each machine.
+@override_settings(
+    MEDIA_ROOT=MEDIA_ROOT,
+    SCREENING_PROVIDER="stub",
+    SCREENING_FALLBACK=True,
+)
 class ForumApiTests(APITestCase):
     @classmethod
     def tearDownClass(cls):
@@ -498,3 +506,134 @@ class ForumApiTests(APITestCase):
             ).exists()
         )
         self.assertFalse(Notification.objects.filter(user=self.moderator).exists())
+
+
+@override_settings(SCREENING_PROVIDER="stub", SCREENING_FALLBACK=True)
+class ForumScreeningApiTests(APITestCase):
+    """AI-03 on the forum: a flagged post waits for a moderator (see docs/SCREENING.md)."""
+
+    def setUp(self):
+        self.author = make_user("2024-911111@rtu.edu.ph")
+        self.other = make_user("2024-922222@rtu.edu.ph")
+        self.moderator = make_user("2024-933333@rtu.edu.ph", role=User.Role.MODERATOR)
+
+    def post(self, author=None, title="Study group", body="Meet at the library on Friday.", **extra):
+        self.client.force_authenticate(author or self.author)
+        payload = {"kind": "post", "topic": "General", "title": title, "body": body}
+        payload.update(extra)
+        return self.client.post("/api/v1/forum/posts/", payload, format="json")
+
+    def feed(self, user=None, **params):
+        self.client.force_authenticate(user)
+        return rows(self.client.get("/api/v1/forum/posts/", params))
+
+    def test_a_flagged_post_is_held_out_of_the_public_feed(self):
+        response = self.post(
+            title="Selling answer keys",
+            body="Complete exam answers for the midterm. Message me.",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        post_id = response.json()["id"]
+        self.assertEqual(response.json()["moderation_status"], "needs_review")
+
+        self.assertEqual(self.feed(), [])
+        self.assertEqual(self.feed(self.other), [])
+        # The author is not left guessing: their own row still comes back.
+        mine = [row["id"] for row in self.feed(self.author)]
+        self.assertIn(post_id, mine)
+        # Staff see it in the same list they moderate from.
+        self.assertIn(post_id, [row["id"] for row in self.feed(self.moderator)])
+
+    def test_an_ordinary_post_is_public_at_once(self):
+        response = self.post()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["moderation_status"], "visible")
+        self.assertEqual(len(self.feed()), 1)
+
+    def test_only_staff_read_the_screening_reasons(self):
+        self.post(
+            title="Selling answer keys",
+            body="Complete exam answers for the midterm. Message me.",
+        )
+
+        staff_row = self.feed(self.moderator)[0]
+        self.assertEqual(staff_row["screening"]["verdict"], "flagged")
+        self.assertTrue(staff_row["screening"]["reasons"])
+        self.assertEqual(staff_row["screening"]["provider"], "stub")
+
+        self.client.force_authenticate(self.author)
+        author_row = self.client.get(f"/api/v1/forum/posts/{staff_row['id']}/").json()
+        self.assertIsNone(author_row["screening"])
+        self.assertEqual(author_row["moderation_status"], "needs_review")
+
+    def test_a_moderator_restore_clears_the_hold(self):
+        post_id = self.post(
+            title="Selling answer keys",
+            body="Complete exam answers for the midterm. Message me.",
+        ).json()["id"]
+
+        self.client.force_authenticate(self.moderator)
+        response = self.client.post(
+            f"/api/v1/forum/posts/{post_id}/moderate/", {"action": "restore"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["moderation_status"], "visible")
+        self.assertEqual(len(self.feed()), 1)
+
+    def test_the_queue_filter_and_its_error(self):
+        held_id = self.post(
+            title="Selling answer keys",
+            body="Complete exam answers for the midterm. Message me.",
+        ).json()["id"]
+        self.post(title="Ordinary question", body="Where is room 305?")
+
+        self.client.force_authenticate(self.moderator)
+        queue = rows(self.client.get("/api/v1/forum/posts/", {"moderation": "needs_review"}))
+        self.assertEqual([row["id"] for row in queue], [held_id])
+
+        # A visitor cannot use the parameter to reach a held post.
+        self.client.force_authenticate(None)
+        self.assertEqual(
+            rows(self.client.get("/api/v1/forum/posts/", {"moderation": "needs_review"})), []
+        )
+
+        self.client.force_authenticate(self.moderator)
+        bad = self.client.get("/api/v1/forum/posts/", {"moderation": "banana"})
+        self.assertEqual(bad.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Unknown moderation status", error_text(bad))
+
+    def test_an_edit_is_screened_again(self):
+        post_id = self.post(title="A normal post", body="Nothing to see here.").json()["id"]
+        self.assertEqual(len(self.feed()), 1)
+
+        self.client.force_authenticate(self.author)
+        response = self.client.patch(
+            f"/api/v1/forum/posts/{post_id}/",
+            {"body": "Actually, selling answer keys for the final exam."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["moderation_status"], "needs_review")
+        self.assertEqual(self.feed(), [])
+
+    def test_a_held_notice_does_not_notify_the_campus(self):
+        response = self.post(
+            author=self.moderator,
+            kind="notice",
+            title="Selling shabu",
+            body="Message me for prices, delivery at the gate.",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["moderation_status"], "needs_review")
+
+        from apps.notifications.models import Notification
+
+        self.assertFalse(
+            Notification.objects.filter(
+                user=self.other, kind=Notification.Kind.ANNOUNCEMENT
+            ).exists()
+        )

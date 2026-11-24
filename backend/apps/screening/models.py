@@ -17,6 +17,18 @@ class ScreeningResult(models.Model):
 
     listing = models.ForeignKey(
         "catalog.Listing",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="screening_results",
+    )
+    # A forum post is screened by the same providers and the same rules, so
+    # its verdict lives in the same table. The two targets are exclusive:
+    # a row is either a listing's verdict or a post's, never both.
+    post = models.ForeignKey(
+        "forum.ForumPost",
+        null=True,
+        blank=True,
         on_delete=models.CASCADE,
         related_name="screening_results",
     )
@@ -36,10 +48,30 @@ class ScreeningResult(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        indexes = [models.Index(fields=["listing", "-created_at"])]
+        indexes = [
+            models.Index(fields=["listing", "-created_at"]),
+            models.Index(fields=["post", "-created_at"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                name="screening_result_exactly_one_target",
+                condition=(
+                    models.Q(listing__isnull=False, post__isnull=True)
+                    | models.Q(listing__isnull=True, post__isnull=False)
+                ),
+            )
+        ]
 
     def __str__(self):
-        return f"{self.listing_id}: {self.verdict}"
+        return f"{self.target_label}: {self.verdict}"
+
+    @property
+    def target_label(self):
+        if self.listing_id:
+            return f"listing {self.listing_id}"
+        if self.post_id:
+            return f"post {self.post_id}"
+        return "unattached result"
 
     @property
     def is_flagged(self) -> bool:
