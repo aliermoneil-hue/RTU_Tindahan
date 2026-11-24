@@ -177,7 +177,52 @@ export function CartPage() {
         ))}
       </div>
 
-      {cartStep === 3 && batchOrders.length > 0 ? (
+      {cartStep === 3 && batchOrders.length === 0 && lastOrderIds.length > 0 ? (
+        // The request was accepted by the server, but the order rows are still
+        // being fetched. Showing the empty-cart screen here was the bug: the
+        // confirmation must appear at once, with the reference it already has.
+        <div className="card stack" style={{ gap: 10, maxWidth: 620 }}>
+          <div className="sent-status-banner">
+            <Icon name="check" size="sm" />
+            <div>
+              <b style={{ display: 'block' }}>
+                {lastOrderIds.length === 1
+                  ? 'Request sent'
+                  : `${lastOrderIds.length} requests sent`}
+              </b>
+              <span className="tiny muted">
+                Your seller has been notified. The full receipt is loading below.
+              </span>
+            </div>
+          </div>
+          <div className="row wrap" style={{ gap: 6 }}>
+            {lastOrderIds.map((ref) => (
+              <span key={ref} className="pill">
+                #{ref}
+              </span>
+            ))}
+          </div>
+          <p className="small muted">
+            Coordinate the campus meet-up in Messages, or track the request in My Orders. Nothing is
+            charged online — you pay in person when you meet.
+          </p>
+          <div className="row wrap" style={{ gap: 8 }}>
+            <button
+              type="button"
+              className="btn yellow"
+              onClick={() => {
+                setCartStep(1)
+                navigate('orders')
+              }}
+            >
+              Track in My Orders
+            </button>
+            <button type="button" className="btn ghost" onClick={() => navigate('marketplace')}>
+              Back to marketplace
+            </button>
+          </div>
+        </div>
+      ) : cartStep === 3 ? (
         <RequestSentView
           batchOrders={batchOrders}
           remainingCartCount={cart.length}

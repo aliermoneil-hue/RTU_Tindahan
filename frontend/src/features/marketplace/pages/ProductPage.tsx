@@ -122,6 +122,23 @@ export function ProductPage() {
       .sort((a, b) => b.ts - a.ts)
   }, [db.reviews, p])
 
+  // Resolve the matching variation row as soon as the attributes are chosen.
+  // It sits above the early returns on purpose: a hook that runs only after the
+  // product arrives is a hook React did not see on the first render, and the
+  // page crashed with "Rendered more hooks than during the previous render"
+  // when a listing was opened straight from a link.
+  const chosenVar = useMemo(() => {
+    if (!p || !hasVars(p) || !p.vars) return null
+    for (const a of p.vars.attrs) {
+      if (!selectedOpts[a.name]) return null
+    }
+    return (
+      p.vars.rows.find((r: ProductVariationRow) =>
+        p.vars!.attrs.every((a: ProductVariationAttr) => r.opts[a.name] === selectedOpts[a.name]),
+      ) || null
+    )
+  }, [p, selectedOpts])
+
   // If listings are still loading, don't show "not available" yet — the
   // product may just not have arrived from the backend.
   if (listingsLoading) {
@@ -163,20 +180,7 @@ export function ProductPage() {
   const isOwnListing = Boolean(p.owner && currentAccount && p.owner === currentAccount.email)
 
   const [place, win] = (p.when || '').split(',').map((s: string) => s.trim())
-  const hasVariations = hasVars(p) && p.vars
-
-  // Resolve matching variation row when all attributes are selected (selVar in js/9d-listings.js)
-  const chosenVar = useMemo(() => {
-    if (!hasVariations || !p.vars) return null
-    for (const a of p.vars.attrs) {
-      if (!selectedOpts[a.name]) return null
-    }
-    return (
-      p.vars.rows.find((r: ProductVariationRow) =>
-        p.vars!.attrs.every((a: ProductVariationAttr) => r.opts[a.name] === selectedOpts[a.name]),
-      ) || null
-    )
-  }, [hasVariations, p.vars, selectedOpts])
+  const hasVariations = Boolean(p.vars)
 
   const unitPr =
     chosenVar && chosenVar.price != null ? chosenVar.price : p.price

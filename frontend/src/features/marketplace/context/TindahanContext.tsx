@@ -3091,17 +3091,29 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         // The snapshot update runs inside React's render pass, so the local
         // `firstOrder` may not be set by the time the inner timeout fires. The
         // reference is known here, so open the confirmation screen with it.
-        const firstRef = officialRef || Object.values(bySeller)[0]
+        const refs = [
+          ...(officialRef ? [officialRef] : []),
+          ...Object.values(bySeller),
+        ]
+        const firstRef = refs[0]
         if (firstRef) {
           setTimeout(() => {
+            // Step 3 is the confirmation, not a detour: the buyer stays on the
+            // cart screen and sees "Request sent" with the references. Clearing
+            // the step and routing through /confirm skipped it entirely — the
+            // screen a buyer needs most after paying is the receipt.
+            setLastOrderIds(refs)
             setLastOrderId(firstRef)
             setSelectedOrderId(firstRef)
             setOrderTab('Requesting')
-            setCartStep(1)
+            setCartStep(3)
             setCartAgree(false)
             setCartErr('')
-            navigate('confirm')
-            toast(`Request sent. Your reference is ${firstRef}.`)
+            navigate('cart')
+            toast(
+              `Request sent to ${Object.keys(bySeller).length || 1} seller` +
+                (refs.length > 1 ? `s (${refs.length} requests).` : '.'),
+            )
           }, 50)
         }
         void refreshStore()
