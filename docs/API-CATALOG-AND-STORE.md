@@ -317,6 +317,17 @@ and on the seller's Incoming orders tab.
 
 ---
 
+## 8a. Messaging reports (MS-04, MS-05)
+
+`POST /conversations/<id>/report/` files a report from a participant — `reason`,
+optional `details`, optional `message`. `GET /message-reports/?status=` is the
+queue: staff see all of it, a member only their own. Each row carries
+`reported_messages` — the text of the reported message, copied at filing time —
+and no other message of the thread, ever; a whole-thread report carries none.
+`POST /message-reports/<id>/resolve/` takes `action` (`dismiss`, `warn`,
+`suspend`) and a `note`, which is required for anything but a dismissal because
+it is what the sender is told. See `MESSAGE-REPORTS.md`.
+
 ## 8b. Appeals API (AI-06, RM-08)
 
 `GET /appeals/?status=` lists a member's own appeals, or the whole queue for

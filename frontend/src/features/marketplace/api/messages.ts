@@ -164,3 +164,77 @@ export function mergeApiConversations<T extends { conv: Conversation[] }>(
     conv: [...conversations.map((dto) => toConversation(dto, me)), ...local],
   }
 }
+
+/* ---------------------------------------------------------------
+ * MS-04 and MS-05: reporting a conversation, and the queue a
+ * moderator reads. The report is the only door onto a private
+ * thread, and it carries one message — never the thread.
+ * ------------------------------------------------------------- */
+
+export type MessageReportReason =
+  | 'harassment'
+  | 'scam'
+  | 'off_platform'
+  | 'prohibited'
+  | 'spam'
+  | 'other'
+
+export const MESSAGE_REPORT_REASONS: Array<[MessageReportReason, string]> = [
+  ['harassment', 'Harassment or threats'],
+  ['scam', 'Scam or fraud'],
+  ['off_platform', 'Payment outside the platform'],
+  ['prohibited', 'Prohibited item or service'],
+  ['spam', 'Spam'],
+  ['other', 'Something else'],
+]
+
+export interface ApiMessageReport {
+  id: number
+  reason: MessageReportReason
+  reason_display: string
+  details: string
+  status: 'open' | 'dismissed' | 'actioned'
+  status_display: string
+  action: 'dismiss' | 'warn' | 'suspend' | ''
+  note: string
+  reporter_name: string
+  reported_user_name: string
+  handled_by_name: string
+  handled_at: string | null
+  is_mine: boolean
+  is_thread_report: boolean
+  /** The reported message, copied when the report was filed. Nothing else. */
+  reported_messages: Array<{ body: string; sent_at: string | null; sender: string }>
+  created_at: string
+}
+
+export function reportConversation(
+  conversationId: number,
+  input: { reason: MessageReportReason; details?: string; message?: number },
+): Promise<ApiMessageReport> {
+  return apiFetch<ApiMessageReport>(`/conversations/${conversationId}/report/`, {
+    method: 'POST',
+    body: input,
+  })
+}
+
+export async function fetchMessageReports(
+  status?: 'open' | 'dismissed' | 'actioned',
+): Promise<ApiMessageReport[]> {
+  const path = `/message-reports/${status ? `?status=${status}` : ''}`
+  const data = await apiFetch<
+    ApiMessageReport[] | { results: ApiMessageReport[] }
+  >(path)
+  return Array.isArray(data) ? data : data.results
+}
+
+export function resolveMessageReport(
+  id: number,
+  action: 'dismiss' | 'warn' | 'suspend',
+  note: string,
+): Promise<ApiMessageReport> {
+  return apiFetch<ApiMessageReport>(`/message-reports/${id}/resolve/`, {
+    method: 'POST',
+    body: { action, note },
+  })
+}

@@ -5,6 +5,13 @@ import { navigate } from '@/common/router/router'
 import { ago, isSvc, refLabel, stamp } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
 import type { Conversation, MessageRef } from '../types'
+import {
+  MESSAGE_REPORT_REASONS,
+  apiConversationId,
+  reportConversation,
+  type MessageReportReason,
+} from '../api/messages'
+import { ApiRequestError } from '@/common/api/client'
 import { AvatarBadge } from '../components/AvatarBadge'
 import './MessagesPage.css'
 
@@ -31,7 +38,43 @@ export function MessagesPage() {
 
   const [draftText, setDraftText] = useState('')
   const [pickerIndex, setPickerIndex] = useState<number | null>(null)
+  // MS-04: reporting a message, or the whole thread, from inside the thread.
+  const [reportFor, setReportFor] = useState<{ messageId?: string } | null>(null)
+  const [reportReason, setReportReason] = useState<MessageReportReason>('off_platform')
+  const [reportDetails, setReportDetails] = useState('')
+  const [reportBusy, setReportBusy] = useState(false)
+  const [reportErr, setReportErr] = useState<string | null>(null)
+  const [reportDone, setReportDone] = useState(false)
   const bodyRef = useRef<HTMLDivElement | null>(null)
+
+  async function sendReport() {
+    if (!cur) return
+    const conversationId = apiConversationId(cur.id)
+    if (!conversationId) {
+      setReportErr('This conversation is not on the server yet, so it cannot be reported.')
+      return
+    }
+    const messageId = reportFor?.messageId
+    const numericMessage = messageId?.startsWith('api:m')
+      ? Number(messageId.slice('api:m'.length))
+      : undefined
+    setReportBusy(true)
+    setReportErr(null)
+    try {
+      await reportConversation(conversationId, {
+        reason: reportReason,
+        details: reportDetails.trim(),
+        ...(numericMessage ? { message: numericMessage } : {}),
+      })
+      setReportDone(true)
+    } catch (err) {
+      setReportErr(
+        err instanceof ApiRequestError ? err.message : 'That report could not be sent.',
+      )
+    } finally {
+      setReportBusy(false)
+    }
+  }
 
   const cur = selectedConvId
     ? myConversations.find(
@@ -292,6 +335,17 @@ export function MessagesPage() {
                         Edit & resubmit
                       </button>
                     ) : null}
+                    <button
+                      type="button"
+                      className="btn ghost sm"
+                      onClick={() => {
+                        setReportFor({})
+                        setReportErr(null)
+                        setReportDone(false)
+                      }}
+                    >
+                      <Icon name="flag" size="sm" /> Report
+                    </button>
                     {cur.ref.type === 'order' && (
                       <button
                         type="button"
@@ -352,6 +406,19 @@ export function MessagesPage() {
                             m.adminReview ? 'admin-review-bub' : ''
                           }`.trim()}
                         >
+                          {!me && m.id.startsWith('api:m') && (
+                            <button
+                              type="button"
+                              className="link tiny m-report-link"
+                              onClick={() => {
+                                setReportFor({ messageId: m.id })
+                                setReportErr(null)
+                                setReportDone(false)
+                              }}
+                            >
+                              Report this message
+                            </button>
+                          )}
                           {m.adminReview && (
                             <div className="m-admin-review-head">
                               <Icon name="shield" size="sm" />
@@ -425,6 +492,85 @@ export function MessagesPage() {
                   )
                 })}
               </div>
+
+              {reportFor && (
+                <div className="card stack m-report-panel" style={{ gap: 8, margin: 10 }}>
+                  {reportDone ? (
+                    <div className="row between wrap">
+                      <p className="small" role="status" style={{ margin: 0 }}>
+                        <Icon name="check" size="sm" /> Reported. A moderator sees only the
+                        message you reported — the rest of this conversation stays private.
+                      </p>
+                      <button
+                        type="button"
+                        className="link"
+                        onClick={() => setReportFor(null)}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="row between wrap">
+                        <b className="small">
+                          {reportFor.messageId
+                            ? 'Report this message'
+                            : 'Report this conversation'}
+                        </b>
+                        <button
+                          type="button"
+                          className="link"
+                          onClick={() => setReportFor(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <div className="row wrap small" style={{ gap: 10 }}>
+                        <label className="small" style={{ gap: 4 }}>
+                          Reason
+                          <select
+                            className="input"
+                            value={reportReason}
+                            onChange={(e) =>
+                              setReportReason(e.target.value as MessageReportReason)
+                            }
+                          >
+                            {MESSAGE_REPORT_REASONS.map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="small grow" style={{ gap: 4 }}>
+                          Anything the moderator should know (optional)
+                          <input
+                            className="input"
+                            maxLength={600}
+                            value={reportDetails}
+                            onChange={(e) => setReportDetails(e.target.value)}
+                          />
+                        </label>
+                      </div>
+                      {reportErr && (
+                        <p className="small" role="alert" style={{ color: 'var(--danger, #b3261e)' }}>
+                          {reportErr}
+                        </p>
+                      )}
+                      <div className="row">
+                        <button
+                          type="button"
+                          className="btn sm"
+                          disabled={reportBusy}
+                          onClick={() => void sendReport()}
+                        >
+                          {reportBusy ? 'Sending…' : 'Send the report'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               <form
                 className="m-comp"

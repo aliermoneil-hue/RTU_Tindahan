@@ -11,10 +11,10 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 59 |
+| Implemented, verified | 61 |
 | Implemented | 79 |
 | Partial | 26 |
-| Not implemented | 3 |
+| Not implemented | 1 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
 | **total** | **174** |
@@ -157,8 +157,8 @@ browser or the tests in this repository.
 | MS-01 | The system shall allow a buyer and seller to exchange direct text messages linked to a specific marketplace listing or active order. | Built | Implemented, verified | threads tied to a listing, unread counts, polls |
 | MS-02 | The system shall provide users with a consolidated conversation inbox featuring visual indicators for unread messages. | Built | Implemented | `apps/messaging` |
 | MS-03 | The system shall allow messaging only between verified users. | Built | Implemented | `apps/messaging` |
-| MS-04 | The system shall allow a participant to formally report a conversation thread for policy violations (refer to Section 3.2.11). | Not yet | Not implemented | no report action on a conversation |
-| MS-05 | The system shall let a moderator see only the messages in a conversation that has been reported. | Not yet | Not implemented | moderators cannot read a reported conversation |
+| MS-04 | The system shall allow a participant to formally report a conversation thread for policy violations (refer to Section 3.2.11). | Not yet | Implemented, verified | POST /conversations/<id>/report/ from a participant, message or whole thread |
+| MS-05 | The system shall let a moderator see only the messages in a conversation that has been reported. | Not yet | Implemented, verified | the report carries a copy of the reported message only; no endpoint exposes the rest of the thread |
 
 ## Ratings and reviews (RR)
 
@@ -325,8 +325,6 @@ with the reason:
 
 | ID | Requirement | Why it is open |
 | --- | --- | --- |
-| MS-04 | The system shall allow a participant to formally report a conversation thread for policy violations (refer to Section 3. | no report action on a conversation |
-| MS-05 | The system shall let a moderator see only the messages in a conversation that has been reported. | moderators cannot read a reported conversation |
 | RR-04 | The system shall hold review text for AI screening before it is published. | reviews are not screened on purpose: `docs/SCREENING.md` §6 |
 | AI-03 | The system shall automatically publish submissions that receive an Approved classification. | a clean verdict still waits for a human: `docs/SCREENING.md` §6 |
 | AI-10 | The system shall let an Administrator update the screening rules without changing the program code. | screening rules live in `providers.py`, not in an admin-editable table |

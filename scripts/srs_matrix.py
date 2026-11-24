@@ -97,8 +97,8 @@ DECIDED = {
     "OT-11": ("verified", "accept moves stock; a decline or cancel returns it"),
     "OT-12": ("verified", "ORDER_REQUEST_TTL_HOURS (48) stamps expires_at; swept on read and by cron at 04:00, both parties notified"),
     "MS-01": ("verified", "threads tied to a listing, unread counts, polls"),
-    "MS-04": ("open", "no report action on a conversation"),
-    "MS-05": ("open", "moderators cannot read a reported conversation"),
+    "MS-04": ("verified", "POST /conversations/<id>/report/ from a participant, message or whole thread"),
+    "MS-05": ("verified", "the report carries a copy of the reported message only; no endpoint exposes the rest of the thread"),
     # --- reviews ------------------------------------------------------------
     "RR-03": ("verified", "average, count and one-per-order on the seller"),
     "RR-04": ("policy", "reviews are not screened on purpose: `docs/SCREENING.md` §6"),

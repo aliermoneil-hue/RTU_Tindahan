@@ -7,14 +7,21 @@ from rest_framework.response import Response
 
 from apps.notifications.services import notify
 
-from .models import Conversation, Message
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
+
+from .models import Conversation, ConversationReport, Message
 from .serializers import (
     ConversationOpenSerializer,
+    ConversationReportCreateSerializer,
+    ConversationReportResolveSerializer,
+    ConversationReportSerializer,
     ConversationSerializer,
     MessageCreateSerializer,
     MessageSerializer,
     touch,
 )
+from .services import report_conversation, resolve_report
 
 
 class ConversationViewSet(
@@ -81,6 +88,37 @@ class ConversationViewSet(
         return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
+    def report(self, request, pk=None):
+        """MS-04: a participant reports the thread, or one message in it."""
+        conversation = self.get_object()
+        serializer = ConversationReportCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        message = None
+        if data.get("message"):
+            message = Message.objects.filter(
+                pk=data["message"], conversation=conversation
+            ).first()
+            if message is None:
+                raise ValidationError({"message": "That message is not in this conversation."})
+        try:
+            report = report_conversation(
+                reporter=request.user,
+                conversation=conversation,
+                reason=data["reason"],
+                details=data.get("details", ""),
+                message=message,
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages)
+        return Response(
+            ConversationReportSerializer(
+                report, context=self.get_serializer_context()
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["post"])
     def read(self, request, pk=None):
         conversation = self.get_object()
         Message.objects.filter(
@@ -89,5 +127,55 @@ class ConversationViewSet(
         return Response(
             ConversationSerializer(
                 conversation, context=self.get_serializer_context()
+            ).data
+        )
+
+
+class ConversationReportViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    """MS-05's queue: staff see every open report; a member sees the ones they filed.
+
+    The row never carries the thread. `reported_messages` holds the message the
+    report is about and nothing else, which is what makes it safe for a
+    moderator to read.
+    """
+
+    serializer_class = ConversationReportSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = ConversationReport.objects.select_related(
+            "reporter", "reported_user", "handled_by", "conversation", "message"
+        )
+        if not user.is_authenticated:
+            return queryset.none()
+        if not user.is_moderator:
+            queryset = queryset.filter(reporter=user)
+        if wanted := self.request.query_params.get("status"):
+            queryset = queryset.filter(status=wanted)
+        return queryset
+
+    @action(detail=True, methods=["post"])
+    def resolve(self, request, pk=None):
+        if not request.user.is_moderator:
+            raise PermissionDenied("Only a moderator or an administrator handles a report.")
+        report = self.get_object()
+        serializer = ConversationReportResolveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            report = resolve_report(
+                report=report,
+                by=request.user,
+                action=serializer.validated_data["action"],
+                note=serializer.validated_data.get("note", ""),
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages)
+        return Response(
+            ConversationReportSerializer(
+                report, context=self.get_serializer_context()
             ).data
         )
