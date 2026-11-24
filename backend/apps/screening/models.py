@@ -93,6 +93,9 @@ class ScreeningResult(models.Model):
     # the log holds what the model saw and never a second copy of the member's
     # contact details. `redactions` says what was taken out, in words.
     screened_text = models.TextField(blank=True)
+    # An extension to AI-01: how many pictures were sent to the model. Zero means
+    # either "no pictures" or "image screening switched off" — `reasons` says which.
+    images_checked = models.PositiveSmallIntegerField(default=0)
     redactions = models.CharField(max_length=200, blank=True)
 
     # Which implementation answered, so a verdict can be explained later.

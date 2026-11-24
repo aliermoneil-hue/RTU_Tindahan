@@ -198,7 +198,7 @@ browser or the tests in this repository.
 
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
-| AI-01 | The system shall use an LLM to check the text of each new listing, each edited listing (as set in LS-05), and each new or edited forum post, commen... | Not yet | Implemented, verified | Gemini provider on create and edit for listings, posts and comments |
+| AI-01 | The system shall use an LLM to check the text of each new listing, each edited listing (as set in LS-05), and each new or edited forum post, commen... | Not yet | Implemented, verified | Gemini provider on create and edit for listings, posts and comments; text per the SRS, and pictures screened too as an extension (`docs/SCREENING.md` §4c), failing closed when the model cannot answer |
 | AI-02 | The system shall classify each screened submission into one of three distinct outcomes: Approved, Needs Review, or Rejected. | Not yet | Implemented, verified | three outcomes: clean passes to approval, flagged is held, rejected is blocked and queued |
 | AI-03 | The system shall automatically publish submissions that receive an Approved classification. | Not yet | Deliberately not done | a clean verdict still waits for a human: `docs/SCREENING.md` §6 |
 | AI-04 | The system shall hold content marked Needs Review and place it in the moderator queue. A human moderator shall make the final decision. | Partly | Implemented, verified | needs_review queue for listings, posts and comments |

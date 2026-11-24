@@ -6,6 +6,7 @@ from unittest.mock import patch
 from decimal import Decimal
 
 from django.core.exceptions import ImproperlyConfigured
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -1088,3 +1089,189 @@ class ScreeningEvidenceApiTests(APITestCase):
         # Either the field is withheld or it is null — what matters is that the
         # evidence does not travel to someone who is not staff.
         self.assertTrue("screening" not in row or row["screening"] is None)
+
+
+class ImageScreeningTests(APITestCase):
+    """AI-01's blind spot: a picture whose text is clean, and whose content is not."""
+
+    def setUp(self):
+        from io import BytesIO
+        from PIL import Image
+
+        self.category = Category.objects.create(name="School Supplies")
+        self.seller = User.objects.create_user(
+            email="2024-770303@rtu.edu.ph",
+            display_name="Seller",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.seller.verify()
+
+        buffer = BytesIO()
+        Image.new("RGB", (400, 300), (200, 120, 90)).save(buffer, format="JPEG")
+        self.photo = SimpleUploadedFile(
+            "photo.jpg", buffer.getvalue(), content_type="image/jpeg"
+        )
+
+    def make_listing(self, with_photo=True):
+        listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Textbook",
+            description="Clean words only.",
+            price=100,
+        )
+        if with_photo:
+            from apps.catalog.models import ListingPhoto
+
+            ListingPhoto.objects.create(
+                listing=listing, image=self.photo, sort_order=0
+            )
+        return listing
+
+    def run_with(self, verdict, reasons=None, *, score=80, confidence=0.9):
+        from apps.screening.providers import Verdict
+
+        answer = Verdict(
+            verdict=verdict,
+            score=score,
+            reasons=reasons or [],
+            confidence=confidence,
+            provider="gemini-vision",
+            model="test",
+        )
+        with override_settings(SCREENING_IMAGES="enforce"), patch(
+            "apps.screening.images.screen_image", return_value=answer
+        ):
+            return run_screening(self.make_listing())
+
+    def test_a_clean_picture_leaves_the_text_verdict_alone(self):
+        # The baseline first: the same listing screened with the picture gate off,
+        # so the comparison is "the picture changed nothing", not "the text is clean".
+        with override_settings(SCREENING_IMAGES="off"):
+            baseline = run_screening(self.make_listing()).verdict
+
+        result = self.run_with("clean")
+
+        self.assertEqual(result.verdict, baseline)
+        self.assertEqual(result.images_checked, 1)
+
+    def test_a_flagged_picture_holds_the_listing_and_says_why(self):
+        result = self.run_with(
+            "flagged", ["A screenshot offering an answer key"], score=70, confidence=0.8
+        )
+        listing = result.listing
+        listing.refresh_from_db()
+
+        self.assertEqual(result.verdict, ScreeningResult.Verdict.FLAGGED)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.NEEDS_REVIEW)
+        self.assertEqual(result.images_checked, 1)
+        self.assertTrue(any("Image:" in reason for reason in result.reasons))
+
+    def test_a_rejected_picture_rejects_the_listing(self):
+        result = self.run_with(
+            "rejected", ["A handgun on a desk"], score=95, confidence=0.97
+        )
+        listing = result.listing
+        listing.refresh_from_db()
+
+        self.assertEqual(result.verdict, ScreeningResult.Verdict.REJECTED)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.REJECTED)
+        self.assertIn("handgun", " ".join(result.reasons).lower())
+
+    def test_a_picture_that_cannot_be_checked_is_never_published_clean(self):
+        """No key, a timeout, a broken model answer: all of it means "a person looks"."""
+        from django.core.exceptions import ImproperlyConfigured
+
+        with override_settings(SCREENING_IMAGES="enforce"), patch(
+            "apps.screening.images.screen_image",
+            side_effect=ImproperlyConfigured("no key"),
+        ):
+            result = run_screening(self.make_listing())
+
+        self.assertEqual(result.verdict, ScreeningResult.Verdict.FLAGGED)
+        self.assertEqual(result.images_checked, 1)
+        self.assertTrue(any("could not be checked" in r for r in result.reasons))
+
+    def test_a_listing_with_no_picture_checks_none(self):
+        with override_settings(SCREENING_IMAGES="enforce"), patch(
+            "apps.screening.images.screen_image"
+        ) as checker:
+            result = run_screening(self.make_listing(with_photo=False))
+
+        self.assertEqual(result.images_checked, 0)
+        checker.assert_not_called()
+
+    def test_at_most_the_configured_number_of_pictures_are_checked(self):
+        from apps.catalog.models import ListingPhoto
+        from apps.screening.providers import Verdict
+
+        listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Album",
+            description="Several photos.",
+            price=100,
+        )
+        for index in range(5):
+            ListingPhoto.objects.create(
+                listing=listing, image=self.photo, sort_order=index
+            )
+
+        answer = Verdict(
+            verdict="clean",
+            score=0,
+            reasons=[],
+            confidence=1.0,
+            provider="gemini-vision",
+            model="test",
+        )
+        with override_settings(SCREENING_IMAGES="enforce", SCREENING_IMAGE_MAX=2), patch(
+            "apps.screening.images.screen_image", return_value=answer
+        ) as checker:
+            result = run_screening(listing)
+
+        self.assertEqual(checker.call_count, 2)
+        self.assertEqual(result.images_checked, 2)
+
+    def test_the_gate_can_be_switched_off_and_says_so(self):
+        with override_settings(SCREENING_IMAGES="off"), patch(
+            "apps.screening.images.screen_image"
+        ) as checker:
+            result = run_screening(self.make_listing())
+
+        self.assertEqual(result.images_checked, 0)
+        checker.assert_not_called()
+
+
+class PictureHygieneTests(TestCase):
+    """SE-04/SE-06 by another route: a photo is a photo, and it keeps no diary."""
+
+    def test_a_jpeg_with_exif_is_re_encoded_without_it(self):
+        from io import BytesIO
+        from PIL import Image
+        from apps.screening.images import strip_metadata
+
+        buffer = BytesIO()
+        image = Image.new("RGB", (60, 60), (10, 20, 30))
+        exif = image.getexif()
+        exif[0x8825] = {1: "N", 2: (14.0, 35.0, 0.0), 3: "E", 4: (121.0, 1.0, 0.0)}
+        image.save(buffer, format="JPEG", exif=exif)
+        uploaded = SimpleUploadedFile("gps.jpg", buffer.getvalue(), content_type="image/jpeg")
+
+        cleaned = strip_metadata(uploaded)
+
+        with Image.open(BytesIO(cleaned.read())) as probe:
+            self.assertFalse(dict(probe.getexif()))
+
+    def test_a_html_file_named_jpg_cannot_be_turned_into_an_image(self):
+        from apps.screening.images import strip_metadata
+
+        fake = SimpleUploadedFile(
+            "evil.jpg", b"<html><script>alert(1)</script></html>", content_type="image/jpeg"
+        )
+
+        with self.assertRaises(Exception):
+            strip_metadata(fake)

@@ -50,8 +50,13 @@ def save_images(data_urls, request):
             raise serializers.ValidationError("A photo could not be decoded.")
         if len(payload) > MAX_IMAGE_BYTES:
             raise serializers.ValidationError("Each photo must be 2 MB or smaller.")
-        name = f"forum/{uuid.uuid4().hex}.{IMAGE_TYPES[kind]}"
-        saved.append(default_storage.save(name, ContentFile(payload)))
+        # SE-04/SE-06: decode the pixels and write a fresh JPEG, so EXIF (where
+        # the photo was taken) and any polyglot payload do not survive storage.
+        from apps.catalog.photos import clean_photo
+
+        cleaned = clean_photo(ContentFile(payload))
+        name = f"forum/{uuid.uuid4().hex}.jpg"
+        saved.append(default_storage.save(name, cleaned))
     return saved
 
 
@@ -127,6 +132,7 @@ class ForumCommentSerializer(serializers.ModelSerializer):
             # AI-08/AI-09: the text the model read, and the details removed first.
             "screened_text": latest.screened_text,
             "redactions": latest.redactions,
+            "images_checked": latest.images_checked,
             "at": latest.created_at,
         }
 
@@ -240,6 +246,7 @@ class ForumPostSerializer(serializers.ModelSerializer):
             # AI-08/AI-09: the text the model read, and the details removed first.
             "screened_text": latest.screened_text,
             "redactions": latest.redactions,
+            "images_checked": latest.images_checked,
             "at": latest.created_at,
         }
 

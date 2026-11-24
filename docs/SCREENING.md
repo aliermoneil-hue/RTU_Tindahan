@@ -356,6 +356,64 @@ and visitors never receive them.
 
 ---
 
+## 4c. Pictures are screened too (an extension to AI-01)
+
+AI-01 asks the model to check the **text** of a listing, post or comment. That left
+a hole an auditor found in a minute: a listing whose words are clean and whose
+photo is not went through text screening untouched. The pictures now go to the same
+provider, with the same three outcomes.
+
+What is sent: up to `SCREENING_IMAGE_MAX` (4) pictures per submission, downscaled
+to 1024 px and re-encoded as JPEG first — the model does not need 4000 px, and the
+re-encode drops EXIF, which on a phone photo includes the coordinates where it was
+taken. Bytes are sent inline; a member's photo is never handed to a model as a
+public URL.
+
+What the model is asked: whether the **picture itself** shows something the rules
+prohibit — weapons, drugs, alcohol, counterfeits, gambling, answer keys and
+completed homework, sexual content, someone's ID, or an image made to harass.
+Text inside the picture counts: a screenshot offering an answer key is prohibited
+even though it is "just" a screenshot.
+
+How the two verdicts become one: the worse wins, and the reasons that earned it are
+kept. A clean picture leaves the text verdict exactly as it was; a flagged picture
+holds the item in `needs_review`; a rejected picture rejects the listing and queues
+it for a moderator (AI-11); a tie keeps both reasons, prefixed `Image:`.
+
+**It fails closed.** No key, a timeout, an unreadable answer — each becomes
+`flagged` with the reason written down ("A picture could not be checked
+(TimeoutError)."), never `clean`. A model that could not be reached is not a model
+that said the picture was fine. That behaviour was observed by accident during the
+live test below, before the vision timeout was raised from the text timeout to 25 s.
+
+`SCREENING_IMAGES=enforce` (default) turns it on; `off` restores text-only
+screening, and the suite runs with it off unless a test opts in, so picture tests
+never depend on a fake model.
+
+### Proved live, with the real model
+
+A listing titled "Notebook bundle" whose description read "Clean words only.
+Selling my old notebooks from last semester." carried one picture reading
+**"ANSWER KEY FOR SALE — Guaranteed pasado. Chat me. All subjects. Instant PDF."**
+The words are clean; the picture is not. The screening row came back
+
+    verdict: rejected | score 100 | confidence 1.0 | images_checked 1
+    reasons: Image: answer key
+
+and the listing was `rejected` and queued for a moderator. Before that, the same
+upload with the vision call timing out produced `flagged` with "Image: A picture
+could not be checked (TimeoutError)." — the fail-closed path, doing its job.
+
+### What this does not claim
+
+A vision model is a filter, not a guarantee. It reads a picture the way a hurried
+moderator would: obvious prohibited content, and text inside images. It will miss
+what is ambiguous, small, or deliberately obfuscated, and it says so with
+`flagged` rather than `clean` when it is unsure. The moderator queue remains the
+real control, which is why AI-03 keeps a clean verdict from publishing on its own.
+
+---
+
 ## 5. The moderator queue
 
 There is no separate queue endpoint. The catalogue API answers it:

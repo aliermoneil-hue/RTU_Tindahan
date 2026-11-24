@@ -120,7 +120,7 @@ DECIDED = {
     "CF-06": ("verified", "posts and comments are held on a flag; `forum/tests_api.py`"),
     "CF-07": ("verified", "author edit/delete, moderator hide/restore, tombstone"),
     # --- screening ----------------------------------------------------------
-    "AI-01": ("verified", "Gemini provider on create and edit for listings, posts and comments"),
+    "AI-01": ("verified", "Gemini provider on create and edit for listings, posts and comments; text per the SRS, and pictures screened too as an extension (`docs/SCREENING.md` \u00a74c), failing closed when the model cannot answer"),
     "AI-02": ("verified", "three outcomes: clean passes to approval, flagged is held, rejected is blocked and queued"),
     "AI-03": ("policy", "a clean verdict still waits for a human: `docs/SCREENING.md` §6"),
     "AI-04": ("verified", "needs_review queue for listings, posts and comments"),

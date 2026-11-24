@@ -308,6 +308,10 @@ SCREENING_PROVIDER = os.getenv("LLM_PROVIDER", "stub").strip().lower()
 # pin it themselves with @override_settings.
 if "test" in sys.argv:
     SCREENING_PROVIDER = "stub"
+    # Picture screening needs a real model to say anything useful, and a stub
+    # answer would make every photo-bearing test depend on a fake. The suite runs
+    # text-only by default; the picture tests switch this on and patch the model.
+    SCREENING_IMAGES = "off"
     # 365 tests create accounts, and PBKDF2 at default work factor is most of
     # the suite's wall time (a 60-test app took two minutes alone). MD5 is the
     # documented Django speed-up for the test runner only: it changes nothing
@@ -326,6 +330,16 @@ SCREENING_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "6"))
 # leaving the listing unscreened. Safe only because screening never publishes:
 # a moderator still approves everything. See docs/SCREENING.md.
 SCREENING_FALLBACK = env_bool("LLM_FALLBACK", True)
+
+# AI-01 extension: pictures are screened too, because text screening cannot see
+# what is in a photo. "enforce" checks up to SCREENING_IMAGE_MAX pictures per
+# submission and fails closed (a picture that cannot be checked is held); "off"
+# restores the old text-only behaviour. Tests pin it off unless they opt in.
+SCREENING_IMAGES = (os.getenv("SCREENING_IMAGES", "enforce") or "off").strip().lower()
+SCREENING_IMAGE_MAX = int(os.getenv("SCREENING_IMAGE_MAX", "4") or 0)
+# A vision call carries the picture itself, so it is slower than a text call; the
+# text timeout would cut it off mid-answer and turn a real verdict into a hold.
+SCREENING_IMAGE_TIMEOUT = float(os.getenv("SCREENING_IMAGE_TIMEOUT", "25"))
 
 # AI-12: below this confidence the item goes to a moderator whatever the
 # provider answered. A clean guess is still a guess; 0.7 keeps an honest model's

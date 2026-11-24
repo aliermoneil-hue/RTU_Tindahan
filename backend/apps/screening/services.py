@@ -63,14 +63,39 @@ def _store(
     confidence=None,
     raw=None,
     subject=None,
+    pictures_checked=0,
+    pictures=None,
 ):
-    """Write the audit row (AI-08), including the cleaned text the provider read."""
+    """Write the audit row (AI-08), including the cleaned text the provider read.
+
+    `pictures` are the image verdicts; the worse of text and pictures is the one
+    stored, and the count says how many pictures were actually looked at.
+    """
     screened_text = ""
     redactions = ""
     if subject is not None:
         text_of = getattr(subject, "as_text", None)
         screened_text = text_of() if callable(text_of) else ""
         redactions = getattr(subject, "redactions", "") or ""
+    if pictures:
+        from .providers import Verdict as _Verdict
+
+        combined = _combine(
+            _Verdict(
+                verdict=verdict,
+                score=score,
+                reasons=list(reasons),
+                confidence=confidence,
+                provider=provider,
+                model=model,
+                raw=raw or {},
+            ),
+            pictures,
+        )
+        verdict = combined.verdict
+        score = combined.score
+        reasons = combined.reasons
+        confidence = combined.confidence
     return ScreeningResult.objects.create(
         **target,
         verdict=verdict,
@@ -82,16 +107,118 @@ def _store(
         raw=raw or {},
         screened_text=screened_text,
         redactions=redactions,
+        images_checked=pictures_checked,
     )
 
 
-def _run(target, subject) -> ScreeningResult:
+IMAGE_RANK = {"clean": 0, "flagged": 1, "rejected": 2}
+
+
+def _screen_pictures(pictures) -> tuple[list, int]:
+    """Screen the pictures, worst-verdict-wins, and never let a failure pass.
+
+    `pictures` is a list of uploaded files. At most `SCREENING_IMAGE_MAX` are
+    checked. A picture that could not be checked becomes "flagged" with the
+    reason, because a model we could not ask is not a model that said it was fine.
+    """
+    from .images import read_upload
+
+    limit = int(getattr(settings, "SCREENING_IMAGE_MAX", 4) or 0)
+    verdicts = []
+    checked = 0
+    for picture in list(pictures)[:limit]:
+        checked += 1
+        try:
+            raw, mime = read_upload(picture)
+            from .images import screen_image
+
+            verdicts.append(screen_image(raw, mime))
+        except Exception as exc:  # noqa: BLE001 - any failure is a "look at it"
+            from .providers import Verdict
+
+            verdicts.append(
+                Verdict(
+                    verdict="flagged",
+                    score=None,
+                    reasons=[f"A picture could not be checked ({type(exc).__name__})."],
+                    confidence=0.0,
+                    provider="error",
+                )
+            )
+    return verdicts, checked
+
+
+def _combine(text_verdict, picture_verdicts):
+    """The worse of the text and the pictures, with the reasons that earned it.
+
+    Ties keep both sets: a listing whose words and photo were both flagged should
+    say so, and a moderator reading "Image: …" beside a text reason knows which
+    of the two to open first.
+    """
+    if not picture_verdicts:
+        return text_verdict
+
+    from .providers import Verdict
+
+    text_rank = IMAGE_RANK.get(text_verdict.verdict, 1)
+    picture_rank = max(IMAGE_RANK.get(v.verdict, 1) for v in picture_verdicts)
+    final_rank = max(text_rank, picture_rank)
+
+    picture_reasons = [
+        f"Image: {reason}"
+        for verdict in picture_verdicts
+        if final_rank == picture_rank
+        for reason in (verdict.reasons or [])
+    ]
+    text_reasons = list(text_verdict.reasons or []) if text_rank == final_rank else []
+    reasons = (picture_reasons + text_reasons)[:4]
+
+    confidences = [c for c in [text_verdict.confidence] if c is not None] + [
+        v.confidence for v in picture_verdicts if v.confidence is not None
+    ]
+
+    if picture_rank > text_rank:
+        winner = next(
+            v for v in picture_verdicts if IMAGE_RANK.get(v.verdict, 1) == picture_rank
+        )
+        return Verdict(
+            verdict=winner.verdict,
+            score=winner.score,
+            reasons=reasons,
+            confidence=min(confidences or [0.0]),
+            provider=winner.provider,
+            model=getattr(winner, "model", ""),
+            raw=getattr(winner, "raw", {}) or {},
+        )
+
+    return Verdict(
+        verdict=text_verdict.verdict,
+        score=text_verdict.score,
+        reasons=reasons or list(text_verdict.reasons or []),
+        confidence=min(confidences or [0.0]),
+        provider=text_verdict.provider,
+        model=getattr(text_verdict, "model", ""),
+        raw=getattr(text_verdict, "raw", {}) or {},
+    )
+
+
+def _run(target, subject, pictures=()) -> ScreeningResult:
     """Screen one subject, store the verdict, and return the audit row.
 
     `target` is `{"listing": row}` or `{"post": row}`; a row in the audit table
-    names exactly one of the two.
+    names exactly one of the two. `pictures` are the uploaded images that will be
+    published with it — text screening cannot see what is in them, so they are
+    checked too and the worse verdict wins.
     """
     configured = (getattr(settings, "SCREENING_PROVIDER", "stub") or "stub").lower()
+
+    # AI-01 extension: the pictures are screened first, because a rejected picture
+    # makes the text verdict irrelevant, and the audit row must carry both.
+    mode = (getattr(settings, "SCREENING_IMAGES", "enforce") or "off").strip().lower()
+    if mode == "enforce" and pictures:
+        picture_verdicts, pictures_checked = _screen_pictures(pictures)
+    else:
+        picture_verdicts, pictures_checked = [], 0
 
     try:
         verdict = get_provider().screen(subject)
@@ -110,6 +237,8 @@ def _run(target, subject) -> ScreeningResult:
                 model=fallback.model,
                 confidence=fallback.confidence,
                 raw={"provider_error": error, **fallback.raw},
+                pictures_checked=pictures_checked,
+                pictures=picture_verdicts,
             )
         else:
             result = _store(
@@ -123,6 +252,8 @@ def _run(target, subject) -> ScreeningResult:
                 ],
                 provider="error",
                 raw={"provider_error": error},
+                pictures_checked=pictures_checked,
+                pictures=picture_verdicts,
             )
     else:
         result = _store(
@@ -135,6 +266,8 @@ def _run(target, subject) -> ScreeningResult:
             model=verdict.model,
             confidence=verdict.confidence,
             raw=verdict.raw,
+            pictures_checked=pictures_checked,
+            pictures=picture_verdicts,
         )
 
     return result
@@ -156,9 +289,18 @@ def needs_a_human(result) -> bool:
 
 
 @transaction.atomic
+def listing_pictures(listing):
+    """The uploaded photos of a listing, in the order the seller gave them."""
+    return [photo.image for photo in listing.photos.all().order_by("sort_order", "id")]
+
+
 def run_screening(listing) -> ScreeningResult:
     """Screen one listing, store the result, and move the status if needed."""
-    result = _run({"listing": listing}, TextSubject.for_listing(listing))
+    result = _run(
+        {"listing": listing},
+        TextSubject.for_listing(listing),
+        pictures=listing_pictures(listing),
+    )
 
     if result.verdict == ScreeningResult.Verdict.REJECTED:
         # AI-11: rejected, and queued. The reason travels to the seller so the
@@ -238,7 +380,22 @@ def run_post_screening(post) -> ScreeningResult:
     is told once, and the moderator queue hears about it, because a post that
     silently disappears is the worst of the three outcomes.
     """
-    result = _run({"post": post}, TextSubject.for_post(post))
+    # The pictures on a post are stored files, not uploads, so they are opened
+    # from storage and handed to the same picture screen.
+    from django.core.files.storage import default_storage
+
+    pictures = []
+    for name in post.images or []:
+        try:
+            pictures.append(default_storage.open(name, "rb"))
+        except Exception:  # noqa: BLE001 - a missing file is not a reason to publish
+            pictures.append(None)
+
+    result = _run(
+        {"post": post},
+        TextSubject.for_post(post),
+        pictures=[p for p in pictures if p is not None],
+    )
 
     # A post has no rejected state: everything that is not a confident clean
     # pass is held (AI-03), which is also where a low confidence belongs (AI-12).

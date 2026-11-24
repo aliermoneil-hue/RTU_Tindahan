@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import Category, Listing, ListingPhoto, ListingVariant, validate_image_size
+from .photos import clean_photo
 
 PHOTO_TYPES = {"jpg", "jpeg", "png", "webp"}
 
@@ -201,6 +202,9 @@ class ListingReadSerializer(serializers.ModelSerializer):
             # evidence rather than against the original text.
             "screened_text": latest.screened_text,
             "redactions": latest.redactions,
+            # How many pictures the model was shown. Zero with pictures present
+            # means the picture gate was off, and the queue should not imply it looked.
+            "images_checked": latest.images_checked,
             "decision": latest.decision,
             "decided_by": (
                 latest.decided_by.display_name or latest.decided_by.email
@@ -280,7 +284,9 @@ class ListingWriteSerializer(serializers.ModelSerializer):
             **validated_data,
         )
         for index, image in enumerate(photos):
-            ListingPhoto.objects.create(listing=listing, image=image, sort_order=index)
+            ListingPhoto.objects.create(
+                listing=listing, image=clean_photo(image), sort_order=index
+            )
         return listing
 
     def update(self, instance, validated_data):
@@ -293,6 +299,6 @@ class ListingWriteSerializer(serializers.ModelSerializer):
             offset = instance.photos.count()
             for index, image in enumerate(photos):
                 ListingPhoto.objects.create(
-                    listing=instance, image=image, sort_order=offset + index
+                    listing=instance, image=clean_photo(image), sort_order=offset + index
                 )
         return instance
