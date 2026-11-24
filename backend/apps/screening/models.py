@@ -5,6 +5,7 @@ re-screened listing survives: a seller can edit an approved item, and a
 moderator may need to see why it was flagged the first time.
 """
 
+from django.conf import settings
 from django.db import models
 
 
@@ -93,3 +94,41 @@ class ScreeningResult(models.Model):
     @property
     def is_flagged(self) -> bool:
         return self.verdict == self.Verdict.FLAGGED
+
+
+class ScreeningRule(models.Model):
+    """AI-10: a screening term an administrator can change without a deploy.
+
+    The list used to live in `providers.py`, which meant that adding a word a
+    seller had found a way around required a code change, a test run and a
+    release. It lives here now; the code's original list is the seeded default,
+    so an empty or wiped table still screens the way it shipped.
+
+    `kind` separates the two lists that behave differently: a `prohibited` term
+    on its own is enough to flag (score 90), while a `scam` term describes a
+    pay-first pattern (score 85, listing text only).
+    """
+
+    class Kind(models.TextChoices):
+        PROHIBITED = "prohibited", "Prohibited item or content"
+        SCAM = "scam", "Scam pattern"
+
+    phrase = models.CharField(max_length=120, unique=True)
+    kind = models.CharField(max_length=12, choices=Kind.choices, default=Kind.PROHIBITED)
+    note = models.CharField(max_length=200, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="screening_rules_added",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["kind", "phrase"]
+
+    def __str__(self):
+        return f"{self.kind}: {self.phrase}"

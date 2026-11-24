@@ -302,7 +302,11 @@ class StubProvider:
             except (InvalidOperation, ValueError):
                 price = None
 
-        hits = [term for term in PROHIBITED_TERMS if _mentions(text, term)]
+        # AI-10: the terms come from the administrator's table, with the list
+        # below as the floor when it is empty.
+        from . import rules
+
+        hits = [term for term in rules.phrases("prohibited") if _mentions(text, term)]
         if hits:
             reasons.append("Mentions a prohibited item: " + ", ".join(sorted(hits)) + ".")
             score = max(score, 90)
@@ -329,7 +333,7 @@ class StubProvider:
                 reasons.append("The text contains a link, which listings must not have.")
                 score = max(score, 60)
 
-            scams = [term for term in SCAM_PATTERNS if _mentions(text, term)]
+            scams = [term for term in rules.phrases("scam") if _mentions(text, term)]
             if PHONE_RE.search(text):
                 scams.append("a phone number")
             if scams:
@@ -388,10 +392,21 @@ class GeminiProvider:
             )
 
     def _payload(self, subject) -> dict:
+        base = GEMINI_INSTRUCTION if subject.kind == "listing" else GEMINI_POST_INSTRUCTION
+        # AI-10: an administrator's edit reaches the model on the next call, not
+        # on the next release. The code's instruction stays the frame; the terms
+        # are the current list.
+        from . import rules
+
+        banned = rules.phrases("prohibited")
+        scams = rules.phrases("scam")
         instruction = (
-            GEMINI_INSTRUCTION
-            if subject.kind == "listing"
-            else GEMINI_POST_INSTRUCTION
+            base
+            + "\n\nThe current prohibited terms, maintained by the administrator: "
+            + ", ".join(banned)
+            + ".\nThe current scam patterns, maintained by the administrator: "
+            + ", ".join(scams)
+            + "."
         )
         text = f"Title: {subject.title}\nText: {subject.description}"
         if subject.kind == "comment":

@@ -13,6 +13,7 @@ import {
   ForumPostPage,
   AppealPage,
   MessageReportsPage,
+  ScreeningRulesPage,
   AppealsPage,
   ForumReportsPage,
   ForgotPasswordPage,
@@ -203,6 +204,8 @@ function renderActiveRoute(path: string, user: { email: string; role: string } |
       case 'message-reports':
       case 'msgreports':
         return <MessageReportsPage />
+      case 'screening-rules':
+        return <ScreeningRulesPage />
       case 'appeal':
         return <AppealPage />
       case 'staff':

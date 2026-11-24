@@ -113,6 +113,11 @@ export const ForumReportsPage = lazy(() =>
     default: m.ForumReportsPage,
   })),
 )
+export const ScreeningRulesPage = lazy(() =>
+  import('@/features/marketplace/pages/admin/ScreeningRulesPage').then((m) => ({
+    default: m.ScreeningRulesPage,
+  })),
+)
 export const MessageReportsPage = lazy(() =>
   import('@/features/marketplace/pages/admin/MessageReportsPage').then((m) => ({
     default: m.MessageReportsPage,

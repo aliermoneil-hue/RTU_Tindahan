@@ -3,14 +3,38 @@
 import json
 from unittest.mock import patch
 
+from decimal import Decimal
+
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, override_settings
+from rest_framework import status
+from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
+from apps.audit.models import AuditLog
 from apps.catalog.models import Category, Listing
-from apps.screening.models import ScreeningResult
-from apps.screening.providers import GeminiProvider, StubProvider, get_provider
+from apps.screening.models import ScreeningResult, ScreeningRule
+from apps.screening.providers import (
+    GeminiProvider,
+    StubProvider,
+    TextSubject,
+    get_provider,
+)
 from apps.screening.services import run_screening
+
+
+def make_user(email, **extra):
+    user = User.objects.create_user(
+        email=email,
+        display_name=email.split("@")[0],
+        password="SecurePass123!",
+        member_type=User.MemberType.STUDENT,
+        college="College of ICT",
+        year_level=2,
+        **extra,
+    )
+    user.verify()
+    return user
 
 
 def make_listing(**overrides):
@@ -628,3 +652,145 @@ class ForumCommentScreeningTests(TestCase):
         row.refresh_from_db()
         self.assertEqual(result.provider, "error")
         self.assertEqual(row.moderation_status, ForumComment.ModerationStatus.NEEDS_REVIEW)
+
+
+class ScreeningRuleTableTests(APITestCase):
+    """AI-10: the rules live in a table an administrator can change."""
+
+    def setUp(self):
+        self.admin = make_user("2024-666001@rtu.edu.ph", role=User.Role.ADMINISTRATOR)
+        self.member = make_user("2024-666002@rtu.edu.ph")
+        self.moderator = make_user("2024-666003@rtu.edu.ph", role=User.Role.MODERATOR)
+
+    def listing(self, title, description="A perfectly ordinary item, described at length."):
+        return Listing.objects.create(
+            seller=self.member,
+            category=Category.objects.first() or Category.objects.create(name="Misc"),
+            title=title,
+            description=description,
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price=Decimal("100.00"),
+            quantity=1,
+            meetup_place="Main lobby",
+        )
+
+    def test_the_table_starts_from_the_code_list(self):
+        from apps.screening.providers import PROHIBITED_TERMS, SCAM_PATTERNS
+
+        self.assertGreaterEqual(ScreeningRule.objects.count(), len(PROHIBITED_TERMS))
+        for phrase in PROHIBITED_TERMS[:5]:
+            self.assertTrue(
+                ScreeningRule.objects.filter(phrase=phrase, kind="prohibited").exists(),
+                phrase,
+            )
+        for phrase in SCAM_PATTERNS[:3]:
+            self.assertTrue(
+                ScreeningRule.objects.filter(phrase=phrase, kind="scam").exists(), phrase
+            )
+
+    def test_a_new_phrase_flags_on_the_next_listing(self):
+        clean = self.listing("Campus cap")
+        verdict = StubProvider().screen(clean)
+        self.assertEqual(verdict.verdict, "clean")
+
+        self.client.force_authenticate(self.admin)
+        created = self.client.post(
+            "/api/v1/screening-rules/",
+            {"phrase": "campus cap", "kind": "prohibited", "note": "Trial rule."},
+            format="json",
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.json())
+
+        verdict = StubProvider().screen(clean)
+        self.assertEqual(verdict.verdict, "flagged")
+        self.assertIn("campus cap", " ".join(verdict.reasons))
+
+    def test_switching_a_phrase_off_stops_it_flagging(self):
+        rule, _ = ScreeningRule.objects.get_or_create(
+            phrase="lab gown", defaults={"kind": "prohibited"}
+        )
+        rule.is_active = True
+        rule.save(update_fields=["is_active"])
+        item = self.listing("Lab gown, size M")
+        self.assertEqual(StubProvider().screen(item).verdict, "flagged")
+
+        self.client.force_authenticate(self.admin)
+        patched = self.client.patch(
+            f"/api/v1/screening-rules/{rule.pk}/", {"is_active": False}, format="json"
+        )
+        self.assertEqual(patched.status_code, status.HTTP_200_OK, patched.json())
+
+        self.assertEqual(StubProvider().screen(item).verdict, "clean")
+
+    def test_an_edit_reaches_the_language_model_on_the_next_call(self):
+        ScreeningRule.objects.get_or_create(
+            phrase="unofficial transcript", defaults={"kind": "prohibited"}
+        )
+        provider = GeminiProvider(api_key="test-key", transport=lambda *a, **k: {})
+        payload = provider._payload(
+            TextSubject(kind="listing", title="Transcript", description="Official copy.", price="10")
+        )
+        instruction = payload["systemInstruction"]["parts"][0]["text"]
+        self.assertIn("unofficial transcript", instruction)
+
+    def test_a_member_cannot_read_or_change_the_rules(self):
+        self.client.force_authenticate(self.member)
+        self.assertEqual(self.client.get("/api/v1/screening-rules/").status_code, 403)
+
+        refused = self.client.post(
+            "/api/v1/screening-rules/", {"phrase": "anything", "kind": "prohibited"}, format="json"
+        )
+        self.assertEqual(refused.status_code, 403)
+
+    def test_a_moderator_may_read_but_not_write(self):
+        self.client.force_authenticate(self.moderator)
+        self.assertEqual(self.client.get("/api/v1/screening-rules/").status_code, 200)
+
+        refused = self.client.post(
+            "/api/v1/screening-rules/", {"phrase": "anything", "kind": "prohibited"}, format="json"
+        )
+        self.assertEqual(refused.status_code, 403)
+
+    def test_every_change_is_audited(self):
+        self.client.force_authenticate(self.admin)
+        created = self.client.post(
+            "/api/v1/screening-rules/", {"phrase": "exam leak", "kind": "prohibited"}, format="json"
+        )
+        rule_id = created.json()["id"]
+        self.client.delete(f"/api/v1/screening-rules/{rule_id}/")
+
+        actions = list(
+            AuditLog.objects.filter(target_type="screening_rule").values_list("action", flat=True)
+        )
+        self.assertIn("screening rule added", actions)
+        self.assertIn("screening rule removed", actions)
+
+    def test_the_whole_list_comes_back_in_one_page(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/v1/screening-rules/?kind=prohibited")
+
+        body = response.json()
+        rows = body["results"] if isinstance(body, dict) and "results" in body else body
+        self.assertEqual(len(rows), ScreeningRule.objects.filter(kind="prohibited").count())
+        self.assertGreater(len(rows), 20)
+
+    def test_a_duplicate_phrase_is_refused(self):
+        ScreeningRule.objects.get_or_create(phrase="answer key", defaults={"kind": "prohibited"})
+        self.client.force_authenticate(self.admin)
+
+        refused = self.client.post(
+            "/api/v1/screening-rules/", {"phrase": "answer key", "kind": "prohibited"}, format="json"
+        )
+
+        self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_an_empty_table_falls_back_to_the_code_list(self):
+        ScreeningRule.objects.all().delete()
+        from apps.screening import rules
+
+        rules.invalidate()
+
+        self.assertIn("answer key", rules.phrases("prohibited"))
+        item = self.listing("Answer key for sale")
+        self.assertEqual(StubProvider().screen(item).verdict, "flagged")

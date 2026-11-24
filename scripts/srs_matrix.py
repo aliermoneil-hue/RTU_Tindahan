@@ -124,7 +124,7 @@ DECIDED = {
     "AI-07": ("verified", "provider failure falls back to rules, and with the fallback off the item is held"),
     "AI-08": ("partial", "verdict, score, reasons, provider, model and time are logged; the cleaned text is not stored"),
     "AI-09": ("partial", "only the content is sent, but names and numbers inside it are not redacted"),
-    "AI-10": ("open", "screening rules live in `providers.py`, not in an admin-editable table"),
+    "AI-10": ("verified", "ScreeningRule table seeded from the code list, editable by an administrator; both providers read it, audited"),
     "AI-11": ("partial", "held items reach the queue and a moderator decides; there is no rejected-then-appeal path"),
     "AI-12": ("partial", "a 0-100 score is stored and the threshold flags; no confidence mapping"),
     "AI-13": ("verified", "ScreeningNotice at sign-up, create-listing, forum composer and comment box"),

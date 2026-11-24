@@ -26,6 +26,9 @@ Suggested contents, copied from the CapStone folder:
 - `BACKUP.md` — the nightly verified database copy (database plus uploads),
   the restore procedure, and the drill that proved a copy by reading it back
   through the ORM.
+- `SCREENING-RULES.md` — AI-10: the two kinds of screening phrase, the seed and
+  the code floor, what an edit reaches (queue and language model), and who may
+  change it.
 - `MESSAGE-REPORTS.md` — MS-04 and MS-05: who may report a conversation, the one
   message a moderator is allowed to read, and who is deliberately told nothing.
 - `APPEALS.md` — the appeal flow behind AI-06 and RM-08: what can be appealed,

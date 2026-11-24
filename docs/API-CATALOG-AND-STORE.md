@@ -317,6 +317,14 @@ and on the seller's Incoming orders tab.
 
 ---
 
+## 8c. Screening rules (AI-10)
+
+`GET /api/v1/screening-rules/?kind=&active=` reads the phrases (moderator or
+administrator); `POST`, `PATCH` and `DELETE` change them (administrator only).
+The list is unpaginated on purpose — the screen shows what the check looks for.
+Every write is audited. With the table empty the shipped list applies; see
+`SCREENING-RULES.md`.
+
 ## 8a. Messaging reports (MS-04, MS-05)
 
 `POST /conversations/<id>/report/` files a report from a participant — `reason`,

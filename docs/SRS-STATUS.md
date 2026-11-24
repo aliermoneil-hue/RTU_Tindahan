@@ -11,10 +11,10 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 61 |
+| Implemented, verified | 62 |
 | Implemented | 79 |
 | Partial | 26 |
-| Not implemented | 1 |
+| Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
 | **total** | **174** |
@@ -207,7 +207,7 @@ browser or the tests in this repository.
 | AI-07 | The system shall send content to the moderator queue, and not publish it, if the LLM service is unavailable or returns an error. | Not yet | Implemented, verified | provider failure falls back to rules, and with the fallback off the item is held |
 | AI-08 | The system shall keep a log of every screening: the content ID, the cleaned text that was sent to the LLM, the outcome, the reason, the confidence... | Not yet | Partial | verdict, score, reasons, provider, model and time are logged; the cleaned text is not stored |
 | AI-09 | The system shall send to the LLM service only the content being checked, and only after removing names, contact numbers, and other identifying deta... | Not yet | Partial | only the content is sent, but names and numbers inside it are not redacted |
-| AI-10 | The system shall let an Administrator update the screening rules without changing the program code. | Not yet | Not implemented | screening rules live in `providers.py`, not in an admin-editable table |
+| AI-10 | The system shall let an Administrator update the screening rules without changing the program code. | Not yet | Implemented, verified | ScreeningRule table seeded from the code list, editable by an administrator; both providers read it, audited |
 | AI-11 | The system shall place every Rejected item in the moderator queue so a moderator can confirm or reverse the rejection. A reversed rejection shall b... | Not yet | Partial | held items reach the queue and a moderator decides; there is no rejected-then-appeal path |
 | AI-12 | The system shall have the LLM give a confidence level with each outcome, and shall treat a low confidence result as Needs Review. | Not yet | Partial | a 0-100 score is stored and the threshold flags; no confidence mapping |
 | AI-13 | The system shall tell users in plain language, at registration and on the posting screens, that content is screened automatically and how to appeal... | Not yet | Implemented, verified | ScreeningNotice at sign-up, create-listing, forum composer and comment box |
@@ -327,7 +327,6 @@ with the reason:
 | --- | --- | --- |
 | RR-04 | The system shall hold review text for AI screening before it is published. | reviews are not screened on purpose: `docs/SCREENING.md` §6 |
 | AI-03 | The system shall automatically publish submissions that receive an Approved classification. | a clean verdict still waits for a human: `docs/SCREENING.md` §6 |
-| AI-10 | The system shall let an Administrator update the screening rules without changing the program code. | screening rules live in `providers.py`, not in an admin-editable table |
 
 ## Note on identifier drift
 

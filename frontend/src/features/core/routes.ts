@@ -58,6 +58,8 @@ export const APP_PAGES: PageInfo[] = [
     about: 'Completed pickups and CSV export.' },
   { path: 'forum-reports', title: 'Forum Reports', icon: 'flag', section: 'ADMIN', backend: 'available',
     about: 'Reported forum posts.' },
+  { path: 'screening-rules', title: 'Screening rules', icon: 'shield', section: 'ADMIN', backend: 'available',
+    about: 'The phrases the automatic check looks for; an administrator keeps them current.' },
   { path: 'message-reports', title: 'Message reports', icon: 'chat', section: 'ADMIN', backend: 'available',
     about: 'Reported conversations: only the reported message is shown to a moderator.' },
   { path: 'appeals', title: 'Appeals', icon: 'flag', section: 'ADMIN', backend: 'available',
