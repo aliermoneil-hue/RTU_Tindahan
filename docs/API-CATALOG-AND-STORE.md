@@ -258,6 +258,49 @@ the plain-text body, and **Download JSON**, which fetches the same filtered rows
 
 ---
 
+## 6b. The default feed's score (BD-07)
+
+`GET /api/v1/listings/` with no `ordering` returns the catalogue in **hybrid
+score** order, and `?ordering=recommended` asks for the same thing by name. The
+score is computed in SQL over the whole filtered set, not over the page, because a
+score applied after pagination sorts twenty rows instead of the catalogue.
+
+    popularity = 3·ln(1+saves) + 0.5·ln(1+views) + 4·ln(1+units sold)
+    decay      = exp(-ln2 · age_days · 24 / half_life_hours)
+    relevance  = 6 · Σ (2 for a word in the title, 1 for a word in the description)
+    score      = popularity · decay + relevance     (relevance only when searching)
+
+Why each piece:
+
+- **A save is worth six views and a sale is worth eight saves.** A save is a
+  decision, a view is a glance, and a sale is the thing the marketplace exists to
+  produce.
+- **Counts are compressed with `ln(1+n)`.** Attention is heavy-tailed: the
+  difference between 400 and 450 views is not the difference between 0 and 50. A
+  raw count lets one popular listing flatten the recency half of the score, at
+  which point the feed is not hybrid at all — only popular.
+- **A half-life, not a cliff.** Scores halve every `FEED_HALF_LIFE_HOURS` (72 by
+  default), so last month's favourite sinks gradually below this morning's good
+  listing. A step change would make a page of results jump at midnight.
+- **Text relevance only when searching.** On a typed search the matched words add
+  to the same score, so a precise match can outrank a popular near-miss.
+- **No personal history.** The score is built from the listing's own columns and
+  its own counts. Nothing about the reader enters it, so two students — signed in
+  or not — see the same order for the same query. That is the requirement, and a
+  test asserts a signed-out reader and a signed-in one get identical results.
+
+The weights are settings, not constants: `FEED_WEIGHT_SAVE`,
+`FEED_WEIGHT_VIEW`, `FEED_WEIGHT_SOLD`, `FEED_RELEVANCE_WEIGHT` and
+`FEED_HALF_LIFE_HOURS`, each overridable from `backend/.env`. `apps/catalog/feed.py`
+also carries `explain(listing)`, which prints the four numbers behind one row —
+that is the answer to "why is this first?" in a panel.
+
+`?ordering=newest` still returns pure newest-first, which is what the Newest
+Listings section uses (BD-08), and every other explicit sort from BD-06 is
+untouched.
+
+---
+
 ## 7. Favorites API (saved listings and sellers)
 
 Favourites used to live in the browser snapshot, so a heart on one device did

@@ -82,7 +82,7 @@ DECIDED = {
     "BD-02": ("verified", "`?category=`, `?max_price=` with validation"),
     "BD-03": ("verified", "best-selling, newest, small sellers"),
     "BD-04": ("verified", "small-seller section and `?ordering=small-sellers`"),
-    "BD-07": ("partial", "sorts are explicit; no blended popularity score"),
+    "BD-07": ("verified", "the default feed is a hybrid score in SQL — log-compressed saves, views and sales, halved every 72 h, plus text relevance when searching; no reader history enters it, and ?ordering=newest still exists"),
     "BD-08": ("verified", "sold, unavailable and zero-quantity rows are hidden"),
     # --- store, tickets, stock ----------------------------------------------
     "ST-04": ("verified", "reserve on request, release on cancel, take on claim; ledger enforces"),

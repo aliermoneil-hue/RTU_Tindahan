@@ -14,6 +14,7 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import User
 from apps.audit.models import AuditLog
 from apps.catalog.models import Category, Listing, ListingPhoto
+from apps.favorites.models import Favorite
 from apps.notifications.models import Notification
 from apps.screening.providers import Verdict
 from apps.screening.services import run_screening
@@ -937,3 +938,140 @@ class CategoryManagementTests(APITestCase):
 
         self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("cannot sit inside itself", str(refused.json()))
+
+
+class FeedOrderingTests(APITestCase):
+    """BD-07: popularity and recency in one score, with time decay, and text
+    relevance when searching. Never the reader's own history (BD-07 again)."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name="Books and Academic Materials")
+        self.seller = User.objects.create_user(
+            email="2024-550001@rtu.edu.ph",
+            display_name="Seller",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.seller.verify()
+        self.reader = User.objects.create_user(
+            email="2024-550002@rtu.edu.ph",
+            display_name="Reader",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.reader.verify()
+
+    def listing(self, title, *, views=0, sold=0, saves=0, age_hours=0):
+        from django.utils import timezone
+        from datetime import timedelta
+
+        row = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title=title,
+            description=f"{title} — a description.",
+            price=100,
+            view_count=views,
+            sold_count=sold,
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+            published_at=timezone.now(),
+        )
+        if age_hours:
+            Listing.objects.filter(pk=row.pk).update(
+                created_at=timezone.now() - timedelta(hours=age_hours)
+            )
+        for index in range(saves):
+            saver = User.objects.create_user(
+                email=f"2024-56{index:04d}@rtu.edu.ph",
+                display_name=f"Saver {index}",
+                password="SecurePass123!",
+                member_type=User.MemberType.STUDENT,
+                college="College of ICT",
+                year_level=2,
+            )
+            saver.verify()
+            Favorite.objects.create(user=saver, listing=row)
+        return row
+
+    def titles(self, query=""):
+        body = self.client.get(f"/api/v1/listings/{query}").json()
+        rows = body["results"] if isinstance(body, dict) else body
+        return [row["title"] for row in rows]
+
+    def test_a_popular_listing_outranks_a_quieter_one_of_the_same_age(self):
+        self.listing("Quiet")
+        self.listing("Popular", views=40, sold=2, saves=3)
+
+        self.assertEqual(self.titles()[0], "Popular")
+
+    def test_an_older_popular_listing_sinks_below_a_fresh_one(self):
+        # 40 views a month ago has decayed far below nothing-but-today.
+        self.listing("Old favourite", views=40, age_hours=24 * 30)
+        self.listing("Fresh today")
+
+        self.assertEqual(self.titles()[0], "Fresh today")
+
+    def test_a_search_scores_the_words_it_matched(self):
+        self.listing("Calculus reviewer", views=1)
+        self.listing("Basketball shoes", views=1)
+
+        self.assertEqual(self.titles("?search=calculus")[0], "Calculus reviewer")
+
+    def test_the_order_is_the_same_for_two_different_readers(self):
+        self.listing("Alpha", views=5)
+        self.listing("Beta", views=9)
+        self.listing("Gamma", saves=2)
+
+        anonymous = self.titles()
+        self.client.force_authenticate(self.reader)
+        as_reader = self.titles()
+
+        self.assertEqual(anonymous, as_reader)
+        self.assertEqual(as_reader[0], "Gamma")
+
+    def test_a_listing_with_nothing_yet_still_scores_above_zero(self):
+        from apps.catalog.feed import annotate_feed_score
+
+        row = self.listing("Brand new")
+        scored = annotate_feed_score(Listing.objects.filter(pk=row.pk)).get()
+
+        self.assertGreater(scored.feed_score, 0)
+
+    def test_the_score_can_be_explained_in_numbers(self):
+        from apps.catalog.feed import annotate_feed_score, explain
+
+        row = self.listing("Explained", views=10, sold=1, saves=2, age_hours=72)
+        row = annotate_feed_score(Listing.objects.filter(pk=row.pk)).get()
+
+        why = explain(row)
+
+        self.assertEqual(why["saves"], 2)
+        self.assertEqual(why["views"], 10)
+        self.assertEqual(why["sold"], 1)
+        # One half-life of age: the decay is almost exactly a half.
+        self.assertAlmostEqual(why["decay"], 0.5, places=2)
+        self.assertGreater(why["score"], 0)
+        self.assertIn("save", why["weights"])
+
+    def test_newest_is_still_available_for_the_newest_section(self):
+        self.listing("Popular", views=50, sold=5)
+        self.listing("Just posted")
+
+        self.assertEqual(self.titles("?ordering=newest")[0], "Just posted")
+
+    def test_the_score_is_computed_over_the_whole_catalogue_not_the_page(self):
+        # Ten quiet listings, then one that is only popular by being old news:
+        # if the score were applied after pagination only the page's rows would
+        # sort, and the popular row on page one would never move.
+        for index in range(3):
+            self.listing(f"Quiet {index}")
+        self.listing("Late popular", views=80, sold=3, saves=4)
+
+        first_page = self.titles("?page_size=2")
+
+        self.assertEqual(first_page[0], "Late popular")

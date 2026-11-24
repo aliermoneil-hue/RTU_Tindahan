@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 88 |
+| Implemented, verified | 89 |
 | Implemented | 79 |
-| Partial | 4 |
+| Partial | 3 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 1 |
@@ -61,7 +61,7 @@ browser or the tests in this repository.
 | BD-04 | The system shall show a section that features listings from small sellers (see 1.3) so they can be discovered. This section is separate from the Ne... | Not yet | Implemented, verified | small-seller section and `?ordering=small-sellers` |
 | BD-05 | The system shall restrict search results and discovery feeds exclusively to approved, currently published listings. | Built | Implemented | `apps/catalog` browse and ordering |
 | BD-06 | The system shall allow users to sort listing results chronologically by newest submission or numerically by price. | Built | Implemented | `apps/catalog` browse and ordering |
-| BD-07 | The system shall order the default browse feed with a hybrid score that combines popularity and recency with time decay. When the user types a sear... | Partly | Partial | sorts are explicit; no blended popularity score |
+| BD-07 | The system shall order the default browse feed with a hybrid score that combines popularity and recency with time decay. When the user types a sear... | Partly | Implemented, verified | the default feed is a hybrid score in SQL — log-compressed saves, views and sales, halved every 72 h, plus text relevance when searching; no reader history enters it, and ?ordering=newest still exists |
 | BD-08 | The system shall keep a Newest Listings section that is not affected by popularity, so first-time sellers stay visible. | Built | Implemented, verified | sold, unavailable and zero-quantity rows are hidden |
 | BD-08 (2) | The system shall not show listings that are marked sold or unavailable, or that have no quantity left, in search results or sections. They shall st... | Partly | Implemented, verified | sold, unavailable and zero-quantity rows are hidden |
 

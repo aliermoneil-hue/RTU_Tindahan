@@ -269,6 +269,17 @@ CORS_EXPOSE_HEADERS = ["Content-Disposition"]
 
 RTU_EMAIL_DOMAIN = os.getenv("RTU_EMAIL_DOMAIN", "rtu.edu.ph")
 
+# BD-07: the default feed's hybrid score. A save is worth more than a view (it is
+# a decision, not a glance), a sale is worth most, and every point of popularity
+# halves every FEED_HALF_LIFE_HOURS so new listings are not buried for long.
+# These are knobs, not constants: the panel can be asked "why is this first?" and
+# the answer is four numbers. FEED_RELEVANCE_WEIGHT applies only when searching.
+FEED_WEIGHT_SAVE = float(os.getenv("FEED_WEIGHT_SAVE", "3"))
+FEED_WEIGHT_VIEW = float(os.getenv("FEED_WEIGHT_VIEW", "0.5"))
+FEED_WEIGHT_SOLD = float(os.getenv("FEED_WEIGHT_SOLD", "4"))
+FEED_RELEVANCE_WEIGHT = float(os.getenv("FEED_RELEVANCE_WEIGHT", "6"))
+FEED_HALF_LIFE_HOURS = float(os.getenv("FEED_HALF_LIFE_HOURS", "72"))
+
 # Students register with their student number in the local part.
 RTU_STUDENT_EMAIL_REGEX = os.getenv(
     "RTU_STUDENT_EMAIL_REGEX",

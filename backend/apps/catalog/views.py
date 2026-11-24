@@ -44,6 +44,9 @@ from .serializers import (
 # two listings posted in the same second can swap places between requests and
 # a visitor sees the same row twice.
 ORDERING = {
+    # BD-07: the default feed. `None` means "annotate a score and sort by it" —
+    # the score itself lives in apps/catalog/feed.py, with the weights in settings.
+    "recommended": None,
     "newest": ("-created_at",),
     "oldest": ("created_at",),
     "price": ("price", "-created_at"),
@@ -346,7 +349,18 @@ class ListingViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(is_official=official.lower() in TRUE_VALUES)
         if params.get("seller") == "me" and user.is_authenticated:
             queryset = queryset.filter(seller=user)
-        if (ordering := params.get("ordering")) in ORDERING:
+        # BD-07: the feed is a hybrid score by default, and a search folds text
+        # relevance into the same score. Both are computed in SQL, over the whole
+        # catalogue rather than over a page of it.
+        ordering = params.get("ordering")
+        if ordering not in ORDERING:
+            ordering = "recommended"
+        if ORDERING[ordering] is None:
+            from .feed import annotate_feed_score
+
+            queryset = annotate_feed_score(queryset, search=params.get("search", ""))
+            queryset = queryset.order_by("-feed_score", "-created_at")
+        else:
             queryset = queryset.order_by(*ORDERING[ordering])
         return queryset
 
