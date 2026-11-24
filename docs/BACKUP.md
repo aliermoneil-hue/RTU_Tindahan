@@ -17,8 +17,12 @@ It runs from cron at **02:10** daily, before the token sweep at 03:10:
 
 ## 1. Where the copies go
 
-    ~/backups/tindahan/db-YYYYMMDD-HHMMSS.sqlite3    mode 600
-    ~/backups/tindahan/backup.log                    what each run said
+    ~/backups/tindahan/db-YYYYMMDD-HHMMSS.sqlite3     mode 600
+    ~/backups/tindahan/media-YYYYMMDD-HHMMSS.tar.gz   mode 600, the uploads
+    ~/backups/tindahan/backup.log                     what each run said
+
+The database and the uploads are stamped together, so a pair restores as one
+point in time. `--skip-media` takes the database alone if you only want that.
 
 Outside the repository on purpose: a backup inside the working tree gets
 committed, swept into a deploy, or deleted by the next `git clean`.
@@ -64,9 +68,25 @@ suddenly empty is visible in the log instead of discovered months later.
 
 A real run looks like this:
 
-    Wrote /home/kallisto/backups/tindahan/db-20261124-183839.sqlite3 (786432 bytes)
+    Wrote /home/kallisto/backups/tindahan/db-20261124-184416.sqlite3 (786432 bytes)
     Verified: users=10, listings=10, orders=3, forum posts=3, store tickets=7
-    1 copy/copies kept, 0 pruned.
+    Wrote /home/kallisto/backups/tindahan/media-20261124-184416.tar.gz (236989 bytes, 63 file(s) verified)
+    3 database copy(s) kept, 0 pruned.
+    1 uploads archive(s) kept, 0 pruned.
+
+## 3b. The uploads travel too
+
+A database copy alone restores rows that name photos the disk no longer has:
+listings and forum threads come back with broken images. `backend/media/` is
+archived into the same stamped file, and the archive is read back: the number
+of files it holds must match the number that went in, or the archive is deleted
+and the run reports it (the database copy is kept either way — it is verified
+first and is not to blame).
+
+Cross-check that was run on 2026-11-24: the database copy references 3 listing
+photos and the archive holds 63 files, so every referenced photo is present.
+The extra files are uploads from listings that have since been deleted; they
+are kept rather than guessed at.
 
 ---
 
@@ -81,6 +101,9 @@ process is how a demo loses its data.
     # 2. prove it before trusting it (read-only, changes nothing)
     sqlite3 "file:$HOME/backups/tindahan/db-YYYYMMDD-HHMMSS.sqlite3?mode=ro" \
       'PRAGMA integrity_check; SELECT COUNT(*) FROM accounts_user;'
+
+    # 2b. the photos that go with it (same timestamp)
+    tar -xzf "media-YYYYMMDD-HHMMSS.tar.gz" -C /home/kallisto/RTU_Tindahan/backend/media/
 
     # 3. stop, keep the damaged file, swap, start
     systemctl --user stop rtu-tindahan
@@ -113,10 +136,6 @@ password hashes and foreign keys included — rather than merely a readable file
 
 ## 5. What this does not cover
 
-- **Uploaded photos are files, not rows.** Listing photos and forum images live
-  under `backend/media/`. A database restore brings back the row that names a
-  photo, not the photo. Copy `backend/media/` alongside the database when a
-  restore matters: `rsync -a backend/media/ ~/backups/tindahan/media-$(date +%F)/`.
 - **Everything is on one disk.** Copies sit on the same machine as the database,
   so a disk failure or a lost host takes both. An offsite copy is one line —
   `rsync -a ~/backups/tindahan/ <another-host>:backups/tindahan/` — and is not

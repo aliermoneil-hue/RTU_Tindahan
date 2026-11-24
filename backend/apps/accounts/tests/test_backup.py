@@ -3,6 +3,7 @@
 import os
 import shutil
 import sqlite3
+import tarfile
 import tempfile
 from io import StringIO
 from unittest.mock import patch
@@ -19,9 +20,27 @@ class BackupCommandTests(TestCase):
     def setUp(self):
         self.directory = tempfile.mkdtemp(prefix="tindahan-backup-")
         self.addCleanup(shutil.rmtree, self.directory, True)
-        override = override_settings(BACKUP_DIR=self.directory, BACKUP_KEEP=14)
+        self.media = tempfile.mkdtemp(prefix="tindahan-media-")
+        self.addCleanup(shutil.rmtree, self.media, True)
+        override = override_settings(
+            BACKUP_DIR=self.directory, BACKUP_KEEP=14, MEDIA_ROOT=self.media
+        )
         override.enable()
         self.addCleanup(override.disable)
+
+    def add_photo(self, name="listings/2026/11/photo_one.png"):
+        path = os.path.join(self.media, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as handle:
+            handle.write(b"\x89PNG not really a png, but a file")
+        return name
+
+    def media_copies(self):
+        return sorted(
+            name
+            for name in os.listdir(self.directory)
+            if name.startswith("media-") and name.endswith(".tar.gz")
+        )
 
     def run_command(self, *args):
         out = StringIO()
@@ -80,6 +99,47 @@ class BackupCommandTests(TestCase):
             )
         finally:
             probe.close()
+
+    def test_the_uploads_travel_with_the_database(self):
+        self.add_photo("listings/2026/11/photo_one.png")
+        self.add_photo("forum/photo_two.png")
+
+        output = self.run_command()
+
+        copies = self.media_copies()
+        self.assertEqual(len(copies), 1, output)
+        path = os.path.join(self.directory, copies[0])
+        self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+        with tarfile.open(path, "r:gz") as archive:
+            names = sorted(m.name for m in archive.getmembers() if m.isfile())
+        self.assertEqual(names, ["forum/photo_two.png", "listings/2026/11/photo_one.png"])
+
+    def test_skip_media_takes_only_the_database(self):
+        self.add_photo()
+
+        self.run_command("--skip-media")
+
+        self.assertEqual(len(self.copies()), 1)
+        self.assertEqual(self.media_copies(), [])
+
+    def test_a_missing_media_directory_is_not_an_error(self):
+        missing = os.path.join(self.media, "does-not-exist")
+        with override_settings(MEDIA_ROOT=missing):
+            self.run_command()
+
+        self.assertEqual(len(self.copies()), 1)
+        self.assertEqual(self.media_copies(), [])
+
+    def test_old_uploads_archives_are_pruned_too(self):
+        for index in range(3):
+            path = os.path.join(self.directory, f"media-2020010{index + 1}-000000.tar.gz")
+            with open(path, "wb") as handle:
+                handle.write(b"old")
+            os.utime(path, (1_000_000 + index, 1_000_000 + index))
+
+        self.run_command("--keep", "2")
+
+        self.assertEqual(len(self.media_copies()), 2)
 
     def test_a_dry_run_writes_nothing(self):
         output = self.run_command("--dry-run")

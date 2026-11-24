@@ -17,6 +17,7 @@ tables are printed so a restore can be compared against them.
 
 import os
 import sqlite3
+import tarfile
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -25,6 +26,8 @@ from django.utils import timezone
 
 BACKUP_PREFIX = "db-"
 BACKUP_SUFFIX = ".sqlite3"
+MEDIA_PREFIX = "media-"
+MEDIA_SUFFIX = ".tar.gz"
 
 # Enough to notice a truncated or emptying database without guessing at the
 # whole schema. Each entry is (label, table) and is reported, not enforced —
@@ -48,18 +51,50 @@ def is_sqlite():
     return connection.vendor == "sqlite"
 
 
-def existing_backups(directory):
-    """Our own copies, newest first. Unrelated files are left alone."""
+def existing_backups(directory, prefix=BACKUP_PREFIX, suffix=BACKUP_SUFFIX):
+    """Our own copies of one kind, newest first. Unrelated files are left alone."""
     try:
         names = [
             name
             for name in os.listdir(directory)
-            if name.startswith(BACKUP_PREFIX) and name.endswith(BACKUP_SUFFIX)
+            if name.startswith(prefix) and name.endswith(suffix)
         ]
     except FileNotFoundError:
         return []
     paths = [os.path.join(directory, name) for name in names]
     return sorted(paths, key=os.path.getmtime, reverse=True)
+
+
+def media_root():
+    return getattr(settings, "MEDIA_ROOT", None) or os.path.join(settings.BASE_DIR, "media")
+
+
+def archive_media(path):
+    """tar.gz the uploads. Returns how many files went in.
+
+    A database copy alone restores rows that name photos the disk no longer
+    has: listings and forum threads come back with broken images. The uploads
+    are small (hundreds of KB), so they travel with the same nightly run.
+    """
+    source = media_root()
+    added = 0
+    with tarfile.open(path, "w:gz") as archive:
+        for root, _dirs, files in os.walk(source):
+            for name in files:
+                full = os.path.join(root, name)
+                archive.add(full, arcname=os.path.relpath(full, source))
+                added += 1
+    return added
+
+
+def verify_media(path, expected):
+    with tarfile.open(path, "r:gz") as archive:
+        names = [member.name for member in archive.getmembers() if member.isfile()]
+    if len(names) != expected:
+        raise CommandError(
+            f"{os.path.basename(path)} holds {len(names)} file(s), expected {expected}"
+        )
+    return names
 
 
 def is_in_memory():
@@ -126,6 +161,11 @@ class Command(BaseCommand):
             action="store_true",
             help="Report what would be written and pruned, and change nothing.",
         )
+        parser.add_argument(
+            "--skip-media",
+            action="store_true",
+            help="Take the database copy only, without the uploads archive.",
+        )
 
     def handle(self, *args, **options):
         if not is_sqlite():
@@ -144,13 +184,20 @@ class Command(BaseCommand):
         final_path = os.path.join(directory, name)
         partial_path = final_path + ".partial"
 
+        media_path = os.path.join(directory, f"{MEDIA_PREFIX}{stamp}{MEDIA_SUFFIX}")
+        want_media = not options["skip_media"] and os.path.isdir(media_root())
+
         old = existing_backups(directory)
+        old_media = existing_backups(directory, MEDIA_PREFIX, MEDIA_SUFFIX)
 
         if options["dry_run"]:
             self.stdout.write(f"Would write {final_path}")
+            if want_media:
+                self.stdout.write(f"Would write {media_path}")
             self.stdout.write(f"Would keep {keep} copy/copies; {len(old)} exist now.")
-            doomed = old[max(keep - 1, 0):]
-            for path in doomed:
+            for path in old[max(keep - 1, 0):]:
+                self.stdout.write(f"Would delete {path}")
+            for path in old_media[max(keep - 1, 0):]:
                 self.stdout.write(f"Would delete {path}")
             return
 
@@ -179,14 +226,42 @@ class Command(BaseCommand):
             "Verified: " + ", ".join(f"{label}={count}" for label, count in counts.items())
         )
 
-        # Prune after the new copy is safe, so a failed run never costs a backup.
-        ranked = existing_backups(directory)
-        keepers, doomed = ranked[:keep], ranked[keep:]
-        for path in doomed:
-            os.unlink(path)
-            self.stdout.write(f"Pruned {path}")
+        # The uploads travel with the same stamp: a database restored without
+        # them comes back with listings whose photos no longer exist.
+        if want_media:
+            media_partial = media_path + ".partial"
+            try:
+                added = archive_media(media_partial)
+                verify_media(media_partial, added)
+            except CommandError:
+                self._discard(media_partial)
+                raise
+            except Exception as exc:  # noqa: BLE001 - keep the database copy
+                self._discard(media_partial)
+                raise CommandError(
+                    "Database copy is safe, but the uploads archive failed and was "
+                    f"discarded: {type(exc).__name__}: {exc}"
+                )
+            os.replace(media_partial, media_path)
+            os.chmod(media_path, 0o600)
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Wrote {media_path} ({os.path.getsize(media_path)} bytes, "
+                    f"{added} file(s) verified)"
+                )
+            )
 
-        self.stdout.write(f"{len(keepers)} copy/copies kept, {len(doomed)} pruned.")
+        # Prune after the new copies are safe, so a failed run never costs one.
+        for prefix, suffix, old_kind in (
+            (BACKUP_PREFIX, BACKUP_SUFFIX, "database copy"),
+            (MEDIA_PREFIX, MEDIA_SUFFIX, "uploads archive"),
+        ):
+            ranked = existing_backups(directory, prefix, suffix)
+            keepers, doomed = ranked[:keep], ranked[keep:]
+            for path in doomed:
+                os.unlink(path)
+                self.stdout.write(f"Pruned {path}")
+            self.stdout.write(f"{len(keepers)} {old_kind}(s) kept, {len(doomed)} pruned.")
 
     def _discard(self, path):
         try:
