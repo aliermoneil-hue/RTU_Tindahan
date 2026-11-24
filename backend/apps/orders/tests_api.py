@@ -9,6 +9,7 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
 from apps.catalog.models import Category, Listing
+from apps.notifications.models import Notification
 from apps.orders.models import Order
 
 
@@ -444,3 +445,120 @@ class SellerSalesHistoryTests(APITestCase):
 
         body = response.content.decode()
         self.assertIn("'=HYPERLINK", body)
+
+
+class PaymentMethodTests(APITestCase):
+    """OT-06: the choice is recorded, and no money moves through the platform."""
+
+    def setUp(self):
+        self.seller = make_user("2024-999001@rtu.edu.ph")
+        self.buyer = make_user("2024-999002@rtu.edu.ph")
+        self.category = Category.objects.create(name="School supplies")
+        self.listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Lab gown",
+            description="Size M, used twice.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price=Decimal("300.00"),
+            quantity=2,
+            meetup_place="Main lobby",
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+        )
+
+    def request_order(self, **extra):
+        payload = {
+            "lines": [{"listing": self.listing.id, "quantity": 1}],
+            "fulfillment": "pickup",
+            "meetup_place": "Main lobby",
+        }
+        payload.update(extra)
+        self.client.force_authenticate(self.buyer)
+        return self.client.post("/api/v1/orders/", payload, format="json")
+
+    def test_cash_is_the_default_and_from_the_exchange(self):
+        body = self.request_order().json()
+
+        self.assertEqual(body["payment_method"], "cash")
+        self.assertEqual(body["payment_method_display"], "Cash at the campus meet-up")
+
+    def test_the_buyer_can_ask_for_a_person_to_person_transfer(self):
+        body = self.request_order(payment_method="p2p").json()
+
+        self.assertEqual(body["payment_method"], "p2p")
+        self.assertEqual(
+            body["payment_method_display"],
+            "Person-to-person transfer (GCash, Maya or bank)",
+        )
+
+    def test_the_seller_can_agree_on_something_else_and_the_buyer_is_told(self):
+        reference = self.request_order().json()["reference"]
+
+        self.client.force_authenticate(self.seller)
+        changed = self.client.post(
+            f"/api/v1/orders/{reference}/payment/", {"method": "p2p"}, format="json"
+        )
+
+        self.assertEqual(changed.status_code, status.HTTP_200_OK, changed.json())
+        self.assertEqual(changed.json()["payment_method"], "p2p")
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.buyer, text__contains="Person-to-person transfer"
+            ).exists()
+        )
+
+    def test_an_accepted_order_can_still_be_settled_either_way(self):
+        reference = self.request_order().json()["reference"]
+        self.client.force_authenticate(self.seller)
+        self.client.post(
+            f"/api/v1/orders/{reference}/transition/", {"status": "accepted"}, format="json"
+        )
+
+        self.client.force_authenticate(self.buyer)
+        changed = self.client.post(
+            f"/api/v1/orders/{reference}/payment/", {"method": "cash"}, format="json"
+        )
+
+        self.assertEqual(changed.status_code, status.HTTP_200_OK)
+        self.assertEqual(changed.json()["payment_method"], "cash")
+
+    def test_a_finished_order_keeps_the_method_it_was_settled_with(self):
+        reference = self.request_order(payment_method="p2p").json()["reference"]
+        self.client.force_authenticate(self.seller)
+        self.client.post(
+            f"/api/v1/orders/{reference}/transition/", {"status": "accepted"}, format="json"
+        )
+        self.client.post(
+            f"/api/v1/orders/{reference}/transition/", {"status": "completed"}, format="json"
+        )
+
+        refused = self.client.post(
+            f"/api/v1/orders/{reference}/payment/", {"method": "cash"}, format="json"
+        )
+
+        self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("stays as it was", str(refused.json()))
+
+    def test_a_stranger_cannot_set_it(self):
+        reference = self.request_order().json()["reference"]
+        self.client.force_authenticate(make_user("2024-999003@rtu.edu.ph"))
+
+        refused = self.client.post(
+            f"/api/v1/orders/{reference}/payment/", {"method": "p2p"}, format="json"
+        )
+
+        self.assertEqual(refused.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_anything_that_is_not_one_of_the_two_is_refused(self):
+        reference = self.request_order().json()["reference"]
+        self.client.force_authenticate(self.buyer)
+
+        refused = self.client.post(
+            f"/api/v1/orders/{reference}/payment/",
+            {"method": "credit_card"},
+            format="json",
+        )
+
+        self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)

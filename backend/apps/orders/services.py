@@ -41,6 +41,7 @@ def place_order(
     meetup_date=None,
     meetup_time="",
     note="",
+    payment_method=None,
 ):
     """lines = [{"listing": <Listing>, "quantity": int}], all from one seller."""
     if not getattr(buyer, "is_verified", False):
@@ -77,6 +78,8 @@ def place_order(
             meetup_date=meetup_date,
             meetup_time=meetup_time[:40],
             note=note,
+            payment_method=payment_method or Order.Payment.CASH,
+            payment_set_by=buyer,
         )
         for row in lines:
             listing = row["listing"]
@@ -95,6 +98,37 @@ def place_order(
         link_kind="shop",
         link_id=order.reference,
         actor=buyer,
+    )
+    return order
+
+
+def set_payment_method(order, method, *, by):
+    """OT-06: either party may agree how to pay, while the order is still open.
+
+    The platform records the choice and nothing else — no wallet, no gateway, no
+    card. A finished order keeps the method it was settled with, because a
+    completed record is a record.
+    """
+    allowed = {Order.Payment.CASH, Order.Payment.P2P}
+    if method not in allowed:
+        raise ValidationError("Choose cash at the meet-up or a person-to-person transfer.")
+    if by.pk not in (order.buyer_id, order.seller_id):
+        raise ValidationError("This is not your order.")
+    if not order.is_open:
+        raise ValidationError("This order is closed, so the payment method stays as it was.")
+    if order.payment_method == method:
+        return order
+    order.payment_method = method
+    order.payment_set_by = by
+    order.save(update_fields=["payment_method", "payment_set_by", "updated_at"])
+    other = order.seller if by.pk == order.buyer_id else order.buyer
+    notify(
+        other,
+        f"{by.display_name} set the payment method to {order.get_payment_method_display()} on {order.reference}.",
+        kind="order",
+        link_kind="order",
+        link_id=order.reference,
+        actor=by,
     )
     return order
 

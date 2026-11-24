@@ -11,10 +11,10 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 57 |
+| Implemented, verified | 58 |
 | Implemented | 79 |
 | Partial | 26 |
-| Not implemented | 5 |
+| Not implemented | 4 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
 | **total** | **174** |
@@ -142,7 +142,7 @@ browser or the tests in this repository.
 | OT-03 | The system shall track each order with these statuses: Pending, Accepted, Ready for Meet-up, Completed, Declined, and Cancelled. A Pending order ca... | Partly | Implemented, verified | requested, accepted, declined, cancelled, completed |
 | OT-04 | The system shall record an exact timestamp for every status transition within an order's lifecycle. | Built | Implemented | `apps/orders`, `apps/messaging` |
 | OT-05 | The system shall keep a record of each order (item, price, quantity, notes, and status history) even if the related chat messages, the listing, or... | Partly | Implemented | `apps/orders`, `apps/messaging` |
-| OT-06 | The system shall let the buyer and seller choose how payment will be made: cash at a campus meet-up or an e-wallet arranged with the seller. The sy... | Not yet | Not implemented | no payment method on an order; cash or e-wallet is not recorded |
+| OT-06 | The system shall let the buyer and seller choose how payment will be made: cash at a campus meet-up or an e-wallet arranged with the seller. The sy... | Not yet | Implemented, verified | cash at the meet-up or a person-to-person transfer, recorded on the order and changeable while open; nothing is processed |
 | OT-07 | The system shall show a user's contact number, if the user entered one, to the other party only while the order is Accepted or Ready for Meet-up, a... | Not yet | Implemented, verified | order payload shares the other party's number only while Accepted |
 | OT-08 | The system shall permit either the buyer or the seller to cancel an active order prior to its final completion. | Partly | Implemented | `apps/orders`, `apps/messaging` |
 | OT-09 | The system shall record the mutually agreed campus meet-up location and scheduled time for every transaction. | Built | Implemented | `apps/orders`, `apps/messaging` |
@@ -325,7 +325,6 @@ with the reason:
 
 | ID | Requirement | Why it is open |
 | --- | --- | --- |
-| OT-06 | The system shall let the buyer and seller choose how payment will be made: cash at a campus meet-up or an e-wallet arran | no payment method on an order; cash or e-wallet is not recorded |
 | OT-12 | The system shall cancel a Pending order that the seller has not answered within a set time, and shall tell the buyer and | a pending order is never auto-cancelled on a timer |
 | MS-04 | The system shall allow a participant to formally report a conversation thread for policy violations (refer to Section 3. | no report action on a conversation |
 | MS-05 | The system shall let a moderator see only the messages in a conversation that has been reported. | moderators cannot read a reported conversation |

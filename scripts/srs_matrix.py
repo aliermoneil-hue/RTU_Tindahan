@@ -91,7 +91,7 @@ DECIDED = {
     "EM-06": ("partial", "per-ticket email drafts exist in the UI; no outbox/preview screen"),
     # --- orders, messaging --------------------------------------------------
     "OT-03": ("verified", "requested, accepted, declined, cancelled, completed"),
-    "OT-06": ("open", "no payment method on an order; cash or e-wallet is not recorded"),
+    "OT-06": ("verified", "cash at the meet-up or a person-to-person transfer, recorded on the order and changeable while open; nothing is processed"),
     "OT-07": ("verified", "order payload shares the other party's number only while Accepted"),
     "OT-10": ("partial", "the seller completes; there is no second confirmation from the buyer"),
     "OT-11": ("verified", "accept moves stock; a decline or cancel returns it"),

@@ -30,6 +30,23 @@ class Order(models.Model):
         choices=Listing.Fulfillment.choices,
         default=Listing.Fulfillment.PICKUP,
     )
+    class Payment(models.TextChoices):
+        # OT-06: the platform records the choice and handles no money. There is
+        # no online payment and no wallet balance — cash changes hands at the
+        # meet-up, or the two students transfer to each other directly.
+        CASH = "cash", "Cash at the campus meet-up"
+        P2P = "p2p", "Person-to-person transfer (GCash, Maya or bank)"
+
+    payment_method = models.CharField(
+        max_length=8, choices=Payment.choices, default=Payment.CASH
+    )
+    payment_set_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="payment_choices_made",
+    )
     meetup_place = models.CharField(max_length=200, blank=True)
     meetup_date = models.DateField(null=True, blank=True)
     meetup_time = models.CharField(max_length=40, blank=True)

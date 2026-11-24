@@ -117,6 +117,7 @@ import {
   fetchOrders as fetchApiOrders,
   orderRecordFromApi,
   orderStatusFromApi,
+  setOrderPayment as setOrderPaymentApi,
   transitionOrder as transitionApiOrder,
   type ApiOrder,
 } from '../api/orders'
@@ -646,6 +647,7 @@ interface TindahanContextValue {
   /** Server-side requests: what I bought and what I sold. */
   apiOrders: ApiOrder[]
   refreshOrders: () => Promise<void>
+  setOrderPaymentMethod: (reference: string, method: 'cash' | 'p2p') => Promise<void>
   /** Open the server thread with another member and hop to Messages. */
   openThreadWith: (input: {
     sellerEmail?: string
@@ -713,6 +715,8 @@ interface TindahanContextValue {
   cartStep: 1 | 2 | 3
   setCartStep: (s: 1 | 2 | 3) => void
   cartMsg: string
+  cartPayment: 'cash' | 'p2p'
+  setCartPayment: (method: 'cash' | 'p2p') => void
   setCartMsg: (s: string) => void
   cartAgree: boolean
   setCartAgree: (b: boolean) => void
@@ -961,6 +965,26 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   // receives them. Both roles are fetched: one call returns what I bought and
   // what I sold.
   const [apiOrders, setApiOrders] = useState<ApiOrder[]>([])
+  // OT-06: either party records how the money will move; the server notifies
+  // the other one and refuses a closed order.
+  const setOrderPaymentMethod = useCallback(
+    async (reference: string, method: 'cash' | 'p2p') => {
+      try {
+        await setOrderPaymentApi(reference, method)
+        await refreshOrders()
+        toast(
+          method === 'cash'
+            ? 'Payment set to cash at the meet-up.'
+            : 'Payment set to a transfer between you.',
+        )
+      } catch (err) {
+        toast(err instanceof ApiRequestError ? err.message : 'That choice could not be saved.')
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
+
   const refreshOrders = useCallback(async () => {
     if (!getToken()) {
       setApiOrders([])
@@ -1247,6 +1271,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       refreshPendingListings,
       refreshMyListings,
       refreshOrders,
+      setOrderPaymentMethod,
       refreshConversations,
       refreshFavorites,
       refreshReviews,
@@ -1483,6 +1508,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
 
   // Cart UI state
   const [cartStep, setCartStep] = useState<1 | 2 | 3>(1)
+  // OT-06: cash at the meet-up, or a transfer between the two students. The
+  // platform records the choice and never touches the money.
+  const [cartPayment, setCartPayment] = useState<'cash' | 'p2p'>('cash')
   const [cartMsg, setCartMsg] = useState(
     'Hi! I will be at the pickup spot a few minutes early. Please confirm your preferred payment method after accepting.',
   )
@@ -3036,6 +3064,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
             meetupPlace: items[0].c.place || items[0].p.when,
             meetupTime: items[0].c.time || '',
             note: (cartMsg || '').trim(),
+            paymentMethod: cartPayment,
           })
           bySeller[owner] = order.reference
 
@@ -3087,6 +3116,8 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     currentAccount,
     cartAgree,
     cartMsg,
+    cartPayment,
+    setCartPayment,
     byId,
     allOnSale,
     baoOrderProblem,
@@ -8983,6 +9014,7 @@ const value = useMemo<TindahanContextValue>(
       refreshMyListings,
       apiOrders,
       refreshOrders,
+      setOrderPaymentMethod,
       actOnOrder,
       openThreadWith,
       moderateListing,
@@ -9029,6 +9061,8 @@ const value = useMemo<TindahanContextValue>(
       setCartStep,
       cartMsg,
       setCartMsg,
+      cartPayment,
+      setCartPayment,
       cartAgree,
       setCartAgree,
       cartErr,
@@ -9153,6 +9187,7 @@ const value = useMemo<TindahanContextValue>(
       refreshMyListings,
       apiOrders,
       refreshOrders,
+      setOrderPaymentMethod,
       actOnOrder,
       openThreadWith,
       moderateListing,
@@ -9199,6 +9234,7 @@ const value = useMemo<TindahanContextValue>(
       cartTotal,
       cartStep,
       cartMsg,
+      cartPayment,
       cartAgree,
       cartErr,
       addToCart,

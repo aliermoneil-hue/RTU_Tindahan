@@ -37,6 +37,8 @@ export function CartPage() {
     setCartMsg,
     cartAgree,
     setCartAgree,
+    cartPayment,
+    setCartPayment,
     cartErr,
     setCartErr,
     byId,
@@ -695,6 +697,32 @@ export function CartPage() {
                     value={cartMsg}
                     onChange={(e) => setCartMsg(e.target.value)}
                   />
+                </div>
+                <div className="field">
+                  <label>How will you pay?</label>
+                  <div className="row wrap" style={{ gap: 10 }}>
+                    {(
+                      [
+                        ['cash', 'Cash at the campus meet-up'],
+                        ['p2p', 'Transfer to the seller (GCash / Maya / bank)'],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <label key={value} className="check">
+                        <input
+                          type="radio"
+                          name="cpay"
+                          value={value}
+                          checked={cartPayment === value}
+                          onChange={() => setCartPayment(value)}
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="tiny muted">
+                    RTU Tindahan records this choice and nothing else. It never handles your money:
+                    cash changes hands at the meet-up, or you transfer to each other directly.
+                  </p>
                 </div>
                 <label className="check">
                   <input

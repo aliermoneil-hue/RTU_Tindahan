@@ -36,6 +36,9 @@ class OrderSerializer(serializers.ModelSerializer):
         max_digits=12, decimal_places=2, read_only=True
     )
     is_open = serializers.BooleanField(read_only=True)
+    payment_method_display = serializers.CharField(
+        source="get_payment_method_display", read_only=True
+    )
     buyer_contact = serializers.SerializerMethodField()
     seller_contact = serializers.SerializerMethodField()
 
@@ -48,6 +51,8 @@ class OrderSerializer(serializers.ModelSerializer):
             "buyer_name",
             "buyer_email",
             "buyer_contact",
+            "payment_method",
+            "payment_method_display",
             "seller",
             "seller_name",
             "seller_email",
@@ -112,6 +117,9 @@ class OrderCreateSerializer(serializers.Serializer):
     meetup_date = serializers.DateField(required=False, allow_null=True)
     meetup_time = serializers.CharField(required=False, allow_blank=True, default="", max_length=40)
     note = serializers.CharField(required=False, allow_blank=True, default="", max_length=1000)
+    payment_method = serializers.ChoiceField(
+        choices=Order.Payment.choices, required=False, default=Order.Payment.CASH
+    )
 
     def validate_lines(self, value):
         if not value:
@@ -129,6 +137,7 @@ class OrderCreateSerializer(serializers.Serializer):
                 meetup_date=validated_data.get("meetup_date"),
                 meetup_time=validated_data.get("meetup_time", ""),
                 note=validated_data.get("note", ""),
+                payment_method=validated_data.get("payment_method", Order.Payment.CASH),
             )
         except DjangoValidationError as exc:
             raise serializers.ValidationError(details(exc))
@@ -137,3 +146,7 @@ class OrderCreateSerializer(serializers.Serializer):
 class OrderTransitionSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Order.Status.choices)
     note = serializers.CharField(required=False, allow_blank=True, default="", max_length=500)
+
+
+class OrderPaymentSerializer(serializers.Serializer):
+    method = serializers.ChoiceField(choices=Order.Payment.choices)

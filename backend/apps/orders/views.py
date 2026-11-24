@@ -16,11 +16,12 @@ from apps.accounts.permissions import IsVerifiedUser
 from .models import Order
 from .serializers import (
     OrderCreateSerializer,
+    OrderPaymentSerializer,
     OrderSerializer,
     OrderTransitionSerializer,
     details,
 )
-from .services import change_order_status
+from .services import change_order_status, set_payment_method
 
 
 class OrderViewSet(
@@ -150,6 +151,20 @@ class OrderViewSet(
         serializer.is_valid(raise_exception=True)
         order = serializer.save()
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"])
+    def payment(self, request, reference=None):
+        """OT-06: either party records how the money will move. Nothing else."""
+        order = self.get_object()
+        serializer = OrderPaymentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            order = set_payment_method(
+                order, serializer.validated_data["method"], by=request.user
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(details(exc))
+        return Response(OrderSerializer(order, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["post"])
     def transition(self, request, reference=None):

@@ -288,6 +288,16 @@ a listing title cannot become a formula in someone's spreadsheet. The seller
 dashboard renders the filters over the rows it already holds and asks the server
 for the same window when downloading, so screen and file cannot disagree.
 
+**Payment method (OT-06).** The platform records *how* money will move and never
+moves any. Two choices only: `cash` — "Cash at the campus meet-up" — and `p2p` —
+"Person-to-person transfer (GCash, Maya or bank)". The buyer picks one when
+sending the request (`payment_method` on `POST /orders/`, default `cash`), and
+either party may change it while the order is open via
+`POST /orders/<ref>/payment/ {"method": "cash"|"p2p"}`; the other party is
+notified, and a closed order keeps the method it was settled with. There is no
+wallet, no gateway, no card field anywhere in the codebase — the requirement says
+the choice is only recorded, and that is all that was built.
+
 **Contact numbers (OT-07).** An order payload carries `buyer_contact` and
 `seller_contact`, and both are `null` unless the order is **Accepted** — then
 each party receives the *other* party's number, and only that one. The rule

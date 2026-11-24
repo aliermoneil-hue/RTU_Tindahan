@@ -59,6 +59,7 @@ export function MyShopPage() {
     myListings,
     refreshMyListings,
     apiOrders,
+    setOrderPaymentMethod,
     refreshOrders,
     actOnOrder,
     openThreadWith,
@@ -802,6 +803,24 @@ export function MyShopPage() {
                   >
                     Decline
                   </button>
+                  {order.is_open ? (
+                    <select
+                      className="input"
+                      aria-label="Payment method"
+                      value={order.payment_method}
+                      onChange={(e) =>
+                        void setOrderPaymentMethod(
+                          order.reference,
+                          e.target.value as 'cash' | 'p2p',
+                        )
+                      }
+                    >
+                      <option value="cash">Cash at meet-up</option>
+                      <option value="p2p">Transfer to buyer</option>
+                    </select>
+                  ) : (
+                    <span className="tiny muted">{order.payment_method_display}</span>
+                  )}
                   {order.buyer_contact ? (
                     <a
                       className="pill green"

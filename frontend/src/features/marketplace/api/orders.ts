@@ -43,6 +43,9 @@ export interface ApiOrder {
   seller_contact: string | null
   status: ApiOrderStatus
   status_display: string
+  /** OT-06: cash at the meet-up, or a transfer between the two students. */
+  payment_method: 'cash' | 'p2p'
+  payment_method_display: string
   fulfillment: 'pickup' | 'delivery' | 'both'
   meetup_place: string
   meetup_date: string | null
@@ -84,6 +87,7 @@ export async function createOrder(input: {
   meetupDate?: string | null
   meetupTime?: string
   note?: string
+  paymentMethod?: 'cash' | 'p2p'
 }): Promise<ApiOrder> {
   return apiFetch<ApiOrder>('/orders/', {
     method: 'POST',
@@ -94,7 +98,19 @@ export async function createOrder(input: {
       meetup_date: input.meetupDate || null,
       meetup_time: input.meetupTime ?? '',
       note: input.note ?? '',
+      payment_method: input.paymentMethod ?? 'cash',
     },
+  })
+}
+
+/** OT-06: either party may agree how to pay, while the order is open. */
+export async function setOrderPayment(
+  reference: string,
+  method: 'cash' | 'p2p',
+): Promise<ApiOrder> {
+  return apiFetch<ApiOrder>(`/orders/${reference}/payment/`, {
+    method: 'POST',
+    body: { method },
   })
 }
 

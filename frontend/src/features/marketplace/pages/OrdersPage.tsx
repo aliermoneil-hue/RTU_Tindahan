@@ -75,6 +75,7 @@ export function OrdersPage() {
     submitReview,
     openModal,
     apiOrders,
+    setOrderPaymentMethod,
     actOnOrder,
     refreshOrders,
     openThreadWith,
@@ -267,6 +268,24 @@ export function OrdersPage() {
                   >
                     {order.status_display}
                   </span>
+                  {order.is_open ? (
+                    <select
+                      className="input"
+                      aria-label="Payment method"
+                      value={order.payment_method}
+                      onChange={(e) =>
+                        void setOrderPaymentMethod(
+                          order.reference,
+                          e.target.value as 'cash' | 'p2p',
+                        )
+                      }
+                    >
+                      <option value="cash">Cash at meet-up</option>
+                      <option value="p2p">Transfer to seller</option>
+                    </select>
+                  ) : (
+                    <span className="tiny muted">{order.payment_method_display}</span>
+                  )}
                   {order.seller_contact ? (
                     <a
                       className="pill green"
