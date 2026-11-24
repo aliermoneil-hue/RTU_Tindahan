@@ -67,8 +67,16 @@ then the honest statement is: "creation is bounded by the AI provider, at roughl
 | crowd | requests | p50 | p95 | p99 | failures |
 |---|---|---|---|---|---|
 | 50 users, think 1.0 s | 1,177 | 42 ms | 753 ms | 1.59 s | 5 (stock rules) |
+| 50 users, clean database | 1,043 | 48 ms | 2.03 s | 3.63 s | 8 (stock rules) |
 | 200 users, think 2.0 s, 12 slots | 2,621 | 917 ms | 3.64 s | 4.45 s | 48 (26 stock rules, 22 sign-in throttle) |
 | 200 users, think 2.0 s, 36 slots | 2,194 | 562 ms | 3.35 s | 4.59 s | 12 |
+
+A note on the second row: the harness writes real rows, and a run that creates
+listings leaves them behind, so a later run measures a larger marketplace than the
+one before it. The clean run is the honest baseline — 40 listings, one seller
+population. The p95 in that row is inflated by the create-listing scenario alone
+(its p99 reaches 6.2 s because it waits for Gemini); every read scenario stayed
+between 30 and 50 ms at p50.
 
 What this says:
 
