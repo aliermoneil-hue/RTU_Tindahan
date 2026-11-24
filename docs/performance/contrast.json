@@ -1,0 +1,258 @@
+{
+  "light": [
+    {
+      "label": "Body text on a card",
+      "fg": "#12233d",
+      "bg": "#ffffff",
+      "ratio": 15.75,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Body text on the page",
+      "fg": "#12233d",
+      "bg": "#f2f5f9",
+      "ratio": 14.4,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Secondary text on a card",
+      "fg": "#5c6b83",
+      "bg": "#ffffff",
+      "ratio": 5.4,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Secondary text on the page",
+      "fg": "#5c6b83",
+      "bg": "#f2f5f9",
+      "ratio": 4.94,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Text on a soft panel",
+      "fg": "#12233d",
+      "bg": "#eaf0f8",
+      "ratio": 13.74,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Secondary text on a soft panel",
+      "fg": "#5c6b83",
+      "bg": "#eaf0f8",
+      "ratio": 4.71,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Sidebar text",
+      "fg": "#d6e2f3",
+      "bg": "#0e2f5a",
+      "ratio": 10.19,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Sidebar secondary text",
+      "fg": "#8fa6c6",
+      "bg": "#0e2f5a",
+      "ratio": 5.36,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Button label (blue)",
+      "fg": "#ffffff",
+      "bg": "#1f5fae",
+      "ratio": 6.35,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Button label (yellow)",
+      "fg": "#3a2a00",
+      "bg": "#f4b63a",
+      "ratio": 7.68,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Success text",
+      "fg": "#17734a",
+      "bg": "#e6f5ec",
+      "ratio": 5.19,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Danger text",
+      "fg": "#c0392b",
+      "bg": "#fbeae8",
+      "ratio": 4.67,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Link text on a card",
+      "fg": "#1f5fae",
+      "bg": "#ffffff",
+      "ratio": 6.35,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Heading on the page (large)",
+      "fg": "#12233d",
+      "bg": "#f2f5f9",
+      "ratio": 14.4,
+      "required": 3.0,
+      "pass": true,
+      "note": ""
+    }
+  ],
+  "dark": [
+    {
+      "label": "Body text on a card",
+      "fg": "#e4e6eb",
+      "bg": "#1f2125",
+      "ratio": 12.91,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Body text on the page",
+      "fg": "#e4e6eb",
+      "bg": "#16171a",
+      "ratio": 14.35,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Secondary text on a card",
+      "fg": "#9aa0aa",
+      "bg": "#1f2125",
+      "ratio": 6.13,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Secondary text on the page",
+      "fg": "#9aa0aa",
+      "bg": "#16171a",
+      "ratio": 6.81,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Text on a soft panel",
+      "fg": "#e4e6eb",
+      "bg": "#2a2d33",
+      "ratio": 11.05,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Secondary text on a soft panel",
+      "fg": "#9aa0aa",
+      "bg": "#2a2d33",
+      "ratio": 5.25,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Sidebar text",
+      "fg": "#e4e6eb",
+      "bg": "#121417",
+      "ratio": 14.78,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Sidebar secondary text",
+      "fg": "#9aa0aa",
+      "bg": "#121417",
+      "ratio": 7.01,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Button label (blue)",
+      "fg": "#121417",
+      "bg": "#6ba3f7",
+      "ratio": 7.21,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Button label (yellow)",
+      "fg": "#16171a",
+      "bg": "#e5b54c",
+      "ratio": 9.43,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Success text",
+      "fg": "#6fcf97",
+      "bg": "#1f2a24",
+      "ratio": 7.81,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Danger text",
+      "fg": "#f48383",
+      "bg": "#3c2b2f",
+      "ratio": 5.33,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Link text on a card",
+      "fg": "#6ba3f7",
+      "bg": "#1f2125",
+      "ratio": 6.3,
+      "required": 4.5,
+      "pass": true,
+      "note": ""
+    },
+    {
+      "label": "Heading on the page (large)",
+      "fg": "#e4e6eb",
+      "bg": "#16171a",
+      "ratio": 14.35,
+      "required": 3.0,
+      "pass": true,
+      "note": ""
+    }
+  ]
+}

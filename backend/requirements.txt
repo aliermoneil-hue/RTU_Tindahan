@@ -4,3 +4,4 @@ django-cors-headers==4.9.0
 python-dotenv==1.2.4
 psycopg[binary]==3.3.6
 Pillow==11.3.0
+gunicorn==27.0.1

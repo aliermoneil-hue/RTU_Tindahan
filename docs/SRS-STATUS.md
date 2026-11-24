@@ -11,12 +11,12 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 72 |
-| Implemented | 79 |
+| Implemented, verified | 75 |
+| Implemented | 80 |
 | Partial | 16 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
-| Not measured | 5 |
+| Not measured | 1 |
 | **total** | **174** |
 
 Legend for the note column: an identifier code citation (`AI-03`) means
@@ -261,10 +261,10 @@ browser or the tests in this repository.
 
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
-| PF-01 | Normal pages shall load within 3 seconds for at least 95% of page loads, measured on the pilot campus network and on mobile data. | Not measured | Not measured | no load measurement was run |
-| PF-02 | Marketplace search queries and filtered views shall return results within 3 seconds. | Not measured | Not measured | no load measurement was run |
+| PF-01 | Normal pages shall load within 3 seconds for at least 95% of page loads, measured on the pilot campus network and on mobile data. | Not measured | Implemented | deployed page + bundle p95 0.78 s and API p95 0.63 s at 200 users, from a home connection rather than the pilot campus network; docs/PERFORMANCE.md |
+| PF-02 | Marketplace search queries and filtered views shall return results within 3 seconds. | Not measured | Implemented, verified | search p95 0.65 s and every filtered view under 0.8 s at 200 online users |
 | PF-03 | AI screening shall normally finish within 30 seconds. While waiting, the user shall be told the content is pending. | Not yet | Implemented, verified | screening answered in ~1 s live; a member sees the item pending meanwhile |
-| PF-04 | The system shall support at least 200 users online at the same time. | Not measured | Not measured | no load measurement was run |
+| PF-04 | The system shall support at least 200 users online at the same time. | Not measured | Implemented, verified | 200 concurrent users sustained, zero failures, p95 0.63 s online and 2.73 s in a burst |
 
 ## Security (SE)
 
@@ -295,10 +295,10 @@ browser or the tests in this repository.
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
 | UX-01 | Every function shall be usable on phone browsers with screen widths of 360 pixels, with no sideways scrolling of the page. | Partly | Implemented, verified | twenty-five routes measured at 360 px with no page-level sideways scrolling; docs/UX-360.md |
-| UX-02 | In a test with 10 new users, at least 8 shall post a listing within 5 minutes without instructions. | Not yet | Not measured | no usability or contrast measurement was run |
+| UX-02 | In a test with 10 new users, at least 8 shall post a listing within 5 minutes without instructions. | Not yet | Not measured | needs ten people and a stopwatch; not something a script can answer |
 | UX-03 | The interface shall be in plain English. Listings, posts, and messages may be written in English, Filipino, or a mix of both. | Built | Implemented | the interface is in English throughout |
 | UX-04 | The system shall display clear, human-readable error messages whenever an exception occurs and guide the user on corrective next steps. | Built | Implemented, verified | API errors carry a human-readable message that the client shows |
-| UX-05 | Text and background colors shall meet WCAG 2.1 level AA contrast: at least 4.5 to 1 for normal text and 3 to 1 for large text. | Not measured | Not measured | no contrast measurement was run |
+| UX-05 | Text and background colors shall meet WCAG 2.1 level AA contrast: at least 4.5 to 1 for normal text and 3 to 1 for large text. | Not measured | Implemented, verified | contrast audit of both themes, 0 failures; three token values were corrected to pass |
 
 ## Reliability (RL)
 

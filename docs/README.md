@@ -29,6 +29,11 @@ Suggested contents, copied from the CapStone folder:
 - `PRIVACY.md` — PR-01: the privacy notice itself — what is collected and why,
   who sees it, how long it is kept, the rights and where each is exercised, and
   what is verified by tests rather than asserted.
+- `PERFORMANCE.md` — PF-01, PF-02, PF-04: the load test, the hardware the
+  numbers describe, the page-load timing, and the two changes they forced
+  (gunicorn, SQLite in WAL mode).
+- `ACCESSIBILITY.md` — UX-05: the contrast audit of both themes, the three token
+  values it failed, and what it cannot cover.
 - `UX-360.md` — UX-01: the measurement of every page at 360 px, the two wide
   elements that are intentional scroll containers, and the one cosmetic note.
 - `SCREENING-RULES.md` — AI-10: the two kinds of screening phrase, the seed and

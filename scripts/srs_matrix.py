@@ -55,8 +55,8 @@ PREFIX = {
     "PX": ("implemented", "favorites, profile, staff tools"),
     "SE": ("implemented", "`config/settings.py`, `apps/accounts`"),
     "PR": ("verified", "the notice is in the app and docs/PRIVACY.md; behaviour traced to tests"),
-    "PF": ("unmeasured", "no load measurement was run"),
-    "UX": ("unmeasured", "no usability or contrast measurement was run"),
+    "PF": ("verified", "measured: docs/PERFORMANCE.md, scripts/load_test.py"),
+    "UX": ("unmeasured", "needs ten people and a stopwatch; not something a script can answer"),
     "RL": ("implemented", "systemd `Restart=always`, nightly verified backups, CI"),
     "MN": ("implemented", "11 apps, 30 models, docs/ set"),
 }
@@ -64,6 +64,11 @@ PREFIX = {
 # id -> (state, note). Only IDs whose answer is not the prefix default, or
 # where the evidence is worth naming, appear here.
 DECIDED = {
+    # --- performance and usability, measured ---------------------------------
+    "PF-01": ("implemented", "deployed page + bundle p95 0.78 s and API p95 0.63 s at 200 users, from a home connection rather than the pilot campus network; docs/PERFORMANCE.md"),
+    "PF-02": ("verified", "search p95 0.65 s and every filtered view under 0.8 s at 200 online users"),
+    "PF-03": ("verified", "screening answers in about a second, and held content says so while it waits"),
+    "PF-04": ("verified", "200 concurrent users sustained, zero failures, p95 0.63 s online and 2.73 s in a burst"),
     # --- accounts -----------------------------------------------------------
     "AV-01": ("verified", "register endpoint; `tests/test_api.py`"),
     "AV-02": ("verified", "RTU address validator; `tests/test_api.py`"),
@@ -170,7 +175,7 @@ DECIDED = {
     "UX-01": ("verified", "twenty-five routes measured at 360 px with no page-level sideways scrolling; docs/UX-360.md"),
     "UX-03": ("implemented", "the interface is in English throughout"),
     "UX-04": ("verified", "API errors carry a human-readable message that the client shows"),
-    "UX-05": ("unmeasured", "no contrast measurement was run"),
+    "UX-05": ("verified", "contrast audit of both themes, 0 failures; three token values were corrected to pass"),
 }
 
 
