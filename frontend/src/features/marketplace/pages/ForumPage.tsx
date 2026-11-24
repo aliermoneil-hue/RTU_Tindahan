@@ -8,6 +8,7 @@ import type { ForumPost } from '../types'
 import { AvatarBadge } from '../components/AvatarBadge'
 import { PhotoUploader } from '../components/PhotoUploader'
 import { ScreeningNotice } from '@/common/components/ScreeningNotice'
+import { ScheduleLine } from '../components/ScheduleLine'
 import './ForumPage.css'
 
 function postTitle(f: ForumPost): string {
@@ -44,6 +45,13 @@ export function ForumPage() {
   const [topic, setTopic] = useState<string>(TOPICS[0])
   const [asNotice, setAsNotice] = useState(false)
   const [imgs, setImgs] = useState<string[]>([])
+  // CF-05: a selling schedule is an appointment, so the composer asks for one.
+  const [eventDate, setEventDate] = useState('')
+  const [eventStart, setEventStart] = useState('')
+  const [eventEnd, setEventEnd] = useState('')
+  const [eventPlace, setEventPlace] = useState('')
+  const [eventErr, setEventErr] = useState<string | null>(null)
+  const isSellingSchedule = topic === 'Selling schedule'
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null)
   const [openReactPostId, setOpenReactPostId] = useState<string | null>(null)
 
@@ -135,11 +143,37 @@ export function ForumPage() {
         noValidate
         onSubmit={(e) => {
           e.preventDefault()
-          if (createForumPost(title, body, topic, notice, imgs)) {
+          if (isSellingSchedule && !notice) {
+            if (!eventDate || !eventStart || !eventPlace.trim()) {
+              setEventErr(
+                'A selling schedule needs a date, a start time and a campus location.',
+              )
+              return
+            }
+            if (eventEnd && eventEnd <= eventStart) {
+              setEventErr('The end time must be after the start time.')
+              return
+            }
+          }
+          setEventErr(null)
+          const schedule =
+            isSellingSchedule && !notice
+              ? {
+                  date: eventDate,
+                  start: eventStart,
+                  end: eventEnd || undefined,
+                  place: eventPlace.trim(),
+                }
+              : undefined
+          if (createForumPost(title, body, topic, notice, imgs, schedule)) {
             setTitle('')
             setBody('')
             setImgs([])
             setAsNotice(false)
+            setEventDate('')
+            setEventStart('')
+            setEventEnd('')
+            setEventPlace('')
             setForumSort('latest')
           }
         }}
@@ -175,6 +209,55 @@ export function ForumPage() {
           label="Photos (optional)"
           onChange={setImgs}
         />
+
+        {isSellingSchedule && !notice && (
+          <div className="stack" style={{ gap: 6 }}>
+            <div className="row wrap small" style={{ gap: 10 }}>
+              <label className="small" style={{ gap: 4 }}>
+                Selling on
+                <input
+                  className="input"
+                  type="date"
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                />
+              </label>
+              <label className="small" style={{ gap: 4 }}>
+                From
+                <input
+                  className="input"
+                  type="time"
+                  value={eventStart}
+                  onChange={(e) => setEventStart(e.target.value)}
+                />
+              </label>
+              <label className="small" style={{ gap: 4 }}>
+                To (optional)
+                <input
+                  className="input"
+                  type="time"
+                  value={eventEnd}
+                  onChange={(e) => setEventEnd(e.target.value)}
+                />
+              </label>
+              <label className="small grow" style={{ gap: 4 }}>
+                Campus location
+                <input
+                  className="input"
+                  maxLength={120}
+                  value={eventPlace}
+                  placeholder="Main lobby, beside the guard house"
+                  onChange={(e) => setEventPlace(e.target.value)}
+                />
+              </label>
+            </div>
+            {eventErr && (
+              <p className="small" role="alert" style={{ color: 'var(--danger, #b3261e)' }}>
+                {eventErr}
+              </p>
+            )}
+          </div>
+        )}
 
         <ScreeningNotice />
 
@@ -483,6 +566,13 @@ export function ForumPage() {
                     </button>
                   </h3>
                 )}
+
+                <ScheduleLine
+                  date={f.eventDate}
+                  start={f.eventStart}
+                  end={f.eventEnd}
+                  place={f.eventPlace}
+                />
 
                 {showTitle ? (
                   bodyStr &&

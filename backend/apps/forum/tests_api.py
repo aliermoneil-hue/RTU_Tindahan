@@ -6,6 +6,9 @@ import tempfile
 from decimal import Decimal
 
 from django.test import override_settings
+from datetime import timedelta
+
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -729,3 +732,74 @@ class ForumCommentScreeningApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["moderation_status"], "needs_review")
         self.assertEqual(self.read_post(post_id, self.other)["comments"], [])
+
+
+class SellingSchedulePostTests(APITestCase):
+    """CF-05: a Selling schedule post is an appointment, and the server says so."""
+
+    def setUp(self):
+        self.user = make_user("2024-333001@rtu.edu.ph")
+        self.client.force_authenticate(self.user)
+
+    def post(self, **payload):
+        body = {"topic": "Selling schedule", "title": "Selling this Saturday", "body": "Come by."}
+        body.update(payload)
+        return self.client.post("/api/v1/forum/posts/", body, format="json")
+
+    def test_a_schedule_without_a_date_is_refused(self):
+        response = self.post(event_start="14:00", event_place="Main lobby")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("a date", str(response.json()))
+
+    def test_a_schedule_without_a_place_is_refused(self):
+        tomorrow = (timezone.localdate() + timedelta(days=1)).isoformat()
+        response = self.post(event_date=tomorrow, event_start="14:00")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("a campus location", str(response.json()))
+
+    def test_a_schedule_in_the_past_is_refused(self):
+        yesterday = (timezone.localdate() - timedelta(days=1)).isoformat()
+        response = self.post(
+            event_date=yesterday, event_start="14:00", event_place="Main lobby"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("cannot be set in the past", str(response.json()))
+
+    def test_an_end_time_before_the_start_is_refused(self):
+        tomorrow = (timezone.localdate() + timedelta(days=1)).isoformat()
+        response = self.post(
+            event_date=tomorrow,
+            event_start="16:00",
+            event_end="14:00",
+            event_place="Main lobby",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("end time must be after", str(response.json()))
+
+    def test_a_complete_schedule_is_published_and_read_back(self):
+        tomorrow = (timezone.localdate() + timedelta(days=1)).isoformat()
+        created = self.post(
+            event_date=tomorrow,
+            event_start="14:00",
+            event_end="16:00",
+            event_place="Main lobby, beside the guard house",
+        )
+
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.json())
+        body = self.client.get(f"/api/v1/forum/posts/{created.json()['id']}/").json()
+        self.assertEqual(body["topic"], "Selling schedule")
+        self.assertEqual(body["event_date"], tomorrow)
+        self.assertEqual(body["event_start"], "14:00:00")
+        self.assertEqual(body["event_end"], "16:00:00")
+        self.assertEqual(body["event_place"], "Main lobby, beside the guard house")
+
+    def test_a_discussion_post_still_needs_no_appointment(self):
+        response = self.post(topic="General", title="Anyone selling a calculator?")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.json())
+        self.assertIsNone(response.json()["event_date"])
+        self.assertEqual(response.json()["event_place"], "")

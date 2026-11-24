@@ -117,7 +117,7 @@ export const REACTS: [ReactionKey, string, string][] = [
   ['sad', '😢', 'Sad'],
 ]
 
-export const TOPICS = ['General', 'Questions', 'Buy & sell tips', 'Lost & found', 'Events']
+export const TOPICS = ['General', 'Questions', 'Selling schedule', 'Buy & sell tips', 'Lost & found', 'Events']
 
 export const FR_REASONS = [
   'Spam or advertising',

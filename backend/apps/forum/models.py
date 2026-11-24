@@ -43,6 +43,13 @@ class ForumPost(models.Model):
     )
     # Storage names, not URLs: the serializer builds absolute media URLs.
     images = models.JSONField(default=list, blank=True)
+    # CF-05: a Selling schedule post is an appointment, so the appointment is
+    # structured rather than buried in the body. All four are blank on every
+    # other topic — a discussion post has no date to keep.
+    event_date = models.DateField(null=True, blank=True)
+    event_start = models.TimeField(null=True, blank=True)
+    event_end = models.TimeField(null=True, blank=True)
+    event_place = models.CharField(max_length=120, blank=True)
     pinned = models.BooleanField(default=False)
     hidden_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

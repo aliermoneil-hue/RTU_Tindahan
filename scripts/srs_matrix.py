@@ -111,7 +111,7 @@ DECIDED = {
     "SD-04": ("verified", "GET /orders/export/ returns the seller's own rows as CSV, filters honoured"),
     # --- forum --------------------------------------------------------------
     "CF-01": ("verified", "topics, notices, pinned announcements"),
-    "CF-05": ("open", "a selling-schedule post has no structured date, time or location"),
+    "CF-05": ("verified", "Selling schedule topic requires a validated date, start time and campus place; end time optional"),
     "CF-06": ("verified", "posts and comments are held on a flag; `forum/tests_api.py`"),
     "CF-07": ("verified", "author edit/delete, moderator hide/restore, tombstone"),
     # --- screening ----------------------------------------------------------

@@ -168,6 +168,12 @@ class ForumPostViewSet(
             body=data.get("body", ""),
             author=request.user,
             images=save_images(data.get("images"), request),
+            # CF-05: kept on every topic (blank elsewhere) so a Selling schedule
+            # post is an appointment the server validated, not prose.
+            event_date=data.get("event_date"),
+            event_start=data.get("event_start"),
+            event_end=data.get("event_end"),
+            event_place=data.get("event_place", ""),
         )
         # Screen before anyone is told about it: a notice that screening holds
         # must not fan out to the whole campus first.
@@ -205,7 +211,7 @@ class ForumPostViewSet(
         serializer = self.get_serializer(post, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        for field in ("title", "body", "topic"):
+        for field in ("title", "body", "topic", "event_date", "event_start", "event_end", "event_place"):
             if field in data:
                 setattr(post, field, data[field])
         if "images" in data:

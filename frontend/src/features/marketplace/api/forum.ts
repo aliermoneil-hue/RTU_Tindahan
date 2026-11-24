@@ -59,6 +59,10 @@ export interface ApiForumPost {
   topic: string
   title: string
   body: string
+  event_date: string | null
+  event_start: string | null
+  event_end: string | null
+  event_place: string
   author_name: string
   author_role: string
   is_mine: boolean
@@ -157,6 +161,11 @@ export interface ForumPostInput {
   title: string
   body: string
   images?: string[]
+  /** CF-05: required by the server when the topic is a selling schedule. */
+  event_date?: string | null
+  event_start?: string | null
+  event_end?: string | null
+  event_place?: string | null
 }
 
 export function createForumPost(input: ForumPostInput): Promise<ApiForumPost> {
@@ -297,6 +306,10 @@ export function forumPostFromApi(row: ApiForumPost, viewerEmail: string): ForumP
     held: row.moderation_status === 'needs_review',
     screening: row.screening ?? undefined,
     imgs: row.images,
+    eventDate: row.event_date ?? null,
+    eventStart: row.event_start ?? null,
+    eventEnd: row.event_end ?? null,
+    eventPlace: row.event_place || null,
     reacts: reactionsFor(row, viewerEmail),
     comments: row.comments.map((c) => commentFromApi(c, viewerEmail)),
   }

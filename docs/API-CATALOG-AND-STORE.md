@@ -300,6 +300,14 @@ and on the seller's Incoming orders tab.
 
 ## 9. Forum API (posts, comments, reactions, reports)
 
+**Selling schedule posts (CF-05).** A post whose `topic` is `Selling schedule`
+is an appointment, and the server enforces it: `event_date`, `event_start` and
+`event_place` are required (an `event_end` is optional but must be after the
+start), the date cannot be in the past, and a missing field returns a sentence
+that names what is missing — `A selling schedule needs a date, a start time and a
+campus location.` The four fields are blank on every other topic. Both the forum
+card and the post page render the appointment as one line under the title.
+
 | Method | Path | Who | Notes |
 | --- | --- | --- | --- |
 | GET | `/api/v1/forum/posts/` | public | Hidden and screening-held posts are excluded for everyone except their author and staff; `?topic=`, `?kind=`, `?author=me`, `?moderation=visible,needs_review` |

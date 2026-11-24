@@ -11,10 +11,10 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 53 |
+| Implemented, verified | 54 |
 | Implemented | 79 |
 | Partial | 26 |
-| Not implemented | 9 |
+| Not implemented | 8 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
 | **total** | **174** |
@@ -190,7 +190,7 @@ browser or the tests in this repository.
 | CF-02 | The system shall allow verified users to publish discussion posts and comments within permitted forum categories. | Built | Implemented | `apps/forum` |
 | CF-03 | The system shall restrict posting privileges within the Announcements category exclusively to designated Office Staff and Administrators. | - | Implemented | `apps/forum` |
 | CF-04 | The system shall pin official announcements to the top of the forum interface for prominent visibility. | - | Implemented | `apps/forum` |
-| CF-05 | The system shall require users creating Selling Schedule posts to specify a valid date, time, and campus location. | - | Not implemented | a selling-schedule post has no structured date, time or location |
+| CF-05 | The system shall require users creating Selling Schedule posts to specify a valid date, time, and campus location. | - | Implemented, verified | Selling schedule topic requires a validated date, start time and campus place; end time optional |
 | CF-06 | The system shall hold all newly submitted forum posts and comments for automated AI screening prior to public display. | - | Implemented, verified | posts and comments are held on a flag; `forum/tests_api.py` |
 | CF-07 | The system shall let the author edit or delete their own posts and comments. An edited post or comment shall be screened again before the change is... | - | Implemented, verified | author edit/delete, moderator hide/restore, tombstone |
 
@@ -331,7 +331,6 @@ with the reason:
 | MS-05 | The system shall let a moderator see only the messages in a conversation that has been reported. | moderators cannot read a reported conversation |
 | RR-04 | The system shall hold review text for AI screening before it is published. | reviews are not screened on purpose: `docs/SCREENING.md` §6 |
 | SD-03 | The system shall allow sellers to filter their historical sales records by date range and order status. | no date-range or status filter on sales history |
-| CF-05 | The system shall require users creating Selling Schedule posts to specify a valid date, time, and campus location. | a selling-schedule post has no structured date, time or location |
 | AI-03 | The system shall automatically publish submissions that receive an Approved classification. | a clean verdict still waits for a human: `docs/SCREENING.md` §6 |
 | AI-06 | The system shall let a user appeal a Rejected decision after a moderator has confirmed it (AI-11). A different moderator | no appeal flow for a rejected item |
 | AI-10 | The system shall let an Administrator update the screening rules without changing the program code. | screening rules live in `providers.py`, not in an admin-editable table |

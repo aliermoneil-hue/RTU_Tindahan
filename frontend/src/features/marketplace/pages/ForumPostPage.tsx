@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ScreeningNotice } from '@/common/components/ScreeningNotice'
+import { ScheduleLine } from '../components/ScheduleLine'
 import { Icon } from '@/common/components/Icon'
 import { navigate, useRoute } from '@/common/router/router'
 import { REACTS, ago, peso, priceLabel, stamp } from '../constants'
@@ -632,6 +633,12 @@ export function ForumPostPage() {
           ) : (
             <>
               <h1 className="ptitle">{postTitle(f)}</h1>
+              <ScheduleLine
+                date={f.eventDate}
+                start={f.eventStart}
+                end={f.eventEnd}
+                place={f.eventPlace}
+              />
               {!(
                 f.kind === 'post' &&
                 !String(f.title || '').trim() &&

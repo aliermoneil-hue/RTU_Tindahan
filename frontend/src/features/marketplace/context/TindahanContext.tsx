@@ -789,7 +789,14 @@ interface TindahanContextValue {
   openContextOrder: (orderId: string, convId: string) => void
 
   // Forum
-  createForumPost: (title: string, body: string, topic: string, asNotice: boolean, imgs: string[]) => boolean
+  createForumPost: (
+    title: string,
+    body: string,
+    topic: string,
+    asNotice: boolean,
+    imgs: string[],
+    schedule?: { date: string; start: string; end?: string; place: string },
+  ) => boolean
   editForumPost: (postId: string, title: string, body: string) => boolean
   deleteForumPost: (postId: string) => void
   toggleForumReaction: (postId: string, react: ReactionKey) => void
@@ -5681,7 +5688,14 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
 
   // Forum actions
   const createForumPost = useCallback(
-    (title: string, body: string, topic: string, asNotice: boolean, imgs: string[]): boolean => {
+    (
+      title: string,
+      body: string,
+      topic: string,
+      asNotice: boolean,
+      imgs: string[],
+      schedule?: { date: string; start: string; end?: string; place: string },
+    ): boolean => {
       if (!currentAccount) return false
       const cleanTitle = title.trim().slice(0, 120)
       const cleanBody = body.trim().slice(0, 2000)
@@ -5704,6 +5718,16 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         title: cleanTitle,
         body: cleanBody,
         images,
+        // CF-05: the server refuses a selling schedule without these, so the
+        // form sends exactly what it validated.
+        ...(schedule
+          ? {
+              event_date: schedule.date,
+              event_start: schedule.start,
+              event_end: schedule.end || null,
+              event_place: schedule.place,
+            }
+          : {}),
       })
         .then(async () => {
           await Promise.all([

@@ -3,6 +3,7 @@ import binascii
 import re
 import uuid
 
+from django.utils import timezone
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from rest_framework import serializers
@@ -145,6 +146,10 @@ class ForumPostSerializer(serializers.ModelSerializer):
             "topic",
             "title",
             "body",
+            "event_date",
+            "event_start",
+            "event_end",
+            "event_place",
             "author_name",
             "author_role",
             "is_mine",
@@ -250,6 +255,9 @@ class ForumPostSerializer(serializers.ModelSerializer):
         return None
 
 
+SELLING_SCHEDULE_TOPICS = {"selling schedule", "selling-schedule", "selling schedules"}
+
+
 class ForumPostWriteSerializer(serializers.ModelSerializer):
     images = serializers.ListField(
         child=serializers.CharField(allow_blank=False), required=False, write_only=True
@@ -257,7 +265,25 @@ class ForumPostWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ForumPost
-        fields = ("kind", "topic", "title", "body", "images")
+        fields = (
+            "kind",
+            "topic",
+            "title",
+            "body",
+            "images",
+            "event_date",
+            "event_start",
+            "event_end",
+            "event_place",
+        )
+
+    def validate_event_date(self, value):
+        """CF-05: a schedule for a day that has passed is not a schedule."""
+        if value and value < timezone.localdate():
+            raise serializers.ValidationError(
+                "A selling schedule cannot be set in the past. Pick today or a later day."
+            )
+        return value
 
     def validate(self, attrs):
         title = (attrs.get("title") or "").strip()
@@ -271,6 +297,35 @@ class ForumPostWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("The post is limited to 2000 characters.")
         attrs["title"] = title
         attrs["body"] = body
+
+        # CF-05: the Selling schedule topic is an appointment, so the server —
+        # not only the form — insists on the day, the time and the place.
+        topic = (attrs.get("topic") or "").strip().lower()
+        if topic in SELLING_SCHEDULE_TOPICS:
+            missing = []
+            if not attrs.get("event_date"):
+                missing.append("a date")
+            if not attrs.get("event_start"):
+                missing.append("a start time")
+            if not (attrs.get("event_place") or "").strip():
+                missing.append("a campus location")
+            if missing:
+                if len(missing) == 1:
+                    phrase = missing[0]
+                elif len(missing) == 2:
+                    phrase = f"{missing[0]} and {missing[1]}"
+                else:
+                    phrase = f"{', '.join(missing[:-1])} and {missing[-1]}"
+                raise serializers.ValidationError(
+                    f"A selling schedule needs {phrase}."
+                )
+            start = attrs.get("event_start")
+            end = attrs.get("event_end")
+            if start and end and end <= start:
+                raise serializers.ValidationError(
+                    {"event_end": "The end time must be after the start time."}
+                )
+            attrs["event_place"] = (attrs.get("event_place") or "").strip()
         return attrs
 
 
