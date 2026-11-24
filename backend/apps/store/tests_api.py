@@ -868,3 +868,93 @@ class StoreRuleSettingsTests(StoreApiTestCase):
         )
 
         self.assertEqual(refused.status_code, 403)
+
+
+class WalkInSaleStudentTests(StoreApiTestCase):
+    """FF-02: a walk-in sale can name the student, and then the limit applies —
+    but never the ordering window."""
+
+    def sell(self, **body):
+        self.client.force_authenticate(self.staff)
+        payload = {"items": [{"variant": self.variant.pk, "quantity": 1}], **body}
+        return self.client.post("/api/v1/store/sales/", payload, format="json")
+
+    def test_a_sale_linked_by_email_names_the_student_on_the_ledger(self):
+        done = self.sell(buyer=self.student.email)
+
+        self.assertEqual(done.status_code, 201, done.content)
+        movement = done.json()["movements"][0]
+        self.assertEqual(movement["buyer_email"], self.student.email)
+        self.assertEqual(movement["buyer_name"], self.student.display_name)
+
+    def test_a_sale_linked_by_student_number_works_too(self):
+        number = self.student.email.split("@")[0]
+
+        done = self.sell(buyer=number)
+
+        self.assertEqual(done.status_code, 201, done.content)
+        self.assertEqual(done.json()["movements"][0]["buyer_email"], self.student.email)
+
+    def test_a_sale_without_a_student_stays_a_walk_in(self):
+        done = self.sell()
+
+        self.assertEqual(done.status_code, 201, done.content)
+        self.assertIsNone(done.json()["movements"][0]["buyer_email"])
+
+    def test_an_unknown_student_is_refused_rather_than_guessed(self):
+        refused = self.sell(buyer="2020-000000")
+
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("No RTU account matches", refused.content.decode())
+
+    def test_a_suspended_account_cannot_be_linked(self):
+        self.student.status = User.Status.SUSPENDED
+        self.student.save(update_fields=["status"])
+
+        refused = self.sell(buyer=self.student.email)
+
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("cannot be linked", refused.content.decode())
+
+    def test_the_student_limit_applies_to_a_linked_sale(self):
+        from apps.store.models import StoreSetting
+
+        setting = StoreSetting.get_solo()
+        setting.max_quantity_per_student = 1
+        setting.save()
+
+        first = self.sell(buyer=self.student.email)
+        second = self.sell(buyer=self.student.email)
+
+        self.assertEqual(first.status_code, 201, first.content)
+        self.assertEqual(second.status_code, 400)
+        self.assertIn("per student", second.content.decode())
+
+    def test_the_ordering_window_does_not(self):
+        """FF-02 says check the limit, not the window: the student is at the counter."""
+        from apps.store.models import StoreSetting
+        from django.utils import timezone
+        from datetime import timedelta
+
+        setting = StoreSetting.get_solo()
+        setting.ordering_window_enabled = True
+        # A window that closed an hour ago: an online request would be refused.
+        now = timezone.localtime()
+        setting.ordering_window_start = (now - timedelta(hours=3)).time()
+        setting.ordering_window_end = (now - timedelta(hours=1)).time()
+        setting.save()
+
+        done = self.sell(buyer=self.student.email)
+
+        self.assertEqual(done.status_code, 201, done.content)
+
+    def test_a_member_cannot_record_a_sale_at_all(self):
+        self.client.force_authenticate(self.student)
+
+        refused = self.client.post(
+            "/api/v1/store/sales/",
+            {"items": [{"variant": self.variant.pk, "quantity": 1}]},
+            format="json",
+        )
+
+        self.assertEqual(refused.status_code, 403)

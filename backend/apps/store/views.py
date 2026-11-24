@@ -56,6 +56,7 @@ from .services import (
     record_daily_count,
     record_stock_in,
     record_walk_in_sale,
+    resolve_walk_in_buyer,
 )
 
 
@@ -194,10 +195,12 @@ class WalkInSaleView(APIView):
         data = serializer.validated_data
 
         try:
+            buyer = resolve_walk_in_buyer(data.get("buyer", ""))
             movements = record_walk_in_sale(
                 [(item["variant"], item["quantity"]) for item in data["items"]],
                 by=request.user,
                 reason=data["reason"] or "Walk-in sale",
+                buyer=buyer,
             )
         except DjangoValidationError as exc:
             raise serializers.ValidationError(details(exc))

@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.conf import settings
 from django.db import transaction
 from django.db.models import F, Sum
 from django.utils import timezone
@@ -430,7 +431,39 @@ def prepare_email(*, ticket=None, kind, event, recipients, subject, body, note="
     )
 
 
-def record_walk_in_sale(lines, *, by=None, reason="Walk-in sale"):
+def resolve_walk_in_buyer(identifier: str):
+    """FF-02: the account behind an email or a student number, or None.
+
+    A student number is the local part of the account's RTU address
+    (`2024-200797@rtu.edu.ph`), which is how the campus issues them; anything with
+    an `@` is treated as an address. Nothing here creates an account: a walk-in
+    buyer without one is a person at the window, not a member.
+    """
+    from apps.accounts.models import User
+
+    text = (identifier or "").strip()
+    if not text:
+        return None
+    if "@" in text:
+        user = User.objects.filter(email__iexact=text).first()
+    else:
+        user = User.objects.filter(email__iexact=f"{text}@{settings.RTU_EMAIL_DOMAIN}").first()
+        if user is None:
+            user = User.objects.filter(email__iexact=text).first()
+    if user is None:
+        raise ValidationError(
+            f"No RTU account matches {text!r}. Leave the field empty for a walk-in "
+            "without an account."
+        )
+    if user.status != "active":
+        raise ValidationError(
+            f"{user.display_name}'s account is {user.get_status_display().lower()}, "
+            "so the sale cannot be linked to it."
+        )
+    return user
+
+
+def record_walk_in_sale(lines, *, by=None, reason="Walk-in sale", buyer=None):
     """Sell units at the window: one SOLD ledger row per line, no ticket.
 
     A walk-in buyer may not have an account, so there is no ticket to carry the
@@ -438,10 +471,45 @@ def record_walk_in_sale(lines, *, by=None, reason="Walk-in sale"):
     both drop by the quantity, which is exactly what the "Sold" movement means.
     Each line is applied to a locked variant, and a failure rolls the whole sale
     back, so a cashier cannot end up with half a sale.
+
+    FF-02: when the office names the student, the ledger rows carry them and the
+    per-student limit is checked — but the ordering window is not, because the
+    student is standing at the counter and the window exists for online requests.
     """
     lines = list(lines)
     if not lines:
         raise ValidationError("Add at least one item to the sale.")
+
+    if buyer is not None:
+        setting = StoreSetting.get_solo()
+        total_quantity = sum(int(quantity) for _variant, quantity in lines)
+        if setting.max_quantity_per_ticket and total_quantity > setting.max_quantity_per_ticket:
+            raise ValidationError(
+                f"At most {setting.max_quantity_per_ticket} units per sale."
+            )
+        if setting.max_quantity_per_student:
+            from apps.store.models import TicketItem
+
+            reserved = (
+                TicketItem.objects.filter(
+                    ticket__buyer=buyer, ticket__status__in=OPEN_STATUSES
+                ).aggregate(total=Sum("quantity"))["total"]
+                or 0
+            )
+            bought_today = (
+                StockMovement.objects.filter(
+                    buyer=buyer,
+                    kind=StockMovement.Kind.SOLD,
+                    created_at__date=timezone.localdate(),
+                ).aggregate(total=Sum("quantity"))["total"]
+                or 0
+            )
+            if reserved + bought_today + total_quantity > setting.max_quantity_per_student:
+                raise ValidationError(
+                    f"At most {setting.max_quantity_per_student} units per student. "
+                    f"{buyer.display_name} already has {reserved + bought_today} open or "
+                    "bought today."
+                )
 
     movements = []
     with transaction.atomic():
@@ -461,6 +529,9 @@ def record_walk_in_sale(lines, *, by=None, reason="Walk-in sale"):
                 by=by,
                 reason=reason,
             )
+            if buyer is not None:
+                StockMovement.objects.filter(pk=movement.pk).update(buyer=buyer)
+                movement.buyer = buyer
             Listing.objects.filter(pk=locked.listing_id).update(
                 sold_count=F("sold_count") + quantity
             )

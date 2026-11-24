@@ -1921,6 +1921,8 @@ function BaoMoveDialog(
   const [dir, setDir] = useState<'1' | '-1'>('1')
   const [qty, setQty] = useState<string>('')
   const [reason, setReason] = useState<string>('')
+  // FF-02: optional, and only meaningful for a sale.
+  const [buyer, setBuyer] = useState<string>('')
 
   if (!p || !u) return null
 
@@ -1945,8 +1947,9 @@ function BaoMoveDialog(
       {props.moveType === 'Sold' && (
         <p className="small muted" style={{ margin: 0 }}>
           A walk-in sale at the window: on hand and available both drop by the
-          number sold, and the item's best-selling count moves. No student
-          account or ticket is needed.
+          number sold, and the item's best-selling count moves. Naming the student
+          is optional — with an address or student number the sale is theirs, and
+          their limit is checked (the ordering window never applies at the counter).
         </p>
       )}
 
@@ -1967,6 +1970,7 @@ function BaoMoveDialog(
               vid: props.vid,
               type: props.moveType,
               qty: q * sign,
+              ...(props.moveType === 'Sold' && buyer.trim() ? { buyer: buyer.trim() } : {}),
               reason:
                 reason.trim() ||
                 (props.moveType === 'Stock In'
@@ -1990,6 +1994,23 @@ function BaoMoveDialog(
           )
         }}
       >
+        {props.moveType === 'Sold' && (
+          <div className="field">
+            <label htmlFor="mv-buyer">Student (email or student number) — optional</label>
+            <input
+              id="mv-buyer"
+              className="input"
+              value={buyer}
+              maxLength={120}
+              placeholder="2024-200797 or 2024-200797@rtu.edu.ph"
+              onChange={(e) => setBuyer(e.target.value)}
+            />
+            <span className="tiny muted">
+              Leave it empty for a walk-in without an account.
+            </span>
+          </div>
+        )}
+
         {props.moveType === 'Adjustment' && (
           <div className="field">
             <label htmlFor="mv-dir">Change</label>

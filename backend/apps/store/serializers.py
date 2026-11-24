@@ -121,11 +121,19 @@ class WalkInSaleLineSerializer(serializers.Serializer):
 
 
 class WalkInSaleSerializer(serializers.Serializer):
-    """A face-to-face sale at the window: items sold, no student ticket."""
+    """A face-to-face sale at the window: items sold, no student ticket.
+
+    FF-02: `buyer` is optional and takes an RTU email or a student number. Given
+    one, the ledger names the student and the per-student limit is checked; left
+    empty, the sale is a genuine walk-in and belongs to nobody.
+    """
 
     items = WalkInSaleLineSerializer(many=True)
     reason = serializers.CharField(
         required=False, allow_blank=True, default="", max_length=200
+    )
+    buyer = serializers.CharField(
+        required=False, allow_blank=True, default="", max_length=120
     )
 
     def validate_items(self, value):
@@ -136,6 +144,11 @@ class WalkInSaleSerializer(serializers.Serializer):
 
 class StockMovementSerializer(serializers.ModelSerializer):
     item = serializers.CharField(source="variant.listing.title", read_only=True)
+    # FF-02: who a walk-in sale belongs to, when the office named the student.
+    buyer_email = serializers.CharField(source="buyer.email", read_only=True, default=None)
+    buyer_name = serializers.CharField(
+        source="buyer.display_name", read_only=True, default=None
+    )
     variant_name = serializers.CharField(source="variant.name", read_only=True)
     ticket_reference = serializers.CharField(
         source="ticket.reference", read_only=True, default=None
@@ -152,6 +165,8 @@ class StockMovementSerializer(serializers.ModelSerializer):
             "item",
             "variant_name",
             "ticket_reference",
+            "buyer_email",
+            "buyer_name",
             "kind",
             "quantity",
             "reason",

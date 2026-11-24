@@ -246,17 +246,25 @@ export async function stockIn(
   })
 }
 
-/** Staff: record a face-to-face sale at the window (no ticket). */
+/**
+ * Staff: record a face-to-face sale at the window (no ticket).
+ *
+ * FF-02: `buyer` is optional and takes an RTU email or a student number. Given
+ * one, the ledger names the student and the per-student limit is checked; the
+ * ordering window never applies, because the buyer is at the counter.
+ */
 export async function sellStock(
   variant: number,
   quantity: number,
   reason = '',
+  buyer = '',
 ): Promise<void> {
   await apiFetch('/store/sales/', {
     method: 'POST',
     body: {
       items: [{ variant, quantity }],
       ...(reason ? { reason } : {}),
+      ...(buyer.trim() ? { buyer: buyer.trim() } : {}),
     },
   })
 }

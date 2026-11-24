@@ -16,6 +16,9 @@ Suggested contents, copied from the CapStone folder:
   Gmail for the deployed backend, plus troubleshooting and rotation rules.
 - `AUTH-HARDENING.md` — password reset by code, token lifetime, and ending
   sessions, with the migration path for each.
+- `GUEST-ACCESS.md` — AV-11: what a visitor can reach, measured against the
+  running service, and the one deliberate deviation from the SRS with its
+  cost written down.
 - `SCREENING.md` — the content-screening boundary: provider rules, the
   deterministic stub, and the moderator queue.
 - `POSTING-AND-SELLING-GUIDELINE.md` — the panel's posting and selling rules

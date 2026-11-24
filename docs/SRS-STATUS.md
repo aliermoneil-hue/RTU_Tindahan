@@ -11,11 +11,11 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 90 |
+| Implemented, verified | 91 |
 | Implemented | 79 |
-| Partial | 2 |
+| Partial | 0 |
 | Not implemented | 0 |
-| Deliberately not done | 2 |
+| Deliberately not done | 3 |
 | Not measured | 1 |
 | **total** | **174** |
 
@@ -38,7 +38,7 @@ browser or the tests in this repository.
 | AV-08 | The system shall allow any verified account holder to operate seamlessly as both a buyer and a seller. | Built | Implemented | `apps/accounts` |
 | AV-09 | The system shall allow only one account for each RTU email address, and shall not let a suspended user register again with the same email. | Built | Implemented | `apps/accounts` |
 | AV-10 | The system shall give each account one state. Only Active accounts can log in, buy, sell, message, or post. | Partly | Implemented, verified | one status; login refuses suspended/banned |
-| AV-11 | The system shall show visitors only the landing page, registration, login, and the preview of RTU merchandise. Everything else shall need a log-in. | Built | Partial | guests can browse the public catalogue and seller pages, beyond the SRS's landing/login/preview-only rule |
+| AV-11 | The system shall show visitors only the landing page, registration, login, and the preview of RTU merchandise. Everything else shall need a log-in. | Built | Deliberately not done | the catalogue, a listing, the categories and the forum are readable without a session, by product decision; everything that acts needs one. The deviation, and what it costs, is in docs/GUEST-ACCESS.md |
 
 ## Listings (LS)
 
@@ -117,7 +117,7 @@ browser or the tests in this repository.
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
 | FF-01 | The system shall let staff record the walk in sale with items, sizes, and quantities. It must provide a ticket along with the source which is Face... | Built | Implemented, verified | Record sale writes the ledger; `store/tests_api.py` |
-| FF-02 | A face to face sale must be linked to a student account when staff provide the email or student number. The system must check the student limit but... | Built | Partial | walk-in sales carry no student account, by design |
+| FF-02 | A face to face sale must be linked to a student account when staff provide the email or student number. The system must check the student limit but... | Built | Implemented, verified | a walk-in sale takes an RTU email or student number, names the student on the ledger, checks the per-student limit and deliberately not the ordering window; without one it stays a walk-in |
 | FF-03 | The system shall give the staff a compiled order sheet of all open online tickets, grouped by item and size, alongside with the requested units, On... | Built | Implemented | `apps/store` walk-in sale and counts |
 | FF-04 | Shortage quantity must be determined by decreasing the 'On Hand' inventory from the specific requested units, ensuring the value will never drop be... | Built | Implemented | `apps/store` walk-in sale and counts |
 | FF-05 | The system shall let the staff enter a counted number for each item and size. A difference from On Hand shall need a reason and shall be saved as a... | Built | Implemented | `apps/store` walk-in sale and counts |
@@ -325,6 +325,7 @@ with the reason:
 
 | ID | Requirement | Why it is open |
 | --- | --- | --- |
+| AV-11 | The system shall show visitors only the landing page, registration, login, and the preview of RTU merchandise. Everythin | the catalogue, a listing, the categories and the forum are readable without a session, by product decision; everything that acts needs one. The deviation, and what it costs, is in docs/GUEST-ACCESS.md |
 | RR-04 | The system shall hold review text for AI screening before it is published. | a first review publishes unscreened by choice; an edit is screened (RR-06): `docs/SCREENING.md` §6 |
 | AI-03 | The system shall automatically publish submissions that receive an Approved classification. | a clean verdict still waits for a human: `docs/SCREENING.md` §6 |
 

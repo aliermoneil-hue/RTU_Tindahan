@@ -213,6 +213,39 @@ sellers first" sort uses the same fields.
 
 ---
 
+## 4b. A walk-in sale that belongs to a student (FF-02)
+
+`POST /api/v1/store/sales/` takes an optional `buyer` — an RTU email
+(`2024-200797@rtu.edu.ph`) or the student number alone (`2024-200797`), because
+that is how the campus issues them and what a cashier reads off an ID.
+
+With a buyer named:
+
+- the ledger rows carry them (`buyer_email`, `buyer_name` on the movement), so a
+  sale is traceable to an account without inventing a ticket for it;
+- the per-student limit is checked — open ticket units **plus** units bought today
+  **plus** this sale against `max_quantity_per_student` — and the refusal names the
+  student and what they already hold;
+- **the ordering window is not checked.** FF-02 says so explicitly: the student is
+  at the counter, and the window exists to pace online requests.
+
+Without a buyer the sale is a genuine walk-in: no account, no limit check, and the
+ledger row says nothing about who paid. An unknown number or address is refused
+(`No RTU account matches '2020-000000'`) rather than guessed at, and a suspended
+account cannot be linked. Selling is Office Staff only, as before.
+
+In the panel, **Record sale** on Store inventory carries the optional field with
+the hint "Leave it empty for a walk-in without an account."
+
+Proved live as Office Staff: a sale linked by student number `2024-200374` returned
+one `sold` movement with `buyer_email 2024-200374@rtu.edu.ph` and the member's
+name; `2020-000000` was refused with the sentence above. The probe sale was then
+undone through the ledger — the unit put back, `sold_count` returned, both movement
+rows removed — and the browser check confirmed the dialog's field and hint render
+without recording anything.
+
+---
+
 ## 5a. The store's own rules, editable (OS-12)
 
 The office edits five things without a deployment, through

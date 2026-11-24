@@ -877,6 +877,8 @@ interface TindahanContextValue {
       qty: number
       reason?: string
       ticket?: string
+      /** FF-02: an RTU email or student number for a linked walk-in sale. */
+      buyer?: string
     }>,
   ) => { ok: boolean; msg?: string }
   baoSaveItemSettings: (
@@ -8008,6 +8010,8 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         qty: number
         reason?: string
         ticket?: string
+        /** FF-02: an RTU email or student number for a linked walk-in sale. */
+        buyer?: string
       }>,
     ): { ok: boolean; msg?: string } => {
       if (!currentAccount || !isStaffUser) {
@@ -8039,7 +8043,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
             const variant = Number((item.vid || '').slice(1))
             const call =
               item.type === 'Sold'
-                ? postWalkInSale(variant, Math.abs(item.qty), item.reason)
+                ? postWalkInSale(variant, Math.abs(item.qty), item.reason, item.buyer)
                 : postStockIn(variant, item.qty, item.reason)
             void call
               .then(() => refreshStore())

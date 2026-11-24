@@ -75,7 +75,7 @@ DECIDED = {
     "AV-03": ("verified", "6-digit code, own table, 5 tries; `tests/test_codes.py`"),
     "AV-06": ("verified", "sign-in, sign-out, reset + changed-mail; `tests/test_hardening.py`"),
     "AV-10": ("verified", "one status; login refuses suspended/banned"),
-    "AV-11": ("partial", "guests can browse the public catalogue and seller pages, beyond the SRS's landing/login/preview-only rule"),
+    "AV-11": ("policy", "the catalogue, a listing, the categories and the forum are readable without a session, by product decision; everything that acts needs one. The deviation, and what it costs, is in docs/GUEST-ACCESS.md"),
     # --- listings and browse ------------------------------------------------
     "LS-04": ("verified", "seller edit, sold, unavailable, delete; owner-only"),
     "LS-05": ("verified", "hold on create and edit; only approve publishes"),
@@ -92,7 +92,7 @@ DECIDED = {
     "IV-11": ("verified", "ledger replay check in Store inventory"),
     "IV-12": ("verified", "ledger CSV export"),
     "FF-01": ("verified", "Record sale writes the ledger; `store/tests_api.py`"),
-    "FF-02": ("partial", "walk-in sales carry no student account, by design"),
+    "FF-02": ("verified", "a walk-in sale takes an RTU email or student number, names the student on the ledger, checks the per-student limit and deliberately not the ordering window; without one it stays a walk-in"),
     "EM-06": ("verified", "a staff outbox at GET /store/outbox/ with a full-body preview per row and a JSON export that honours the same filters"),
     # --- orders, messaging --------------------------------------------------
     "OT-03": ("verified", "requested, accepted, declined, cancelled, completed"),

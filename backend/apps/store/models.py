@@ -267,6 +267,15 @@ class StockMovement(models.Model):
         on_delete=models.PROTECT,
         related_name="stock_movements",
     )
+    # FF-02: a walk-in sale may name the student it belongs to. Nullable, because
+    # a genuine walk-in with no account must still be recordable.
+    buyer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="walk_in_purchases",
+    )
     ticket = models.ForeignKey(
         OfficialTicket,
         null=True,
