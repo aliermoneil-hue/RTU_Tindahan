@@ -69,6 +69,7 @@
 /* Auth button group */
 .pub-top-actions {
   display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
   align-items: center;
 }

@@ -1,5 +1,6 @@
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from rest_framework import serializers
 
 from .models import College, User
@@ -63,7 +64,7 @@ class RegisterSerializer(serializers.Serializer):
 
     def validate_email(self, value: str) -> str:
         value = normalize_email(value)
-        if User.objects.filter(email=value).exists():
+        if User.objects.filter(email=value, verified_at__isnull=False).exists():
             raise serializers.ValidationError("An account with this email already exists.")
         return value
 
@@ -137,16 +138,32 @@ class RegisterSerializer(serializers.Serializer):
         validated_data.pop("password_confirm")
         validated_data.pop("privacy_consent")
 
-        user = User.objects.create_user(
-            email=validated_data["email"],
-            display_name=validated_data["display_name"],
-            password=validated_data["password"],
-            member_type=validated_data["member_type"],
-            college=validated_data["college"],
-            year_level=validated_data.get("year_level"),
-            contact_number=validated_data.get("contact_number", "").strip(),
-            role=User.Role.VISITOR,
-        )
+        email = validated_data["email"]
+
+        # Allow re-registering while the email is still unverified: update the
+        # existing pending account instead of creating a duplicate.
+        existing = User.objects.filter(email=email, verified_at__isnull=True).first()
+        if existing:
+            existing.display_name = validated_data["display_name"]
+            existing.member_type = validated_data["member_type"]
+            existing.college = validated_data["college"]
+            existing.year_level = validated_data.get("year_level")
+            existing.contact_number = validated_data.get("contact_number", "").strip()
+            existing.set_password(validated_data["password"])
+            existing.save()
+            return existing
+
+        with transaction.atomic():
+            user = User.objects.create_user(
+                email=email,
+                display_name=validated_data["display_name"],
+                password=validated_data["password"],
+                member_type=validated_data["member_type"],
+                college=validated_data["college"],
+                year_level=validated_data.get("year_level"),
+                contact_number=validated_data.get("contact_number", "").strip(),
+                role=User.Role.VISITOR,
+            )
         # The view issues the 6-digit code and emails it, so that a failed
         # send can be reported instead of leaving a silent half-signup.
         return user
@@ -232,4 +249,33 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
     def validate_profile_photo(self, value):
         if value and value.size > 5 * 1024 * 1024:
             raise serializers.ValidationError("The photo must be 5 MB or smaller.")
+        return value
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_current_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Your current password is incorrect.")
+        return value
+
+    def validate_new_password(self, value):
+        user = self.context["request"].user
+        try:
+            validate_password(value, user=user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages))
+        return value
+
+
+class DeleteAccountSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Your password is incorrect.")
         return value

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { navigate } from '@/common/router/router'
 import { Icon } from '@/common/components/Icon'
 import { Button } from '@/common/components/Button'
@@ -31,14 +31,14 @@ interface Step1Data {
 
 interface VerifyFormProps {
   onStep3Complete?: () => void
+  onStepChange?: (step: 1 | 2 | 3) => void
 }
 
-export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
-  const { register, resendCode, confirmCode, otp } = useAuth()
-  // A code was already requested (this page reloaded, or the user came back),
-  // so resume on the code screen instead of asking for the details again.
-  const [step, setStep] = useState<1 | 2 | 3>(otp ? 2 : 1)
-  const [step1, setStep1] = useState<Step1Data>({
+export function VerifyForm({ onStep3Complete, onStepChange }: VerifyFormProps) {
+  const { register, resendCode, confirmCode, otp, clearOtp } = useAuth()
+  const DRAFT_KEY = 'rtu:register-draft'
+
+  const defaultStep1: Step1Data = {
     first: '',
     last: '',
     prog: PROGRAMS[0],
@@ -48,7 +48,55 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
     pass2: '',
     code: '',
     agree: false,
-  })
+  }
+
+  const loadDraft = (): Step1Data => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY)
+      if (!raw) return defaultStep1
+      const parsed = JSON.parse(raw)
+      return {
+        ...defaultStep1,
+        first: String(parsed.first ?? ''),
+        last: String(parsed.last ?? ''),
+        prog: String(parsed.prog ?? defaultStep1.prog),
+        year: Number(parsed.year) || defaultStep1.year,
+        email: String(parsed.email ?? ''),
+        agree: Boolean(parsed.agree),
+      }
+    } catch {
+      return defaultStep1
+    }
+  }
+
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [step1, setStep1] = useState<Step1Data>(loadDraft)
+  // Persist the draft (name, program, year, email, agree) so a reload or
+  // navigating away and back does not lose what was filled in. Never store
+  // passwords or the code.
+  useEffect(() => {
+    try {
+      const { first, last, prog, year, email, agree } = step1
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ first, last, prog, year, email, agree }))
+    } catch {
+      /* sessionStorage unavailable or quota-exceeded; ignore */
+    }
+  }, [step1])
+  // Drop the draft once registration is complete.
+  useEffect(() => {
+    if (step === 3) {
+      try {
+        sessionStorage.removeItem(DRAFT_KEY)
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [step])
+  // Notify the page header whenever the step changes.
+  useEffect(() => {
+    onStepChange?.(step)
+  }, [step])
+
   // Per-field errors shown below each input
   const [firstErr, setFirstErr] = useState<string | null>(null)
   const [lastErr, setLastErr] = useState<string | null>(null)
@@ -173,6 +221,7 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
   }
 
   const handleChangeEmail = () => {
+    clearOtp()
     setStep(1)
     setStep1((prev) => ({ ...prev, code: '' }))
   }
@@ -413,6 +462,17 @@ export function VerifyForm({ onStep3Complete }: VerifyFormProps) {
               </Button>
             </span>
           </div>
+          {otp && (
+            <div className="row wrap" style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                className="link"
+                onClick={() => setStep(2)}
+              >
+                I already have a code
+              </button>
+            </div>
+          )}
         </>
       ) : (
         // ============ STEP 2 ============

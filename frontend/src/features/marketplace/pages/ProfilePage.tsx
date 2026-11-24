@@ -3,6 +3,8 @@ import { useAuth } from '@/features/authentication'
 import { DAYS, monthYear } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
 import { AvatarBadge } from '../components/AvatarBadge'
+import { ProfileSettings } from '../components/ProfileSettings'
+import { useProfileSettings } from '../profileSettingsStore'
 import './ProfilePage.css'
 
 export function ProfilePage() {
@@ -16,6 +18,8 @@ export function ProfilePage() {
 
   if (!currentAccount) return null
 
+  const { privacy } = useProfileSettings(currentAccount.email)
+
   const ann = db.ann || []
   const pickedOrders = (currentAccount.orders || []).filter(
     (o) => o.tab === 'Completed',
@@ -24,12 +28,14 @@ export function ProfilePage() {
     (r) => r.state === 'done',
   ).length
 
+  const showContact = privacy.showContact
+
   const verifRows: [string, string][] = [
     ['RTU email (@rtu.edu.ph)', 'Confirmed'],
     [`Student ID (${currentAccount.sid})`, 'On file'],
     ['Campus affiliation', 'Pasig Campus'],
     ...(user?.year_level != null ? ([['Year level', `Year ${user.year_level}`]] as [string, string][]) : []),
-    ...(user?.contact_number ? ([['Contact number', user.contact_number]] as [string, string][]) : []),
+    ...(showContact && user?.contact_number ? ([['Contact number', user.contact_number]] as [string, string][]) : []),
     ['Account status', 'Good standing'],
   ]
 
@@ -183,14 +189,6 @@ export function ProfilePage() {
                 </span>
               </div>
             ))}
-            <button
-              type="button"
-              className="btn ghost sm"
-              style={{ alignSelf: 'flex-start' }}
-              onClick={() => openModal({ kind: 'verif-status' })}
-            >
-              Manage verification
-            </button>
           </div>
 
           <div className="card stack">
@@ -231,7 +229,17 @@ export function ProfilePage() {
                 )
               })}
             </div>
+            {currentAccount.windows.length > 0 ? (
+              <p className="tiny muted">
+                Saved automatically. New listings start with {currentAccount.windows.join(', ')}.
+              </p>
+            ) : (
+              <p className="tiny muted">
+                No days selected. New listings start with Mon, Tue.
+              </p>
+            )}
           </div>
+          <ProfileSettings />
         </div>
       </div>
     </>

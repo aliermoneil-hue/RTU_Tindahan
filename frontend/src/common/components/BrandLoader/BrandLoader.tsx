@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import gsap from "gsap";
+import { Banderitas } from "@/common/components/Banderitas"
 import "./BrandLoader.css";
 
 /**
@@ -39,6 +40,15 @@ export const LOADER_TIMING = {
   adaptiveExitFast: 0.24,   // < 400ms load
   adaptiveExitNormal: 0.32, // 400–1200ms load
   adaptiveExitSlow: 0.42,   // > 1200ms load
+
+  // Fiesta banderitas: wrapper divs drop in staggered, never flags/SVG
+  bunting: {
+    dropDuration: 0.7,
+    topStart: 0.1,
+    lowStart: 0.3,
+    bottomStart: 0.45,
+    dropDistance: 90, // px
+  },
 
   // Calm idle shine sweep interval (seconds)
   idleShineDuration: 0.75,
@@ -187,8 +197,24 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
       // Clear overflow so CSS (and the app's normal scrolling) takes over.
       document.body.style.removeProperty("overflow");
       rootEl?.removeAttribute("aria-busy");
+      // Always clear the inline navy background so the app's CSS background
+      // (var(--bg)) shows through even if the exit animation never ran.
+      document.body.style.removeProperty("background-color");
+      document.body.style.removeProperty("margin");
+      document.body.style.removeProperty("height");
     };
   }, [shouldRender]);
+
+  // 7. Safety net: if the loader stays visible for more than 10 seconds
+  //    (e.g. auth/restore or listings fetch is hung), force the exit so the
+  //    user is never trapped behind a blank navy overlay.
+  useEffect(() => {
+    if (!shouldRender || !isLoading) return;
+    const safetyTimer = window.setTimeout(() => {
+      runExit(0.2);
+    }, 10000);
+    return () => window.clearTimeout(safetyTimer);
+  }, [shouldRender, isLoading]);
 
   // 4. Trigger exit animation helper
   const runExit = (adaptiveExitDuration?: number) => {
@@ -290,6 +316,7 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
           ".bl-cursor",
           ".bl-tag-group",
           ".bl-shine",
+          ".bl-bunting",
         ], { opacity: 1, scaleX: 1, y: 0, x: 0, skewX: 0, rotation: 0, scale: 1, transformOrigin: "center center" });
         gsap.fromTo(
           overlayRef.current,
@@ -321,6 +348,9 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
       gsap.set(".bl-cursor", { scale: 0, opacity: 0, transformOrigin: "20% 20%" });
       gsap.set(".bl-tag-group", { rotation: -28, opacity: 0, transformOrigin: "100% 0%" });
       gsap.set(".bl-shine", { x: -460, opacity: 0 });
+
+      const buntingCfg = LOADER_TIMING.bunting;
+      gsap.set(".bl-bunting", { y: -buntingCfg.dropDistance, opacity: 0 });
 
       const tl = gsap.timeline({
         onComplete: () => {
@@ -449,6 +479,30 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
         ease: "power2.inOut",
       });
 
+      // STEP 5: Fiesta banderitas wrappers drop in staggered (absolute start times).
+      // Even though they're added late in the chain, absolute times keep them overlapping
+      // the logo build so the total build duration does not grow.
+      tl.to(
+        ".bl-bunting--top",
+        { y: 0, opacity: 1, duration: buntingCfg.dropDuration, ease: "back.out(1.4)" },
+        buntingCfg.topStart
+      )
+        .to(
+          ".bl-bunting--low",
+          { y: 0, opacity: 1, duration: buntingCfg.dropDuration, ease: "back.out(1.4)" },
+          buntingCfg.lowStart
+        )
+        .to(
+          ".bl-bunting--bottom",
+          {
+            y: 0,
+            opacity: 1,
+            duration: buntingCfg.dropDuration,
+            ease: "back.out(1.4)",
+          },
+          buntingCfg.bottomStart
+        );
+
       // Network-aware starting speed: slow networks play slower, fast networks play at normal/compact speed
       const effType = (navigator as any).connection?.effectiveType;
       const isSlowNetwork =
@@ -496,6 +550,8 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
   // 6. Bidirectional adaptive speed:
   //    - While loading drags on, smoothly decelerate the build (calm, never frozen)
   //    - When loading finishes, fast-forward proportionally to how fast it actually was
+  //    - Safety: if the build timeline is null (e.g. context was recreated), force
+  //      the exit so the overlay never traps the app under a blank navy screen.
   useEffect(() => {
     if (!shouldRender) return;
 
@@ -542,15 +598,19 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
     }
 
     // ----- Loading finished: fast-forward adaptively -----
-    if (!isLoading && buildTlRef.current) {
+    if (!isLoading) {
       const elapsedMs = Date.now() - loadStartMsRef.current;
+      adaptiveExitSecRef.current =
+        elapsedMs < 400 ? 0.24 : elapsedMs < 1200 ? 0.32 : 0.40;
 
       if (buildCompletedRef.current) {
-        adaptiveExitSecRef.current =
-          elapsedMs < 400 ? 0.24 : elapsedMs < 1200 ? 0.32 : 0.40;
         runExit(adaptiveExitSecRef.current);
-      } else {
+      } else if (buildTlRef.current) {
         accelerateToFinish(buildTlRef.current);
+      } else {
+        // No timeline exists — force the exit immediately so we never
+        // leave the user staring at a blank navy overlay.
+        runExit(adaptiveExitSecRef.current);
       }
     }
   }, [isLoading, shouldRender]);
@@ -566,7 +626,7 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
     >
       <span className="bl-sr-only">Loading RTU Tindahan</span>
 
-      <div ref={stageRef} className="brand-loader-stage">
+      <div ref={stageRef} className="brand-loader-stage" style={{ position: "relative", zIndex: 2 }}>
         <svg
           className="brand-loader-svg"
           viewBox="0 0 600 340"
@@ -725,6 +785,22 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
             />
           </g>
         </svg>
+      </div>
+
+      <div className="bl-bunting bl-bunting--top" aria-hidden="true">
+        <div className="bl-bunting-scale">
+          <Banderitas variant="canopy" opacity={0.95} />
+        </div>
+      </div>
+      <div className="bl-bunting bl-bunting--low" aria-hidden="true">
+        <div className="bl-bunting-scale">
+          <Banderitas variant="garland" opacity={0.9} />
+        </div>
+      </div>
+      <div className="bl-bunting bl-bunting--bottom" aria-hidden="true">
+        <div className="bl-bunting-scale">
+          <Banderitas variant="garland" opacity={0.8} />
+        </div>
       </div>
 
       {isSlowLoad && (

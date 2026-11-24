@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '@/common/components/Icon'
 import { Link, navigate } from '@/common/router/router'
-import { useTheme } from '@/common/hooks/useTheme'
+import { ThemeToggle } from '@/common/components/ThemeToggle'
 import { useAuth } from '@/features/authentication'
 import type { User } from '@/common/types'
 import { ago, initialsOf } from '@/features/marketplace/constants'
@@ -28,7 +28,6 @@ interface TopbarProps {
  */
 export function Topbar({ user, onMenuClick, onCloseMobileMenu }: TopbarProps) {
   const { logout } = useAuth()
-  const { theme, toggle } = useTheme()
   const {
     currentAccount,
     isStaffUser,
@@ -112,6 +111,9 @@ export function Topbar({ user, onMenuClick, onCloseMobileMenu }: TopbarProps) {
 
       <div className="top-end">
         <div className="right-actions">
+          <div className="rel" onClick={(e) => { e.stopPropagation(); setOpen(''); onCloseMobileMenu?.() }}>
+            <ThemeToggle />
+          </div>
           <Link
             to="messages"
             className="iconbtn"
@@ -250,10 +252,6 @@ export function Topbar({ user, onMenuClick, onCloseMobileMenu }: TopbarProps) {
                 <Link to="help" className="mi" role="menuitem" onClick={() => setOpen('')}>
                   <Icon name="info" /> Help Center & Manual
                 </Link>
-                <button type="button" className="mi" role="menuitem" onClick={toggle}>
-                  <Icon name={theme === 'dark' ? 'sun' : 'moon'} />{' '}
-                  {theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-                </button>
                 {isStaffUser && (
                   <>
                     <hr />

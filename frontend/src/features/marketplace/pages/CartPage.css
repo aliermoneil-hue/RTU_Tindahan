@@ -21,11 +21,10 @@
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
 }
 
 /* Checkbox wrapper — clean .check pattern beside thumbnail */
-.check {
+.cart-check {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -35,14 +34,14 @@
   margin: 0;
 }
 
-.check input[type="checkbox"] {
+.cart-check input[type="checkbox"] {
   margin-top: 2px;
   accent-color: var(--navy);
   width: 15px;
   height: 15px;
 }
 
-:root[data-theme='dark'] .check input[type="checkbox"] {
+:root[data-theme='dark'] .cart-check input[type="checkbox"] {
   accent-color: var(--yellow);
 }
 
@@ -75,5 +74,132 @@
 @media (max-width: 1000px) {
   .cart-two {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1001px) {
+  .cart-summary {
+    position: sticky;
+    top: calc(var(--header-offset, 76px) + 18px);
+  }
+}
+
+/* Sent order cards — expandable Step 3 details */
+.sent-card {
+  transition: border-color 0.15s ease;
+}
+
+.sent-card.expanded {
+  border-color: var(--blue);
+}
+
+:root[data-theme='dark'] .sent-card.expanded {
+  border-color: var(--yellow);
+}
+
+.sent-card-head {
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sent-chev {
+  transition: transform 0.2s ease;
+  color: var(--muted);
+}
+
+.sent-card.expanded .sent-chev {
+  transform: rotate(180deg);
+  color: var(--blue);
+}
+
+:root[data-theme='dark'] .sent-card.expanded .sent-chev {
+  color: var(--yellow);
+}
+
+.sent-details {
+  background: var(--bg);
+  padding: 12px;
+  gap: 10px;
+  animation: sentFadeIn 0.18s ease-out;
+}
+
+@keyframes sentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sent-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.sent-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.sent-meta-row b {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.sent-msg-btn {
+  align-self: flex-start;
+}
+
+@media (max-width: 600px) {
+  .sent-msg-btn {
+    width: 100%;
+  }
+}
+
+.sent-divider {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 2px 0;
+}
+
+.sent-summary-item {
+  gap: 8px;
+}
+
+.sent-summary-title {
+  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 165px;
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sent-card {
+    transition: none;
+  }
+  .sent-chev {
+    transition: none;
+  }
+  .sent-details {
+    animation: none;
   }
 }

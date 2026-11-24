@@ -1,7 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.utils import timezone
 
-from .models import College, CollegeAlias, User
+from .models import College, CollegeAlias, LoginAttempt, User
 
 
 class CollegeAliasInline(admin.TabularInline):
@@ -21,6 +22,20 @@ class CollegeAdmin(admin.ModelAdmin):
     @admin.display(description="accounts")
     def members(self, obj):
         return obj.members.count()
+
+
+
+
+def clear_selected_lockouts(modeladmin, request, queryset):
+    """Staff action: clear failed-attempt records (unlock accounts)."""
+    count = queryset.count()
+    queryset.delete()
+    modeladmin.message_user(
+        request, f"Cleared {count} login attempt record(s)."
+    )
+
+
+clear_selected_lockouts.short_description = "Clear selected lockouts"
 
 
 @admin.register(User)
@@ -94,3 +109,33 @@ class UserAdmin(BaseUserAdmin):
     )
 
     readonly_fields = ("date_joined", "last_login", "status_changed_at")
+
+
+@admin.register(LoginAttempt)
+class LoginAttemptAdmin(admin.ModelAdmin):
+    """Read-only admin for login attempt records, with an unlock action."""
+
+    list_display = (
+        "email",
+        "failed_count",
+        "locked_until",
+        "last_failed_at",
+        "updated_at",
+    )
+    list_filter = ("locked_until", "updated_at")
+    search_fields = ("email",)
+    readonly_fields = ("email", "failed_count", "locked_until", "last_failed_at", "updated_at")
+    actions = [clear_selected_lockouts]
+
+    def has_add_permission(self, request):
+        return False
+
+    def is_locked(self, obj):
+        if obj.locked_until and obj.locked_until > timezone.now():
+            return "Yes"
+        return "No"
+
+    is_locked.short_description = "Currently locked"
+
+    def get_readonly_fields(self, request, obj=None):
+        return self.readonly_fields

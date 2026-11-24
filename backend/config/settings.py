@@ -173,8 +173,17 @@ AUTH_PASSWORD_VALIDATORS = [
 SESSION_COOKIE_AGE = 60 * 30
 SESSION_SAVE_EVERY_REQUEST = True
 
-# Email verification links stay valid for 24 hours.
+# SE-05: email verification links stay valid for 24 hours.
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
+
+# ---------------------------------------------------------------------------
+# Login lockout (failed attempt protection)
+# ---------------------------------------------------------------------------
+LOGIN_COOLDOWN_AFTER = int(os.getenv("LOGIN_COOLDOWN_AFTER", "5"))
+LOGIN_COOLDOWN_SECONDS = int(os.getenv("LOGIN_COOLDOWN_SECONDS", "60"))
+LOGIN_RESTRICT_AFTER = int(os.getenv("LOGIN_RESTRICT_AFTER", "7"))
+LOGIN_RESTRICT_SECONDS = int(os.getenv("LOGIN_RESTRICT_SECONDS", "900"))
+LOGIN_ATTEMPT_WINDOW_HOURS = int(os.getenv("LOGIN_ATTEMPT_WINDOW_HOURS", "24"))
 
 # ---------------------------------------------------------------------------
 # Django REST Framework
@@ -198,10 +207,11 @@ REST_FRAMEWORK = {
     + (["rest_framework.renderers.BrowsableAPIRenderer"] if DEBUG else []),
     # SE-05: limit repeated failed log-ins and abusive sign-up calls.
     "DEFAULT_THROTTLE_RATES": {
-        "login": os.getenv("THROTTLE_LOGIN", "5/min"),
+        "login": os.getenv("THROTTLE_LOGIN", "30/min"),
         "register": os.getenv("THROTTLE_REGISTER", "10/hour"),
         "verify": os.getenv("THROTTLE_VERIFY", "20/hour"),
         "password-reset": os.getenv("THROTTLE_PASSWORD_RESET", "5/hour"),
+        "login-status": os.getenv("THROTTLE_LOGIN_STATUS", "60/min"),
     },
 }
 

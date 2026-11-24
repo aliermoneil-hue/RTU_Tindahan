@@ -17,6 +17,12 @@
   opacity: 1;
 }
 
+/* Dark mode overlay: matte charcoal with warm-amber radial glow behind center */
+:root[data-theme='dark'] .brand-loader-overlay {
+  background-color: #16171a;
+  background-image: radial-gradient(circle at 50% 44%, rgba(229, 181, 76, 0.11) 0%, rgba(22, 23, 26, 0) 52%);
+}
+
 /* Allows clicks to pass through to the mounted app underneath during exit */
 .brand-loader-overlay--exiting {
   pointer-events: none;
@@ -30,6 +36,68 @@
   align-items: center;
   justify-content: center;
   will-change: transform, opacity;
+}
+
+/* --- Fiesta banderitas wrappers: full-screen, behind the stage --- */
+.brand-loader-overlay .bl-bunting {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* Top canopy: full width across the top */
+.brand-loader-overlay .bl-bunting--top .banderitas {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+
+/* Low garland: full width, mid-lower area */
+.brand-loader-overlay .bl-bunting--low .banderitas {
+  top: auto;
+  bottom: 16vh;
+  left: 0;
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+
+/* Bottom garland: full width, near bottom edge */
+.brand-loader-overlay .bl-bunting--bottom .banderitas {
+  top: auto;
+  bottom: 5vh;
+  left: 0;
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+
+/* Mobile: hide the low garland (stage takes most vertical space),
+   scale the top/bottom garlands so flags stay readable.
+   GSAP animates .bl-bunting (translateY/opacity) via inline styles,
+   so scale lives on the inner .bl-bunting-scale div — no conflict. */
+@media (max-width: 640px) {
+  .brand-loader-overlay .bl-bunting--low {
+    display: none;
+  }
+  .brand-loader-overlay .bl-bunting--top .bl-bunting-scale {
+    transform: scale(1.8);
+    transform-origin: 50% 0;
+  }
+  .brand-loader-overlay .bl-bunting--bottom .bl-bunting-scale {
+    transform: scale(1.8);
+    transform-origin: 50% 100%;
+  }
+}
+
+/* Keep the retry box above the bunting and clickable */
+.brand-loader-slow {
+  z-index: 50;
+  position: relative;
 }
 
 .brand-loader-svg {
@@ -62,7 +130,8 @@
 .bl-letter,
 .bl-cursor,
 .bl-tag-group,
-.bl-shine {
+.bl-shine,
+.bl-bunting {
   opacity: 0;
 }
 /* Tagline lines are hidden by GSAP (scaleX:0 with right/left center origin).
@@ -72,6 +141,84 @@
 .bl-tagline-line-right {
   opacity: 0;
 }
+
+/* --- Dark mode SVG color overrides --- */
+/* Letters R, T, U: soft off-white */
+:root[data-theme='dark'] .bl-letter-r path,
+:root[data-theme='dark'] .bl-letter-t path,
+:root[data-theme='dark'] .bl-letter-u path {
+  fill: #e4e6eb;
+}
+
+/* TINDAHAN wordmark: warm gold */
+:root[data-theme='dark'] .bl-tindahan text {
+  fill: #e5b54c;
+}
+
+/* Tagline text: soft off-white */
+:root[data-theme='dark'] .bl-tagline-text {
+  fill: #e4e6eb;
+}
+
+/* Tagline side lines: warm gold */
+:root[data-theme='dark'] .bl-tagline-line {
+  stroke: #e5b54c;
+}
+
+/* Price tag + string: cream/off-white with warm gold tag */
+:root[data-theme='dark'] .bl-tag-group path[stroke="#ffffff"],
+:root[data-theme='dark'] .bl-tag-group path[fill="#ffffff"] {
+  stroke: #fffaf0;
+  fill: #fffaf0;
+}
+:root[data-theme='dark'] .bl-tag-group path[fill="#c25959"] {
+  fill: #e5b54c;
+}
+:root[data-theme='dark'] .bl-tag-group circle {
+  fill: #e4e6eb;
+  stroke: #fffaf0;
+}
+
+/* Cursor arrow: warm gold */
+:root[data-theme='dark'] .bl-cursor path {
+  fill: #e5b54c;
+}
+
+/* Dark mode slow-load text and retry button */
+:root[data-theme='dark'] .brand-loader-slow {
+  color: #e4e6eb;
+}
+
+:root[data-theme='dark'] .brand-loader-retry {
+  background-color: #e5b54c;
+  color: #16171a;
+}
+
+:root[data-theme='dark'] .brand-loader-retry:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+/* Dark mode progress/status text: calm muted */
+:root[data-theme='dark'] .bl-sr-only {
+  clip: rect(0, 0, 0, 0);
+}
+
+/* Primary labels and secondary text in dark mode */
+:root[data-theme='dark'] .brand-loader-slow span {
+  color: #e4e6eb;
+}
+
+:root[data-theme='dark'] .brand-loader-slow .brand-loader-retry {
+  color: #16171a;
+}
+
+/* Secondary/status text tone */
+:root[data-theme='dark'] .brand-loader-slow {
+  color: #e4e6eb;
+}
+
+/* Dark mode subtle glow behind center brand mark handled via overlay background-image */
 
 /* Slow-load fallback message and retry button shown after ~8s */
 .brand-loader-slow {

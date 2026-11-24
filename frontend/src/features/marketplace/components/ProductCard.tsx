@@ -183,9 +183,7 @@ export function ProductCard({
 
       <div className="row between">
         <span className="price tnum">{priceLabel(product)}</span>
-        <span className="tiny muted" style={{ textAlign: 'right', overflowWrap: 'anywhere' }}>
-          {sellerText}
-        </span>
+        <span className="tiny muted pcard-seller">{sellerText}</span>
       </div>
       {extraActions}
     </div>

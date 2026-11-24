@@ -13,6 +13,7 @@ import { BaoProgressBar } from '../pages/OrdersPage'
 import type { BaoStatus } from '../types'
 import { useEffect, useId, useState } from 'react'
 import { Icon } from '@/common/components/Icon'
+import { setAfterLogin } from '@/common/utils/afterLogin'
 import { navigate } from '@/common/router/router'
 import { useAuth } from '@/features/authentication'
 import {
@@ -333,6 +334,7 @@ function ModalContent(props: ModalContentProps) {
               type="button"
               className="btn ghost"
               onClick={() => {
+                setAfterLogin(activeModal.after || activeModal.route)
                 closeModal()
                 navigate('register')
               }}
@@ -343,6 +345,7 @@ function ModalContent(props: ModalContentProps) {
               type="button"
               className="btn"
               onClick={() => {
+                setAfterLogin(activeModal.after || activeModal.route)
                 closeModal()
                 navigate('login')
               }}

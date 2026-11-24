@@ -1,6 +1,8 @@
-import { useLayoutEffect, useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useEffect, useRef, useState, useCallback } from 'react'
 import gsap from 'gsap'
 import { navigate } from '@/common/router/router'
+import { peekAfterLogin } from '@/common/utils/afterLogin'
+import { apiFetch, ApiRequestError } from '@/common/api/client'
 import { LoginForm } from '../components/LoginForm'
 import { useAuth } from '../AuthContext'
 import { Icon } from '@/common/components/Icon'
@@ -11,8 +13,11 @@ import imgBef from '@/assets/SampleImages/bef71f2e0c003d63.jpeg'
 import img3 from '@/assets/SampleImages/images (3).jpeg'
 import img4 from '@/assets/SampleImages/images (4).jpeg'
 import img5 from '@/assets/SampleImages/images (5).jpeg'
+import { Banderitas } from '@/common/components/Banderitas'
 import type { LoginCredentials } from '../types'
 import './LoginPage.css'
+
+const LAST_LOGIN_EMAIL_KEY = 'rtu:last-login-email'
 
 const CAROUSEL_IMAGES = [
   { src: img0, alt: 'Sample image 0' },
@@ -124,8 +129,12 @@ export function LoginPage() {
   const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lock, setLock] = useState<{ kind: 'cooldown' | 'restricted'; until: number } | null>(null)
+  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null)
+  const [nextPenalty, setNextPenalty] = useState<string | null>(null)
   const [popup, setPopup] = useState<'guidelines' | 'policy' | null>(null)
   const loginStartRef = useRef<number>(0)
+  const lockTimerRef = useRef<number>(0)
 
   // Always scroll down when entering the sign-in page
   useEffect(() => {
@@ -135,14 +144,121 @@ export function LoginPage() {
     return () => clearTimeout(timer)
   }, [])
 
+  // ---- Lockout / cooldown timer ----
+  // Remaining time is always computed from `until - Date.now()` so a throttled
+  // background tab does not drift. Changing the computer clock only changes the
+  // display; the server enforces the real block.
+  const clearLockTimer = useCallback(() => {
+    if (lockTimerRef.current) {
+      window.clearInterval(lockTimerRef.current)
+      lockTimerRef.current = 0
+    }
+  }, [])
+
+  const tickLock = useCallback(() => {
+    if (!lock) return
+    const remaining = Math.max(0, lock.until - Date.now())
+    if (remaining <= 0) {
+      clearLockTimer()
+      setLock(null)
+      setAttemptsLeft(null)
+      setNextPenalty(null)
+      // Confirm with the server now that the lock should be gone.
+      const savedEmail = sessionStorage.getItem(LAST_LOGIN_EMAIL_KEY)
+      if (savedEmail) {
+        void apiFetch<{ locked: boolean; code: string | null; retry_after: number }>('/auth/login-status/', {
+          method: 'POST',
+          body: { email: savedEmail },
+        }).then(({ locked, code, retry_after }) => {
+          if (!locked) {
+            // Server says the lock is gone; the form is re-enabled.
+            return
+          }
+          // Server still locked: restore from its answer.
+          setLock({ kind: code === 'login_restricted' ? 'restricted' : 'cooldown', until: Date.now() + retry_after * 1000 })
+        })
+      }
+      return
+    }
+  }, [lock, clearLockTimer])
+
+  // ---- On mount: restore any in-progress lock from sessionStorage ----
+  useEffect(() => {
+    const savedEmail = sessionStorage.getItem(LAST_LOGIN_EMAIL_KEY)
+    if (!savedEmail) return
+
+    void apiFetch<{ locked: boolean; code: string | null; retry_after: number }>('/auth/login-status/', {
+      method: 'POST',
+      body: { email: savedEmail },
+    }).then(({ locked, code, retry_after }) => {
+      if (locked && retry_after > 0) {
+        setLock({ kind: code === 'login_restricted' ? 'restricted' : 'cooldown', until: Date.now() + retry_after * 1000 })
+        lockTimerRef.current = window.setInterval(tickLock, 1000)
+      }
+    })
+
+    return () => {
+      clearLockTimer()
+    }
+  }, [tickLock, clearLockTimer])
+
+  // Whenever the email field loses focus, check the server for the current lock state.
+  const checkLockStatus = (email: string) => {
+    const trimmed = email.trim().toLowerCase()
+    if (!trimmed) return
+    sessionStorage.setItem(LAST_LOGIN_EMAIL_KEY, trimmed)
+    void apiFetch<{ locked: boolean; code: string | null; retry_after: number }>('/auth/login-status/', {
+      method: 'POST',
+      body: { email: trimmed },
+    }).then(({ locked, code, retry_after }) => {
+      if (locked && retry_after > 0) {
+        setLock({ kind: code === 'login_restricted' ? 'restricted' : 'cooldown', until: Date.now() + retry_after * 1000 })
+        setAttemptsLeft(null)
+        setNextPenalty(null)
+        lockTimerRef.current = window.setInterval(tickLock, 1000)
+      } else {
+        setLock(null)
+        setAttemptsLeft(null)
+        setNextPenalty(null)
+        clearLockTimer()
+      }
+    })
+  }
+
   const handleLogin = async ({ email, password }: LoginCredentials) => {
     loginStartRef.current = Date.now()
     setIsLoading(true)
     setError(null)
+    setAttemptsLeft(null)
+    setNextPenalty(null)
     try {
       await login(email, password)
-      navigate('', { replace: true }) // the home route shows the marketplace once signed in
+      // Successful login: clear any stored lock email.
+      sessionStorage.removeItem(LAST_LOGIN_EMAIL_KEY)
+      clearLockTimer()
+      setLock(null)
+      navigate(peekAfterLogin() ?? '', { replace: true }) // the home route shows the marketplace once signed in
     } catch (err) {
+      if (err instanceof ApiRequestError) {
+        if (err.retryAfter !== undefined) {
+          // A lock (cooldown or restriction) was imposed.
+          setLock({ kind: err.code === 'login_restricted' ? 'restricted' : 'cooldown', until: Date.now() + err.retryAfter * 1000 })
+          sessionStorage.setItem(LAST_LOGIN_EMAIL_KEY, email.trim().toLowerCase())
+          lockTimerRef.current = window.setInterval(tickLock, 1000)
+          if (err.attemptsLeft !== undefined) {
+            setAttemptsLeft(err.attemptsLeft)
+            setNextPenalty(err.nextPenalty ?? null)
+          }
+          setError(err.code === 'login_restricted'
+            ? `Your login access is temporarily restricted for security reasons. Try again in ${formatTime(err.retryAfter)}.`
+            : `Too many failed attempts. You can try again in ${formatTime(err.retryAfter)}.`)
+          return
+        }
+        if (err.attemptsLeft !== undefined) {
+          setAttemptsLeft(err.attemptsLeft)
+          setNextPenalty(err.nextPenalty ?? null)
+        }
+      }
       setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.')
     } finally {
       setIsLoading(false)
@@ -157,16 +273,21 @@ export function LoginPage() {
     setPopup('guidelines')
   }
 
+  // Remaining seconds for the active lock (0 when none).
+  const remainingSeconds = lock ? Math.max(0, Math.ceil((lock.until - Date.now()) / 1000)) : 0
+  const defaultEmail = sessionStorage.getItem(LAST_LOGIN_EMAIL_KEY) || ''
+
   return (
     <div className="login-page">
       <div className="split">
         {/* Left info panel (navy background, from prototype) */}
-        <div className="l">
-          <button className="logo" type="button" onClick={() => navigate('/')}>
+        <div className="l" style={{ position: 'relative' }}>
+          <Banderitas variant="canopy" opacity={0.88} />
+          <button className="logo" type="button" onClick={() => navigate('/')} style={{ position: 'relative', zIndex: 2 }}>
             <img className="logo-img" src={logoImg} alt="RTU Tindahan Campus Marketplace" />
           </button>
           <LoginCarousel images={CAROUSEL_IMAGES} />
-          <div className="info-panel">
+          <div className="info-panel" style={{ position: 'relative', zIndex: 2 }}>
             <h1 className="hero-h">Your campus marketplace, made for everyday student life.</h1>
             <p>
               Buy merienda, find pre-loved books, book student services, and request official RTU items from verified students and personnel at Pasig Campus.
@@ -207,6 +328,12 @@ export function LoginPage() {
             isLoading={isLoading}
             error={error}
             onForgotPassword={handleForgotPassword}
+            lock={lock}
+            attemptsLeft={attemptsLeft}
+            nextPenalty={nextPenalty}
+            defaultEmail={defaultEmail}
+            onEmailBlur={checkLockStatus}
+            remainingSeconds={remainingSeconds}
           />
         </div>
       </div>
@@ -236,4 +363,11 @@ export function LoginPage() {
       )}
     </div>
   )
+}
+
+/** Format seconds as m:ss. */
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
 }

@@ -2,6 +2,7 @@ import { Logo } from '@/common/components/Logo'
 import { Link } from '@/common/router/router'
 import { scrollToSection } from '@/common/utils/scrollToSection'
 import { useTindahan } from '@/features/marketplace/context/TindahanContext'
+import { Banderitas } from '@/common/components/Banderitas'
 import './SiteFooter.css'
 
 interface SiteFooterProps {
@@ -16,7 +17,9 @@ export function SiteFooter({ variant }: SiteFooterProps) {
 
   return (
     <footer className={`sitefoot ${guest ? 'sf-guest' : ''}`} aria-label="Site footer">
-      <div className="page-content-shell">
+      <Banderitas variant="corner-left" surface="dark" compact opacity={0.75} />
+      <Banderitas variant="corner-right" surface="dark" compact opacity={0.75} />
+      <div className="page-content-shell" style={{ position: 'relative', zIndex: 2 }}>
         <div className="sf-grid">
           <div className="sf-brand">
           <div className="row" style={{ gap: 10 }}>

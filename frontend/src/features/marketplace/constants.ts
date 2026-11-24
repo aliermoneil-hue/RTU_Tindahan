@@ -501,7 +501,7 @@ export function getSellerTimeWindows(p?: PrototypeProduct | null): string[] {
   return slots
 }
 
-export function blankDraft(isAdmin = false): ListingDraft {
+export function blankDraft(isAdmin = false, defaultDays: readonly string[] = []): ListingDraft {
   return {
     type: 'product',
     editLid: null,
@@ -517,7 +517,7 @@ export function blankDraft(isAdmin = false): ListingDraft {
     window: '12:00 PM to 1:00 PM',
     tStart: '12:00',
     tEnd: '13:00',
-    days: ['Mon', 'Tue'],
+    days: cleanDays(defaultDays).length ? cleanDays(defaultDays) : ['Mon', 'Tue'],
     agree: false,
     images: [],
     svcType: 'Printing',

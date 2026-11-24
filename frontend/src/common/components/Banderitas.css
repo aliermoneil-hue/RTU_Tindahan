@@ -1,0 +1,195 @@
+/* ==========================================================================
+   BANDERITAS — reusable decorative pennant garland (RTU Tindahan brand colors)
+   Pure CSS, no Tailwind. Inline SVGs are aria-hidden decorative accents.
+   ========================================================================== */
+
+/* Base: decorative only, never blocks interaction or text selection. */
+.banderitas {
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+  display: block;
+  position: absolute;
+}
+
+/* SVG fills its wrapper box; wrapper controls size and corner placement. */
+.banderitas svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  animation: banderitasSway 5.5s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+/* --- corner-left / corner-right: compact diagonal drapes tucked in corners --- */
+.banderitas--corner-left {
+  top: 0;
+  left: 0;
+  width: clamp(150px, 19vw, 240px);
+  height: auto;
+}
+.banderitas--corner-left.banderitas--compact {
+  width: clamp(90px, 11vw, 130px);
+}
+.banderitas--corner-right {
+  top: 0;
+  right: 0;
+  width: clamp(160px, 21vw, 260px);
+  height: auto;
+}
+.banderitas--corner-right.banderitas--compact {
+  width: clamp(90px, 11vw, 130px);
+}
+
+/* --- canopy: wide hero/auth banner swag across the top --- */
+.banderitas--canopy {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+}
+
+/* --- garland: full-width horizontal double-swag --- */
+.banderitas--garland {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  max-height: 52px;
+}
+
+/* --- mini: compact inline block (position relative so it flows in layout) --- */
+.banderitas--mini {
+  position: relative;
+  display: block;
+  width: 110px;
+  height: 22px;
+  overflow: visible;
+  margin: 0 auto;
+  transform-origin: center;
+}
+
+/* Light surface: cream flag becomes RTU Navy so no white-on-white gaps */
+.banderitas--light {
+  --band-alt: #1a2f57;
+}
+:root[data-theme='dark'] .banderitas--light {
+  --band-alt: #fffaf0;
+}
+
+/* --- Theme toggle: pennants (light mode) vs string lights (dark mode) --- */
+.banderitas-lights {
+  display: none;
+}
+
+:root[data-theme='dark'] .banderitas-pennants {
+  display: none;
+}
+
+:root[data-theme='dark'] .banderitas-lights {
+  display: block;
+}
+
+/* Dark-mode string & bulb styles */
+:root[data-theme='dark'] .banderitas-string {
+  stroke: rgba(160, 168, 182, 0.38);
+  stroke-width: 1.5;
+}
+
+.banderitas-socket {
+  stroke: #3a3f4a;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.banderitas-bulb {
+  fill: #fff3c4;
+  animation: bulbCorePulse 3.6s ease-in-out infinite;
+}
+
+.banderitas-halo {
+  animation: bulbHaloTwinkle 3.6s ease-in-out infinite;
+}
+
+/* Bulb animations */
+@keyframes bulbHaloTwinkle {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes bulbCorePulse {
+  0%,
+  100% {
+    opacity: 0.88;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Windy overall string breeze (active in both light and dark modes) */
+@keyframes banderitasSway {
+  0%,
+  100% {
+    transform: rotate(-0.9deg) translateY(0);
+  }
+  50% {
+    transform: rotate(1.1deg) translateY(2px);
+  }
+}
+
+/* Staggered individual flag flutter (light mode only) */
+.banderitas-flag {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: flagFlutter 3.2s ease-in-out infinite;
+  vector-effect: non-scaling-stroke;
+}
+
+@keyframes flagFlutter {
+  0%,
+  100% {
+    transform: skewX(0deg) scaleY(1);
+  }
+  35% {
+    transform: skewX(5deg) scaleY(0.95);
+  }
+  70% {
+    transform: skewX(-4deg) scaleY(1.03);
+  }
+}
+
+/* Respect reduced motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  .banderitas svg,
+  .banderitas-flag,
+  .banderitas-bulb,
+  .banderitas-halo {
+    animation: none;
+  }
+}
+
+/* Mobile: keep corner drapes and canopy clear of text. */
+@media (max-width: 640px) {
+  .banderitas--corner-left,
+  .banderitas--corner-right {
+    width: 120px;
+    opacity: 0.78 !important;
+  }
+  .banderitas--corner-left.banderitas--compact {
+    width: 80px;
+    opacity: 0.65 !important;
+  }
+  .banderitas--corner-right.banderitas--compact {
+    width: 80px;
+    opacity: 0.65 !important;
+  }
+  .banderitas--canopy {
+    opacity: 0.72 !important;
+  }
+}

@@ -33,6 +33,12 @@ export class ApiRequestError extends Error {
   status: number
   /** Machine code from the backend, e.g. "email_not_verified". */
   code?: string
+  /** Seconds until a cooldown / restriction lock expires. */
+  retryAfter?: number
+  /** How many failed attempts remain before the next penalty. */
+  attemptsLeft?: number
+  /** What the next penalty will be: "cooldown" or "restriction". */
+  nextPenalty?: string
   constructor(message: string, status: number, code?: string) {
     super(message)
     this.name = 'ApiRequestError'

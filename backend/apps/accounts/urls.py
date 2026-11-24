@@ -3,6 +3,9 @@ from django.urls import path
 from .admin_api import AdminUserViewSet, DatabaseBackupView
 from .views import (
     CollegeListView,
+    ChangePasswordView,
+    DeleteAccountView,
+    LoginStatusView,
     LoginView,
     LogoutAllView,
     LogoutView,
@@ -45,6 +48,7 @@ urlpatterns = [
         name="password-reset-confirm",
     ),
     path("auth/login/", LoginView.as_view(), name="login"),
+    path("auth/login-status/", LoginStatusView.as_view(), name="login-status"),
     path("auth/logout/", LogoutView.as_view(), name="logout"),
     path("auth/logout-all/", LogoutAllView.as_view(), name="logout-all"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
@@ -76,5 +80,12 @@ urlpatterns = [
         "admin/backup/",
         DatabaseBackupView.as_view(),
         name="admin-backup",
+    ),
+    # The signed-in member's own account: change the password, or delete.
+    path(
+        "auth/change-password/", ChangePasswordView.as_view(), name="change-password"
+    ),
+    path(
+        "auth/delete-account/", DeleteAccountView.as_view(), name="delete-account"
     ),
 ]

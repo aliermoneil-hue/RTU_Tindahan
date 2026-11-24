@@ -4,6 +4,7 @@ import { GlobalOverlays } from '@/features/marketplace/components/GlobalOverlays
 import { Sidebar } from '../components/Sidebar'
 import { Topbar } from '../components/Topbar'
 import { SiteFooter } from '../components/SiteFooter'
+import { Banderitas } from '@/common/components/Banderitas'
 import './AppLayout.css'
 
 interface AppLayoutProps {
@@ -143,6 +144,8 @@ export function AppLayout({ user, activePath, children }: AppLayoutProps) {
         />
         <div className="page-wrap">
           <main className="page">
+            <Banderitas className="page-banderitas-left" compact opacity={0.7} surface="light" variant="corner-left" />
+            <Banderitas className="page-banderitas-right" opacity={0.75} surface="light" variant="corner-right" />
             <div className="page-content-shell">{children}</div>
           </main>
           <SiteFooter variant="member" />

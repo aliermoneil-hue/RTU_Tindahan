@@ -10,6 +10,9 @@
   padding: 28px 22px 18px;
   width: 100%;
   box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  z-index: 2;
 }
 
 .sitefoot .logo-img {

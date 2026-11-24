@@ -18,6 +18,16 @@
   flex-direction: column;
   gap: 14px;
   box-shadow: 0 6px 20px rgba(10, 20, 38, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+.hc-hero-top,
+.hc-hero h1,
+.hc-hero p,
+.hc-search-wrap,
+.hc-quick-chips {
+  position: relative;
+  z-index: 2;
 }
 .hc-hero-top {
   display: flex;
@@ -291,10 +301,12 @@
   font-size: 14px;
   font-weight: 700;
   flex: none;
+  transition: transform 0.25s ease, background-color 0.15s ease, color 0.15s ease;
 }
 .hc-faq-item.open .hc-faq-toggle {
   background: var(--soft);
   color: var(--blue);
+  transform: rotate(180deg);
 }
 .hc-faq-a {
   padding: 12px 16px 15px;
@@ -303,6 +315,10 @@
   color: var(--ink);
   line-height: 1.6;
   background: var(--bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hc-faq-toggle { transition: none; }
 }
 
 /* Section Pager (Previous / Next section) */

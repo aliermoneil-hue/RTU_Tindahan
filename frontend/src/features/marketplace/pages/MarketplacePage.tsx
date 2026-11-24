@@ -6,6 +6,7 @@ import { MiniLoader } from '@/common/components/BrandLoader'
 import { CATEGORIES, CAT_META, SERVICES_CAT } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
 import { MarketplaceProductShelf } from '../components/MarketplaceProductShelf'
+import { Banderitas } from '@/common/components/Banderitas'
 import './MarketplacePage.css'
 
 export function MarketplacePage() {
@@ -206,7 +207,7 @@ export function MarketplacePage() {
       </div>
 
       <div
-        className="card"
+        className="card market-banner"
         style={{
           background: 'var(--navy)',
           color: '#fff',
@@ -216,22 +217,27 @@ export function MarketplacePage() {
           flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <div className="stack" style={{ gap: 6, maxWidth: 520 }}>
+        <Banderitas compact opacity={0.8} surface="dark" variant="corner-left" />
+        <Banderitas opacity={0.9} surface="dark" variant="corner-right" />
+        <div className="stack market-banner-copy" style={{ gap: 6, maxWidth: 520, position: 'relative', zIndex: 2 }}>
           <span className="pill yellow" style={{ alignSelf: 'flex-start' }}>
             Today at RTU Pasig
           </span>
-          <h2 style={{ fontSize: 22 }}>
+          <h2 style={{ fontSize: 22, position: 'relative', zIndex: 2 }}>
             Merienda, school supplies, and more, ready for campus meetup.
           </h2>
-          <p className="small" style={{ opacity: 0.85 }}>
+          <p className="small" style={{ opacity: 0.85, position: 'relative', zIndex: 2 }}>
             Browse listings that students and RTU staff have posted for campus meetup.
           </p>
         </div>
         <button
           type="button"
           className="btn yellow"
+          style={{ position: 'relative', zIndex: 2 }}
           onClick={() => browseFor({ goBrowse: true })}
         >
           Browse listings

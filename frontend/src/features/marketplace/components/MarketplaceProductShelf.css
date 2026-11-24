@@ -39,14 +39,30 @@
 .shelf-row {
   display: flex;
   flex-wrap: nowrap;
-  gap: 16px;
+  gap: 10px;
   min-width: max-content;
 }
 
-/* Card slot sizing: exactly 5 cards across on desktop using container query units */
+/* Card slot sizing driven by shelf container width */
 .shelf-row .pcard {
-  width: calc((100cqi - (4 * 16px)) / 5);
+  --cols: 2;
+  --gap: 10px;
+  --peek: 28px;
+  width: max(150px, calc((100cqi - var(--peek) - (var(--cols) - 1) * var(--gap)) / var(--cols)));
   flex-shrink: 0;
+}
+
+@container (min-width: 520px) {
+  .shelf-row { gap: 16px; }
+  .shelf-row .pcard { --cols: 3; --gap: 16px; --peek: 0px; }
+}
+@container (min-width: 760px) {
+  .shelf-row { gap: 16px; }
+  .shelf-row .pcard { --cols: 4; --gap: 16px; --peek: 0px; }
+}
+@container (min-width: 960px) {
+  .shelf-row { gap: 16px; }
+  .shelf-row .pcard { --cols: 5; --gap: 16px; --peek: 0px; }
 }
 
 /* Compact typography so seller names/prices don't wrap at 5-across width */
@@ -132,17 +148,21 @@
   height: 20px;
 }
 
-/* Mobile: hide scroll buttons */
 @media (max-width: 767px) {
+  .shelf-viewport {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 8px 16px 12px 2px;
+  }
+  .shelf-viewport::-webkit-scrollbar {
+    display: none;
+  }
   .shelf-track {
     gap: 10px;
   }
   .shelf-row {
     gap: 10px;
-  }
-  .shelf-row .pcard {
-    width: calc((100cqi - 10px) / 2);
-    flex-shrink: 0;
   }
   .shelf-chev {
     display: none;

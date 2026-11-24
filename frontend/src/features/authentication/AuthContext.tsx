@@ -49,6 +49,8 @@ interface AuthValue {
   isSigningIn: boolean
   /** The pending sign-up code request (null before one has been sent) */
   otp: OtpState | null
+  /** Clear the pending code request (used when starting over on step 1). */
+  clearOtp: () => void
   login: (email: string, password: string) => Promise<void>
   /** Step 2 of sign up: create the account and email a 6-digit code. */
   register: (input: RegisterInput) => Promise<void>
@@ -174,6 +176,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOtp(null)
   }, [])
 
+  // Clear the pending code request so starting over on step 1 does not
+  // auto-resume on the code screen.
+  const clearOtp = useCallback(() => {
+    setOtp(null)
+  }, [])
+
   // -----------------------------------------------------------------------
   // Sign out
   // -----------------------------------------------------------------------
@@ -189,8 +197,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, isLoading, isSigningIn, otp, login, register, resendCode, confirmCode, logout }),
-    [user, isLoading, isSigningIn, otp, login, register, resendCode, confirmCode, logout],
+    () => ({
+      user,
+      isLoading,
+      isSigningIn,
+      otp,
+      clearOtp,
+      login,
+      register,
+      resendCode,
+      confirmCode,
+      logout,
+    }),
+    [user, isLoading, isSigningIn, otp, clearOtp, login, register, resendCode, confirmCode, logout],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

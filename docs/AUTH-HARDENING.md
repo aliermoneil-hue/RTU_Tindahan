@@ -13,9 +13,12 @@ sign-up flow keeps its own document: `AUTH-CODE-FLOW.md`.
 | POST | `/api/v1/auth/password-reset/confirm/` | anyone | Spend the code, set the new password |
 | POST | `/api/v1/auth/token/refresh/` | signed in | Rotate the caller's token |
 | POST | `/api/v1/auth/logout-all/` | signed in | End every session for the account |
+| POST | `/api/v1/auth/login-status/` | anyone | Is this address locked right now, and for how long |
+| POST | `/api/v1/auth/change-password/` | signed in | Change the password from Profile → Security |
+| POST | `/api/v1/auth/delete-account/` | signed in | Delete the account, or scrub it when orders/listings must survive |
 
-All four are in `apps/accounts/urls.py`; the logic lives in `views.py` with the
-code plumbing in `verification.py`.
+All of them are in `apps/accounts/urls.py`; the logic lives in `views.py` with
+the code plumbing in `verification.py` and the lockout policy in `lockout.py`.
 
 ---
 
@@ -136,7 +139,53 @@ move to per-device tokens, which is the change that will actually need it.
 
 ---
 
-## 5. Not done, and why
+## 5. Login lockout (SE-05)
+
+Guessing a password is now rate-limited per address, in the database, so a
+restart does not forgive an attacker. `apps/accounts/lockout.py` is the whole
+policy; `LoginView` only asks it questions.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `LOGIN_COOLDOWN_AFTER` | 5 | failures before the first cooldown |
+| `LOGIN_COOLDOWN_SECONDS` | 60 | how long that cooldown lasts |
+| `LOGIN_RESTRICT_AFTER` | 7 | failures before a restriction |
+| `LOGIN_RESTRICT_SECONDS` | 900 | how long a restriction lasts |
+| `LOGIN_ATTEMPT_WINDOW_HOURS` | 24 | an older count is stale and starts again |
+
+    wrong password, 1st time
+    → 400 {"detail": "Email or password is incorrect.",
+           "attempts_left": 4, "next_penalty": "cooldown"}
+
+    the 5th
+    → 429 {"detail": "Too many failed attempts. ...", "code": "login_cooldown",
+           "retry_after": 60}   + Retry-After: 60
+
+    the 7th
+    → 429 {"code": "login_restricted", "retry_after": 900}
+
+    POST auth/login-status/  {"email": "..."}
+    → {"locked": true, "code": "login_cooldown", "retry_after": 59}
+
+Rules that matter:
+
+- **Keyed by email, not by user row.** An address that does not exist behaves
+  exactly like one that does, so this endpoint cannot be used to discover which
+  RTU addresses have accounts.
+- **A correct password does not bypass an active lock.** The lock is checked
+  before the password, so a locked address cannot be used to confirm a guess.
+- **It is cleared on success, on a password reset, and by hand.** A reset is
+  the way out when a student is locked out: the confirm view calls
+  `lockout.reset(email)`, so the new password signs in immediately instead of
+  waiting out a cooldown earned on the old one. Staff can also select rows in
+  Django admin and run **Clear selected lockouts**.
+- **The per-IP throttle is separate.** `THROTTLE_LOGIN` (30/min) still exists
+  and answers `429` with DRF's own wording; the lockout above is per address
+  and survives a new IP.
+
+---
+
+## 6. Not done, and why
 
 - **Per-device sessions.** Needs a token table with a label per device (knox or
   a custom model). Worth doing when "sign out my other phone" becomes a real
@@ -147,7 +196,7 @@ move to per-device tokens, which is the change that will actually need it.
 
 ---
 
-## 6. Checking it by hand
+## 7. Checking it by hand
 
 ```bash
 BASE=http://localhost:8000/api/v1
@@ -174,7 +223,7 @@ curl -s -X POST $BASE/auth/logout-all/  -H "Authorization: Token $TOKEN"
 
 ---
 
-## 7. Files
+## 8. Files
 
 | File | Change |
 | --- | --- |
@@ -187,7 +236,13 @@ curl -s -X POST $BASE/auth/logout-all/  -H "Authorization: Token $TOKEN"
 | `backend/apps/accounts/views.py` | four views, fresh-token-on-login, the changed-mail on reset |
 | `backend/apps/accounts/urls.py` | four routes |
 | `backend/apps/accounts/tests/test_hardening.py` | 22 tests |
-| `backend/config/settings.py` | auth class, `AUTH_TOKEN_TTL_DAYS`, throttle scope |
+| `backend/apps/accounts/lockout.py` | cooldown / restriction policy and its lock rows |
+| `backend/apps/accounts/migrations/0006_loginattempt.py` | `LoginAttempt` table |
+| `backend/apps/accounts/tests/test_login_lockout.py` | lockout tests |
+| `backend/config/settings.py` | auth class, `AUTH_TOKEN_TTL_DAYS`, throttle scopes, `LOGIN_*` |
 
-Run `python manage.py migrate` after pulling this, or the reset table is
-missing.
+Run `python manage.py migrate` after pulling this, or the reset and lockout
+tables are missing.
+
+`manage.py test apps.accounts` covers this whole document; the lockout suite is
+`apps/accounts/tests/test_login_lockout.py`.
