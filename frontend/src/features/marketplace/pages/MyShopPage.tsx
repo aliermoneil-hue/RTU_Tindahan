@@ -621,6 +621,15 @@ export function MyShopPage() {
                           </span>
                         </span>
                         <span className={`pill ${state.tone}`}>{state.label}</span>
+                        {listing.moderation_status === 'rejected' && (
+                          <button
+                            type="button"
+                            className="btn sm"
+                            onClick={() => navigate(`appeal?kind=listing&id=${listing.id}`)}
+                          >
+                            Appeal
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn ghost sm"

@@ -113,6 +113,16 @@ export const ForumReportsPage = lazy(() =>
     default: m.ForumReportsPage,
   })),
 )
+export const AppealsPage = lazy(() =>
+  import('@/features/marketplace/pages/admin/AppealsPage').then((m) => ({
+    default: m.AppealsPage,
+  })),
+)
+export const AppealPage = lazy(() =>
+  import('@/features/marketplace/pages/AppealPage').then((m) => ({
+    default: m.AppealPage,
+  })),
+)
 export const StaffToolsPage = lazy(() =>
   import('@/features/marketplace/pages/admin/StaffToolsPage').then((m) => ({
     default: m.StaffToolsPage,

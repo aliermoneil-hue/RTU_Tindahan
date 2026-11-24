@@ -11,10 +11,10 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 55 |
+| Implemented, verified | 57 |
 | Implemented | 79 |
 | Partial | 26 |
-| Not implemented | 7 |
+| Not implemented | 5 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
 | **total** | **174** |
@@ -203,7 +203,7 @@ browser or the tests in this repository.
 | AI-03 | The system shall automatically publish submissions that receive an Approved classification. | Not yet | Deliberately not done | a clean verdict still waits for a human: `docs/SCREENING.md` §6 |
 | AI-04 | The system shall hold content marked Needs Review and place it in the moderator queue. A human moderator shall make the final decision. | Partly | Implemented, verified | needs_review queue for listings, posts and comments |
 | AI-05 | The system shall block the publication of submissions classified as Rejected and present the submitting user with the specific reason for rejection. | Partly | Partial | held items cannot publish; a permanent Rejected state does not exist |
-| AI-06 | The system shall let a user appeal a Rejected decision after a moderator has confirmed it (AI-11). A different moderator, or an Administrator, shal... | Not yet | Not implemented | no appeal flow for a rejected item |
+| AI-06 | The system shall let a user appeal a Rejected decision after a moderator has confirmed it (AI-11). A different moderator, or an Administrator, shal... | Not yet | Implemented, verified | POST /appeals/ + decide; the moderator who confirmed the rejection is refused via original_decider |
 | AI-07 | The system shall send content to the moderator queue, and not publish it, if the LLM service is unavailable or returns an error. | Not yet | Implemented, verified | provider failure falls back to rules, and with the fallback off the item is held |
 | AI-08 | The system shall keep a log of every screening: the content ID, the cleaned text that was sent to the LLM, the outcome, the reason, the confidence... | Not yet | Partial | verdict, score, reasons, provider, model and time are logged; the cleaned text is not stored |
 | AI-09 | The system shall send to the LLM service only the content being checked, and only after removing names, contact numbers, and other identifying deta... | Not yet | Partial | only the content is sent, but names and numbers inside it are not redacted |
@@ -226,7 +226,7 @@ browser or the tests in this repository.
 | RM-05 | The system shall record a comprehensive audit log entry for every moderation action executed on the platform. | - | Implemented, verified | `apps/audit/record()` on every staff moderation action |
 | RM-06 | The system shall show a moderator the past reports and actions linked to a user when the moderator reviews a report. | - | Partial | the audit trail names the member acted on; there is no per-user report history view |
 | RM-07 | The system shall strictly conceal the identity of the reporting user from the individual who was reported. | - | Implemented, verified | the reported member never receives the reporter's identity |
-| RM-08 | The system shall let a user appeal a moderator's removal, warning, or suspension. An Administrator who did not make the original decision shall rev... | - | Not implemented | no appeal flow for a removal, warning or suspension |
+| RM-08 | The system shall let a user appeal a moderator's removal, warning, or suspension. An Administrator who did not make the original decision shall rev... | - | Implemented, verified | appeals for removals and suspensions; suspended accounts appeal from /appeals/suspension/, decided by someone who did not decide |
 
 ## Notification (NT)
 
@@ -331,9 +331,7 @@ with the reason:
 | MS-05 | The system shall let a moderator see only the messages in a conversation that has been reported. | moderators cannot read a reported conversation |
 | RR-04 | The system shall hold review text for AI screening before it is published. | reviews are not screened on purpose: `docs/SCREENING.md` §6 |
 | AI-03 | The system shall automatically publish submissions that receive an Approved classification. | a clean verdict still waits for a human: `docs/SCREENING.md` §6 |
-| AI-06 | The system shall let a user appeal a Rejected decision after a moderator has confirmed it (AI-11). A different moderator | no appeal flow for a rejected item |
 | AI-10 | The system shall let an Administrator update the screening rules without changing the program code. | screening rules live in `providers.py`, not in an admin-editable table |
-| RM-08 | The system shall let a user appeal a moderator's removal, warning, or suspension. An Administrator who did not make the  | no appeal flow for a removal, warning or suspension |
 
 ## Note on identifier drift
 

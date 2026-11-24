@@ -298,6 +298,17 @@ and on the seller's Incoming orders tab.
 
 ---
 
+## 8b. Appeals API (AI-06, RM-08)
+
+`GET /appeals/?status=` lists a member's own appeals, or the whole queue for
+staff. `POST /appeals/` files one — `kind` of `listing`, `post`, `comment` or
+`account`, plus the target id and a reason of at least a sentence.
+`POST /appeals/<id>/decide/` takes `grant` and a required `note`; the server
+refuses the appellant and the person who made the original decision.
+`POST /appeals/suspension/` is the one unauthenticated door: email, password and
+reason, for an account that cannot sign in to appeal. See `APPEALS.md` for the
+rules and the outcome of each kind.
+
 ## 9. Forum API (posts, comments, reactions, reports)
 
 **Selling schedule posts (CF-05).** A post whose `topic` is `Selling schedule`

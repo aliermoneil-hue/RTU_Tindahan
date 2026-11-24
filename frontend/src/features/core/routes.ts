@@ -58,6 +58,8 @@ export const APP_PAGES: PageInfo[] = [
     about: 'Completed pickups and CSV export.' },
   { path: 'forum-reports', title: 'Forum Reports', icon: 'flag', section: 'ADMIN', backend: 'available',
     about: 'Reported forum posts.' },
+  { path: 'appeals', title: 'Appeals', icon: 'flag', section: 'ADMIN', backend: 'available',
+    about: 'Appeals against a rejected listing, a removed post or comment, or a suspended account.' },
   { path: 'staff', title: 'Staff tools', icon: 'edit', section: 'ADMIN', backend: 'available',
     about: 'Backup, restore and other staff utilities.' },
   // Pages reached from the top bar (not in the sidebar):

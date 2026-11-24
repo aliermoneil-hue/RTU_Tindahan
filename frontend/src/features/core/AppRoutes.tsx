@@ -11,6 +11,8 @@ import {
   FavoritesPage,
   ForumPage,
   ForumPostPage,
+  AppealPage,
+  AppealsPage,
   ForumReportsPage,
   ForgotPasswordPage,
   GuestOfficialStorePage,
@@ -195,6 +197,10 @@ function renderActiveRoute(path: string, user: { email: string; role: string } |
       case 'forum-reports':
       case 'forumreports':
         return <ForumReportsPage />
+      case 'appeals':
+        return <AppealsPage />
+      case 'appeal':
+        return <AppealPage />
       case 'staff':
         return <StaffToolsPage />
       default:

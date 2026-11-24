@@ -335,6 +335,18 @@ export function LoginPage() {
             onEmailBlur={checkLockStatus}
             remainingSeconds={remainingSeconds}
           />
+
+          <p className="small muted" style={{ marginTop: 10, textAlign: 'center' }}>
+            Account suspended and you think it was a mistake?{' '}
+            <button
+              type="button"
+              className="link"
+              onClick={() => navigate('appeal?kind=account')}
+            >
+              Appeal the suspension
+            </button>{' '}
+            — no sign-in needed.
+          </p>
         </div>
       </div>
 

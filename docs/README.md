@@ -26,6 +26,9 @@ Suggested contents, copied from the CapStone folder:
 - `BACKUP.md` — the nightly verified database copy (database plus uploads),
   the restore procedure, and the drill that proved a copy by reading it back
   through the ORM.
+- `APPEALS.md` — the appeal flow behind AI-06 and RM-08: what can be appealed,
+  the separation rule that stops a moderator reviewing their own decision, the
+  suspended-account path, and the endpoints.
 - `DATA-RETENTION.md` — the retention period behind PR-05: which setting
   governs what, what the nightly purge deletes, what it never touches, and the
   default chosen while the University confirms the number.

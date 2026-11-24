@@ -120,7 +120,7 @@ DECIDED = {
     "AI-03": ("policy", "a clean verdict still waits for a human: `docs/SCREENING.md` §6"),
     "AI-04": ("verified", "needs_review queue for listings, posts and comments"),
     "AI-05": ("partial", "held items cannot publish; a permanent Rejected state does not exist"),
-    "AI-06": ("open", "no appeal flow for a rejected item"),
+    "AI-06": ("verified", "POST /appeals/ + decide; the moderator who confirmed the rejection is refused via original_decider"),
     "AI-07": ("verified", "provider failure falls back to rules, and with the fallback off the item is held"),
     "AI-08": ("partial", "verdict, score, reasons, provider, model and time are logged; the cleaned text is not stored"),
     "AI-09": ("partial", "only the content is sent, but names and numbers inside it are not redacted"),
@@ -137,7 +137,7 @@ DECIDED = {
     "RM-03": ("verified", "hide, restore, delete, dismiss; moderators only"),
     "RM-05": ("verified", "`apps/audit/record()` on every staff moderation action"),
     "RM-07": ("verified", "the reported member never receives the reporter's identity"),
-    "RM-08": ("open", "no appeal flow for a removal, warning or suspension"),
+    "RM-08": ("verified", "appeals for removals and suspensions; suspended accounts appeal from /appeals/suspension/, decided by someone who did not decide"),
     # --- notifications ------------------------------------------------------
     "NT-01": ("verified", "one row per event, written by the causing service, polled at 20 s"),
     "NT-02": ("partial", "verification, reset and the password-changed notice are sent; store mail is not"),

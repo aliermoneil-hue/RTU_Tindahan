@@ -86,6 +86,7 @@ INSTALLED_APPS = [
     "apps.forum",
     "apps.notifications",
     "apps.audit",
+    "apps.appeals",
 ]
 
 MIDDLEWARE = [
@@ -213,6 +214,7 @@ REST_FRAMEWORK = {
         "verify": os.getenv("THROTTLE_VERIFY", "20/hour"),
         "password-reset": os.getenv("THROTTLE_PASSWORD_RESET", "5/hour"),
         "login-status": os.getenv("THROTTLE_LOGIN_STATUS", "60/min"),
+        "suspension-appeal": os.getenv("THROTTLE_SUSPENSION_APPEAL", "5/hour"),
     },
 }
 

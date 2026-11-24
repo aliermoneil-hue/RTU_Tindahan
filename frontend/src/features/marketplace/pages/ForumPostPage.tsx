@@ -459,6 +459,19 @@ export function ForumPostPage() {
                 {f.topic && f.kind === 'post' && <span className="pill">{f.topic}</span>}
                 {f.pinned && <span className="pill yellow">Pinned</span>}
                 {f.hidden && <span className="pill red">Hidden by staff</span>}
+                {f.hidden && mine && (
+                  <button
+                    type="button"
+                    className="link small"
+                    onClick={() =>
+                      navigate(
+                        `appeal?kind=post&id=${String(f.id).replace('api:', '')}`,
+                      )
+                    }
+                  >
+                    Appeal this removal
+                  </button>
+                )}
                 {f.held && <span className="pill red">Held for review</span>}
                 {nrep > 0 && (
                   <button
