@@ -158,7 +158,7 @@ DECIDED = {
     "SE-07": ("verified", "store rules run on the server, not the browser"),
     "PR-02": ("verified", "privacy consent recorded at registration"),
     "PR-03": ("verified", "profile edit and account deletion"),
-    "PR-05": ("open", "no documented retention period"),
+    "PR-05": ("implemented", "DATA_RETENTION_DAYS plus nightly purge_expired_data; the number awaits the University (Appendix B.2)"),
     "PR-06": ("verified", "delete scrubs name, email, contact and photo when rows must survive"),
     "RL-02": ("verified", "nightly verified copy of database and uploads, 14 kept: docs/BACKUP.md"),
     "RL-03": ("implemented", "orders and audit rows are append-only and survive account changes"),

@@ -219,6 +219,13 @@ REST_FRAMEWORK = {
 # AV-06: how long a sign-in lasts. Zero disables the check (the old behaviour).
 AUTH_TOKEN_TTL_DAYS = int(os.getenv("AUTH_TOKEN_TTL_DAYS", "14") or 0)
 
+# PR-05: how long a finished record is kept. Two years is the working default;
+# the SRS (Appendix B.2) leaves the number to the University, so it is a setting
+# and not a constant. 0 disables the purge entirely.
+DATA_RETENTION_DAYS = int(os.getenv("DATA_RETENTION_DAYS", "730") or 0)
+# Read notifications are housekeeping, not records: they go after a quarter.
+NOTIFICATION_RETENTION_DAYS = int(os.getenv("NOTIFICATION_RETENTION_DAYS", "90") or 0)
+
 # ---------------------------------------------------------------------------
 # CORS (the React app runs on a different port during development)
 # ---------------------------------------------------------------------------

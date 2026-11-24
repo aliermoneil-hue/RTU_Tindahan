@@ -26,6 +26,9 @@ Suggested contents, copied from the CapStone folder:
 - `BACKUP.md` — the nightly verified database copy (database plus uploads),
   the restore procedure, and the drill that proved a copy by reading it back
   through the ORM.
+- `DATA-RETENTION.md` — the retention period behind PR-05: which setting
+  governs what, what the nightly purge deletes, what it never touches, and the
+  default chosen while the University confirms the number.
 - `REQUIREMENTS-TRACE.md` — each requirement ID this repository cites, the file
   that enforces it, the surface to touch, and the test that would fail if it
   stopped being true.

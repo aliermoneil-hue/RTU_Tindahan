@@ -12,9 +12,9 @@ gap is named in the note.
 | State | Count |
 | --- | --- |
 | Implemented, verified | 52 |
-| Implemented | 78 |
+| Implemented | 79 |
 | Partial | 26 |
-| Not implemented | 11 |
+| Not implemented | 10 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
 | **total** | **174** |
@@ -287,7 +287,7 @@ browser or the tests in this repository.
 | PR-02 | The system shall show a privacy notice and get the user's consent when the user registers. The notice shall say what data is collected and why, tha... | Not yet | Implemented, verified | privacy consent recorded at registration |
 | PR-03 | The system shall let a user view and correct their personal data and request deletion of their account. Deletion follows PR-06. | Partly | Implemented, verified | profile edit and account deletion |
 | PR-04 | The system shall restrict internal access to personal user data based on administrative roles, ensuring moderators can view private content only wh... | Partly | Implemented | admin endpoints are role-gated; personal data is not exposed to members |
-| PR-05 | The system shall follow a data retention period that is defined and documented (to be confirmed, see Appendix B). | Not yet | Not implemented | no documented retention period |
+| PR-05 | The system shall follow a data retention period that is defined and documented (to be confirmed, see Appendix B). | Not yet | Implemented | DATA_RETENTION_DAYS plus nightly purge_expired_data; the number awaits the University (Appendix B.2) |
 | PR-06 | When an account is deleted, the system shall remove the user's personal data (name, email, contact number, and photo). Order records and published... | Not yet | Implemented, verified | delete scrubs name, email, contact and photo when rows must survive |
 
 ## Usability (UX)
@@ -337,7 +337,6 @@ with the reason:
 | AI-06 | The system shall let a user appeal a Rejected decision after a moderator has confirmed it (AI-11). A different moderator | no appeal flow for a rejected item |
 | AI-10 | The system shall let an Administrator update the screening rules without changing the program code. | screening rules live in `providers.py`, not in an admin-editable table |
 | RM-08 | The system shall let a user appeal a moderator's removal, warning, or suspension. An Administrator who did not make the  | no appeal flow for a removal, warning or suspension |
-| PR-05 | The system shall follow a data retention period that is defined and documented (to be confirmed, see Appendix B). | no documented retention period |
 
 ## Note on identifier drift
 
