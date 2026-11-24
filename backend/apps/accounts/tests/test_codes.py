@@ -3,6 +3,7 @@
 import re
 from datetime import timedelta
 
+from django.contrib.auth.hashers import check_password
 from django.core import mail
 from django.core.cache import cache
 from django.test import override_settings
@@ -69,8 +70,12 @@ class CodeFlowTests(APITestCase):
         code = code_from_last_email()
 
         record = VerificationCode.objects.get()
+        # Assert the property, not the hasher's prefix: the suite runs on a fast
+        # hasher and production does not, and either way the code must be
+        # unreadable in the row while still being checkable against it.
         self.assertNotEqual(record.code_hash, code)
-        self.assertTrue(record.code_hash.startswith("pbkdf2_"))
+        self.assertNotIn(code, record.code_hash)
+        self.assertTrue(check_password(code, record.code_hash))
         self.assertEqual(record.attempts, 0)
 
     def test_the_email_carries_the_same_code_that_was_stored(self):

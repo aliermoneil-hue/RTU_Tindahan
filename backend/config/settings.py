@@ -266,6 +266,11 @@ SCREENING_PROVIDER = os.getenv("LLM_PROVIDER", "stub").strip().lower()
 # pin it themselves with @override_settings.
 if "test" in sys.argv:
     SCREENING_PROVIDER = "stub"
+    # 365 tests create accounts, and PBKDF2 at default work factor is most of
+    # the suite's wall time (a 60-test app took two minutes alone). MD5 is the
+    # documented Django speed-up for the test runner only: it changes nothing
+    # about what is measured, and no test asserts a hash format.
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 SCREENING_API_KEY = os.getenv("LLM_API_KEY", "")
 
 # Which model, and how long to wait for it. Kept in .env because providers

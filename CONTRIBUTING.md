@@ -104,6 +104,21 @@ history.
 
 ---
 
+## 5b. Running the tests
+
+    cd backend
+    .venv/bin/python manage.py test apps.forum     # one app while you work
+    .venv/bin/python manage.py test                # everything, before you push
+
+The suite pins two things for itself in `config/settings.py` when `test` is the
+command: the screening provider is the deterministic rules stub (so a laptop's
+`LLM_PROVIDER=gemini` cannot make the run wait on the network) and passwords use
+a fast hasher (PBKDF2 against hundreds of test accounts was ~8 minutes; the
+whole suite is now seconds). Nothing about what the tests check changes, and CI
+gets both settings automatically because it runs the same command.
+
+---
+
 ## 6. Review checklist
 
 When you review someone's pull request, check:
