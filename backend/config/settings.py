@@ -9,6 +9,7 @@ Reference: https://docs.djangoproject.com/en/5.2/topics/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -259,12 +260,20 @@ RTU_STUDENT_EMAIL_REGEX = os.getenv(
 # ---------------------------------------------------------------------------
 
 SCREENING_PROVIDER = os.getenv("LLM_PROVIDER", "stub").strip().lower()
+# `load_dotenv()` above puts the machine's provider into the suite, so a
+# laptop with LLM_PROVIDER=gemini would make every listing test wait on the
+# network — and answer differently from CI. Tests that want a real provider
+# pin it themselves with @override_settings.
+if "test" in sys.argv:
+    SCREENING_PROVIDER = "stub"
 SCREENING_API_KEY = os.getenv("LLM_API_KEY", "")
 
 # Which model, and how long to wait for it. Kept in .env because providers
 # retire model names without notice; a code change should not be needed.
-SCREENING_MODEL = os.getenv("LLM_MODEL", "gemini-3.1-flash-lite").strip()
-SCREENING_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "12"))
+SCREENING_MODEL = os.getenv("LLM_MODEL", "gemini-3.5-flash-lite").strip()
+# Screening runs inline, so this is the member's worst-case wait when the
+# provider is down. 6 s is long enough for a slow-but-working call.
+SCREENING_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "6"))
 
 # When the provider fails, fall back to the deterministic rules instead of
 # leaving the listing unscreened. Safe only because screening never publishes:

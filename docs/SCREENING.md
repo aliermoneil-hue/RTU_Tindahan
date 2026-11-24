@@ -134,21 +134,34 @@ list. Do not describe it to the panel as an AI checker.
 
     LLM_PROVIDER=gemini
     LLM_API_KEY=<the key>
-    LLM_MODEL=gemini-3.1-flash-lite
-    LLM_TIMEOUT=12
+    LLM_MODEL=gemini-3.5-flash-lite
+    LLM_TIMEOUT=6
     LLM_FALLBACK=True
 
 `GeminiProvider` sends the title, description, and price with a system
 instruction and a response schema, so the answer comes back as JSON with a
 verdict, a score, and at most three reasons written for a moderator. Measured
-on this project's machine: 1.0–2.1 seconds per listing, about 160 tokens each.
+on this project's machine: 0.9–1.8 seconds per listing and per post, about 160
+tokens each, which is why the whole create request lands in under 2 s.
+
+`LLM_TIMEOUT=6` is deliberate. Screening runs inline, so the timeout is the
+worst-case wait a member pays when the provider is down; 6 s is long enough for
+a slow-but-working call and short enough that the rules fallback answers before
+anyone assumes the form is broken. Twelve seconds was the old value and it was
+felt on every post.
 
 **The model name lives in `.env`, never in code, and is taken from the
 provider's own model list.** That is not fussiness. The first name tried here
 was `gemini-2.5-flash`; the API answered *"no longer available to new users"*
 and pointed at a successor that then returned `503 UNAVAILABLE` for minutes at
-a time. `gemini-3.1-flash-lite` answered 6 of 6 test listings correctly. When a
-model is retired again, change one line in `.env` — and check the list first:
+a time. `gemini-3.1-flash-lite` then served 6 of 6 test listings correctly for
+months, but on 2026-11-24 it began answering `503` on some calls while staying
+available on others — a flaky model is worse than a retired one, because the
+fallback hides it behind a 6-second stall. `gemini-3.5-flash-lite` was measured
+on the same day at 0.9–1.3 s with 4 of 4 correct verdicts (clean listing,
+answer-key listing, ordinary post, vape post), and is the one now in `.env`.
+When a model is retired again, change one line in `.env` — and check the list
+first:
 
     curl -s -H "x-goog-api-key: $KEY" \
       "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200" \
@@ -188,6 +201,11 @@ Three steps, none of them outside `providers.py`:
 3. Set `LLM_PROVIDER`, `LLM_MODEL`, and `LLM_API_KEY` in `backend/.env`, then run
    `python manage.py test apps.screening`. The existing tests still apply: a
    provider that raises, returns nonsense, or times out must not publish.
+
+The suite never touches the network for this: `config/settings.py` forces
+`SCREENING_PROVIDER="stub"` whenever `manage.py test` is the entry point, because
+`load_dotenv()` would otherwise carry a laptop's `LLM_PROVIDER=gemini` into the
+run. A test that wants the real provider pins it with `@override_settings`.
 
 Pass the transport into the constructor when you write tests — both providers
 accept one — so the suite answers from a fixture instead of the network.

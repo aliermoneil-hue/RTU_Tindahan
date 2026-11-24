@@ -18,7 +18,10 @@ Two providers ship:
           because model names are retired without notice: the first name tried
           for this project answered "no longer available to new users" and
           pointed at a successor that then returned 503s. `gemini-3.1-flash-lite`
-          is the one measured to work (1-2 s per listing).
+          then worked for months before becoming intermittent (503 on some
+          calls, 1 s on others), which the fallback hides as a stall.
+          `gemini-3.5-flash-lite` is the one measured on 2026-11-24: four of
+          four sample items correct in 0.9-1.3 s.
 """
 
 import json
@@ -138,7 +141,7 @@ FLAG_THRESHOLD = 50
 MIN_DESCRIPTION = 20
 EXCESSIVE_PRICE = 50_000
 
-DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite"
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 GEMINI_ENDPOINT = (
     "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 )
