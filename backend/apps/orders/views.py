@@ -1,6 +1,13 @@
+import csv
+from datetime import date
+
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import HttpResponse
+from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -46,7 +53,24 @@ class OrderViewSet(
 
         if order_status := self.request.query_params.get("status"):
             queryset = queryset.filter(status=order_status)
+
+        # SD-03: a seller narrows their own sales history by date range.
+        date_from = self._date_param("from")
+        date_to = self._date_param("to")
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
         return queryset
+
+    def _date_param(self, name):
+        raw = (self.request.query_params.get(name) or "").strip()
+        if not raw:
+            return None
+        parsed = parse_date(raw)
+        if parsed is None:
+            raise ValidationError({name: "Use YYYY-MM-DD."})
+        return parsed
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -57,6 +81,69 @@ class OrderViewSet(
         if self.action == "create":
             return [IsVerifiedUser()]
         return [IsAuthenticated()]
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        """SD-04: a member downloads their own records as a structured file.
+
+        The staff ledger has exported CSV for a while; a seller had no way to
+        take their own numbers away. This uses the same queryset as the list, so
+        it can never widen the scope: `?role=seller` is the default here, the
+        date and status filters apply, and a member can only ever export rows
+        they are party to.
+        """
+        role = (request.query_params.get("role") or "seller").strip()
+        if role not in ("seller", "buyer"):
+            role = "seller"
+        # get_queryset reads the role from query_params; make the default stick.
+        if not request.query_params.get("role"):
+            request.query_params._mutable = True
+            request.query_params["role"] = role
+            request.query_params._mutable = False
+
+        orders = self.get_queryset().order_by("-created_at")
+
+        stamp = timezone.localdate().strftime("%Y%m%d")
+        filename = f"tindahan-{role}-sales-{stamp}.csv"
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response)
+        writer.writerow(
+            [
+                "reference",
+                "placed_on",
+                "status",
+                "buyer",
+                "buyer_email",
+                "items",
+                "total",
+                "meetup_place",
+                "completed_on",
+            ]
+        )
+        for order in orders:
+            lines = "; ".join(
+                f"{line.title} x{line.quantity}" for line in order.lines.all()
+            )
+            writer.writerow(
+                [
+                    _cell(order.reference),
+                    _cell(timezone.localtime(order.created_at).strftime("%Y-%m-%d %H:%M")),
+                    _cell(order.status),
+                    _cell(order.buyer.display_name if order.buyer else ""),
+                    _cell(order.buyer.email if order.buyer else ""),
+                    _cell(lines),
+                    _cell(f"{order.total_amount:.2f}"),
+                    _cell(order.meetup_place),
+                    _cell(
+                        timezone.localtime(order.updated_at).strftime("%Y-%m-%d %H:%M")
+                        if order.status == Order.Status.COMPLETED
+                        else ""
+                    ),
+                ]
+            )
+        return response
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -76,3 +163,16 @@ class OrderViewSet(
         except DjangoValidationError as exc:
             raise serializers.ValidationError(details(exc))
         return Response(OrderSerializer(order).data)
+
+
+def _cell(value):
+    """A spreadsheet must not run what a member typed.
+
+    A title of `=HYPERLINK(...)` is a formula the moment the file opens, so any
+    cell that starts with one of the formula characters is prefixed with a quote
+    and read as text.
+    """
+    text = "" if value is None else str(value)
+    if text[:1] in ("=", "+", "-", "@"):
+        return "'" + text
+    return text

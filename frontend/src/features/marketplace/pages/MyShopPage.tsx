@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Icon } from '@/common/components/Icon'
+import { apiDownload } from '@/common/api/client'
 import { navigate } from '@/common/router/router'
 import { baoItemType, baoReserved, baoUnits } from '../baoHelpers'
 import { isSvc, peso, stamp } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
 import { imgSrc } from '../imageStore'
 import { API_ID_PREFIX, type ApiListing } from '../api/listings'
+import type { ApiOrder } from '../api/orders'
 import { AvatarBadge } from '../components/AvatarBadge'
 import { PhotoUploader } from '../components/PhotoUploader'
 import { RatingText, StarsDisplay } from '../components/StarRating'
@@ -838,6 +840,10 @@ export function MyShopPage() {
       {/* Incoming orders tab */}
       {shopTab === 'orders' && (
         <>
+          <SalesHistoryCard
+            orders={apiOrders}
+            sellerEmail={currentAccount.email}
+          />
           <div className="card stack">
             <div className="row between wrap">
               <div>
@@ -1564,4 +1570,166 @@ export function MyShopPage() {
 
 function rDateSuffix(edited?: number | null): string {
   return edited ? ' · edited' : ''
+}
+
+/**
+ * SD-03 and SD-04: a seller's own history, narrowed and taken away.
+ *
+ * The filters run over the rows the server already returned for this seller, and
+ * the download asks the server for the same window rather than rebuilding the
+ * file in the browser — so the CSV and the screen can never disagree about what
+ * counts as a sale.
+ */
+function SalesHistoryCard({
+  orders,
+  sellerEmail,
+}: {
+  orders: ApiOrder[]
+  sellerEmail: string
+}) {
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [status, setStatus] = useState<'all' | 'requested' | 'accepted' | 'completed' | 'cancelled' | 'declined'>('all')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const mine = useMemo(
+    () => orders.filter((o) => o.seller_email === sellerEmail),
+    [orders, sellerEmail],
+  )
+
+  const rows = useMemo(() => {
+    return mine.filter((o) => {
+      if (status !== 'all' && o.status !== status) return false
+      const day = (o.created_at || '').slice(0, 10)
+      if (from && day < from) return false
+      if (to && day > to) return false
+      return true
+    })
+  }, [mine, status, from, to])
+
+  const query = () => {
+    const params = new URLSearchParams({ role: 'seller' })
+    if (status !== 'all') params.set('status', status)
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    return params.toString()
+  }
+
+  async function download() {
+    setBusy(true)
+    setError(null)
+    try {
+      const { blob, filename } = await apiDownload(`/orders/export/?${query()}`)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename || 'sales.csv'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That download could not be prepared.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const total = rows.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
+
+  return (
+    <div className="card stack">
+      <div className="row between wrap">
+        <div>
+          <b>Sales history</b>
+          <p className="small muted">
+            Every order a buyer has sent you. Narrow it by day or status, then take it away as a
+            spreadsheet.
+          </p>
+        </div>
+        <button type="button" className="btn sm" disabled={busy} onClick={() => void download()}>
+          <Icon name="dl" size="sm" /> {busy ? 'Preparing…' : 'Download CSV'}
+        </button>
+      </div>
+
+      <div className="row wrap" style={{ gap: 10 }}>
+        <label className="small" style={{ gap: 4 }}>
+          From
+          <input
+            className="input"
+            type="date"
+            value={from}
+            max={to || undefined}
+            onChange={(e) => setFrom(e.target.value)}
+          />
+        </label>
+        <label className="small" style={{ gap: 4 }}>
+          To
+          <input
+            className="input"
+            type="date"
+            value={to}
+            min={from || undefined}
+            onChange={(e) => setTo(e.target.value)}
+          />
+        </label>
+        <label className="small" style={{ gap: 4 }}>
+          Status
+          <select
+            className="input"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as typeof status)}
+          >
+            <option value="all">All</option>
+            <option value="requested">Requested</option>
+            <option value="accepted">Accepted</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="declined">Declined</option>
+          </select>
+        </label>
+        {(from || to || status !== 'all') && (
+          <button
+            type="button"
+            className="link small"
+            onClick={() => {
+              setFrom('')
+              setTo('')
+              setStatus('all')
+            }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {error && <p className="small" style={{ color: 'var(--danger, #b3261e)' }}>{error}</p>}
+
+      <div className="row between small muted">
+        <span>
+          {rows.length} of {mine.length} order{mine.length === 1 ? '' : 's'}
+        </span>
+        <span className="tnum">{peso(total)} in this view</span>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="small muted">No sales in this window. Widen the dates or clear the status.</p>
+      ) : (
+        <div className="stack" style={{ gap: 8 }}>
+          {rows.map((order) => (
+            <div key={order.reference} className="row between wrap small" style={{ gap: 8 }}>
+              <span style={{ overflowWrap: 'anywhere', flex: 1 }}>
+                <b>{order.reference}</b> · {(order.created_at || '').slice(0, 10)} ·{' '}
+                {order.buyer_name} ·{' '}
+                {order.lines.map((l) => `${l.quantity} × ${l.title}`).join(', ')}
+              </span>
+              <span className="small muted">{order.status_display}</span>
+              <span className="tnum">{peso(Number(order.total_amount))}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }

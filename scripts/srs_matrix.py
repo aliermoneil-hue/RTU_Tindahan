@@ -108,7 +108,7 @@ DECIDED = {
     "SD-01": ("verified", "My shop lists received orders"),
     "SD-02": ("partial", "counts and totals per status exist; no period selector"),
     "SD-03": ("open", "no date-range or status filter on sales history"),
-    "SD-04": ("open", "no CSV export of a seller's sales"),
+    "SD-04": ("verified", "GET /orders/export/ returns the seller's own rows as CSV, filters honoured"),
     # --- forum --------------------------------------------------------------
     "CF-01": ("verified", "topics, notices, pinned announcements"),
     "CF-05": ("open", "a selling-schedule post has no structured date, time or location"),

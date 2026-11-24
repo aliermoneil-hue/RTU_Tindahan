@@ -277,6 +277,17 @@ Server orders are also merged into the buyer's My Orders snapshot
 tab, the rating panel and the "requests you sent" summary agree. Order lines
 carry the backend listing id, so an item stays rateable after it sells out.
 
+**Sales history (SD-03, SD-04).** `GET /orders/` takes `?role=seller|buyer`,
+`?status=`, and a date window `?from=YYYY-MM-DD&to=YYYY-MM-DD` on the day the
+order was placed; a malformed date is a 400 that says `Use YYYY-MM-DD.` rather
+than an empty list. `GET /orders/export/` returns the same rows as
+`text/csv` with `Content-Disposition: attachment; filename="tindahan-<role>-sales-<date>.csv"`,
+and defaults to `role=seller` — a member can only ever export rows they are
+party to. Cells that begin with `=`, `+`, `-` or `@` are prefixed with a quote so
+a listing title cannot become a formula in someone's spreadsheet. The seller
+dashboard renders the filters over the rows it already holds and asks the server
+for the same window when downloading, so screen and file cannot disagree.
+
 **Contact numbers (OT-07).** An order payload carries `buyer_contact` and
 `seller_contact`, and both are `null` unless the order is **Accepted** — then
 each party receives the *other* party's number, and only that one. The rule

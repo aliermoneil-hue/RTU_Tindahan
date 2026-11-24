@@ -235,6 +235,9 @@ CORS_ALLOWED_ORIGINS = env_list(
     "http://localhost:5173,http://127.0.0.1:5173",
 )
 CORS_ALLOW_CREDENTIALS = True
+# A CSV download names itself in Content-Disposition; without this the browser
+# hides the header from JavaScript and the saved file loses its name.
+CORS_EXPOSE_HEADERS = ["Content-Disposition"]
 
 # ---------------------------------------------------------------------------
 # RTU identity rules

@@ -1,7 +1,9 @@
 """API tests for student-to-student orders."""
 
+from datetime import timedelta
 from decimal import Decimal
 
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -321,3 +323,124 @@ class OrderContactVisibilityTests(APITestCase):
         response = self.client.get(f"/api/v1/orders/{self.reference}/")
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class SellerSalesHistoryTests(APITestCase):
+    """SD-03 and SD-04: filtering and exporting a seller's own sales."""
+
+    def setUp(self):
+        self.seller = make_user("2024-888001@rtu.edu.ph")
+        self.other_seller = make_user("2024-888002@rtu.edu.ph")
+        self.buyer = make_user("2024-888003@rtu.edu.ph")
+        self.category = Category.objects.create(name="Books")
+        self.listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Statistics Textbook",
+            description="No highlights.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price=Decimal("250.00"),
+            quantity=5,
+            meetup_place="Main lobby",
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+        )
+        self.other_listing = Listing.objects.create(
+            seller=self.other_seller,
+            category=self.category,
+            title="Someone else's book",
+            description="Not mine.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price=Decimal("100.00"),
+            quantity=5,
+            meetup_place="Main lobby",
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+        )
+
+    def place(self, listing, status_name, days_ago=0):
+        self.client.force_authenticate(self.buyer)
+        response = self.client.post(
+            "/api/v1/orders/",
+            {"lines": [{"listing": listing.id, "quantity": 1}], "meetup_place": "Main lobby"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.json())
+        reference = response.json()["reference"]
+        order = Order.objects.get(reference=reference)
+        order.status = status_name
+        order.save(update_fields=["status"])
+        if days_ago:
+            stamp = timezone.now() - timedelta(days=days_ago)
+            Order.objects.filter(pk=order.pk).update(created_at=stamp, updated_at=stamp)
+        return reference
+
+    def seller_get(self, path):
+        self.client.force_authenticate(self.seller)
+        return self.client.get(path)
+
+    def test_status_filter_returns_only_that_status(self):
+        self.place(self.listing, Order.Status.COMPLETED)
+        self.place(self.listing, Order.Status.REQUESTED)
+
+        body = self.seller_get("/api/v1/orders/?role=seller&status=completed").json()
+
+        rows = body["results"] if isinstance(body, dict) else body
+        self.assertEqual([row["status"] for row in rows], ["completed"])
+
+    def test_date_range_narrows_the_history(self):
+        self.place(self.listing, Order.Status.COMPLETED, days_ago=40)
+        self.place(self.listing, Order.Status.COMPLETED, days_ago=2)
+
+        today = timezone.localdate()
+        start = (today - timedelta(days=7)).isoformat()
+        end = today.isoformat()
+        body = self.seller_get(
+            f"/api/v1/orders/?role=seller&status=completed&from={start}&to={end}"
+        ).json()
+
+        rows = body["results"] if isinstance(body, dict) else body
+        self.assertEqual(len(rows), 1)
+
+    def test_a_malformed_date_is_refused_in_plain_words(self):
+        response = self.seller_get("/api/v1/orders/?role=seller&from=yesterday")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Use YYYY-MM-DD", str(response.json()))
+
+    def test_export_returns_a_csv_of_the_sellers_own_rows_only(self):
+        mine = self.place(self.listing, Order.Status.COMPLETED)
+        self.place(self.other_listing, Order.Status.COMPLETED)
+
+        response = self.seller_get("/api/v1/orders/export/?role=seller")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response["Content-Type"].startswith("text/csv"))
+        self.assertIn("attachment; filename=\"tindahan-seller-sales-", response["Content-Disposition"])
+        body = response.content.decode()
+        self.assertIn("reference,placed_on,status,buyer,buyer_email,items,total", body)
+        self.assertIn(mine, body)
+        self.assertIn("Statistics Textbook x1", body)
+        self.assertNotIn("Someone else's book", body)
+
+    def test_export_honours_the_same_filters_as_the_list(self):
+        self.place(self.listing, Order.Status.COMPLETED)
+        self.place(self.listing, Order.Status.CANCELLED)
+
+        response = self.seller_get("/api/v1/orders/export/?role=seller&status=cancelled")
+
+        body = response.content.decode()
+        self.assertIn(",cancelled,", body)
+        self.assertNotIn(",completed,", body)
+
+    def test_a_formula_in_a_title_cannot_run_in_the_spreadsheet(self):
+        self.listing.title = "=HYPERLINK(\"http://example.com\")"
+        self.listing.save(update_fields=["title"])
+        self.place(self.listing, Order.Status.COMPLETED)
+
+        response = self.seller_get("/api/v1/orders/export/?role=seller")
+
+        body = response.content.decode()
+        self.assertIn("'=HYPERLINK", body)
