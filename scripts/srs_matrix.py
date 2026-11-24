@@ -153,7 +153,7 @@ DECIDED = {
     # --- non-functional -----------------------------------------------------
     "PF-03": ("verified", "screening answered in ~1 s live; a member sees the item pending meanwhile"),
     "SE-02": ("verified", "HTTPS public origin, secure cookies and HSTS with DEBUG off"),
-    "SE-05": ("partial", "5-failure cooldown and 7-failure restriction exist; sessions expire after 14 days, not 30 idle minutes"),
+    "SE-05": ("verified", "a session ends after 30 idle minutes and 5 failures in a row lock the address for 15 minutes, with unlock_login as the rescue"),
     "SE-06": ("verified", "type, 5 MB, 100 px side; enforced in the serializer too"),
     "SE-07": ("verified", "store rules run on the server, not the browser"),
     "PR-02": ("verified", "privacy consent recorded at registration"),

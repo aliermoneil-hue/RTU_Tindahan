@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from django.core import mail
 from django.core.cache import cache
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
@@ -306,3 +306,110 @@ class PasswordChangedEmailTests(APITestCase):
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password("BrandNewPass456!"))
         self.assertEqual(Token.objects.filter(user=self.user).count(), 0)
+
+
+@override_settings(AUTH_IDLE_MINUTES=30, AUTH_IDLE_TOUCH_SECONDS=60)
+class IdleSessionTests(APITestCase):
+    """SE-05: thirty minutes of no activity ends the session.
+
+    The token's age is not the question — a session used a minute ago is alive
+    however old the token is, and one abandoned an hour ago is over however new
+    it is.
+    """
+
+    def setUp(self):
+        self.user = make_user("2024-121212@rtu.edu.ph")
+        self.token = Token.objects.create(user=self.user)
+
+    def call(self, key=None):
+        return self.client.get(
+            "/api/v1/auth/me/", HTTP_AUTHORIZATION=f"Token {key or self.token.key}"
+        )
+
+    def idle_for(self, minutes):
+        from apps.accounts.models import TokenActivity
+
+        self.call()  # a first request, to stamp the row
+        TokenActivity.objects.filter(token=self.token).update(
+            last_seen=timezone.now() - timedelta(minutes=minutes)
+        )
+
+    def test_a_session_used_just_now_works(self):
+        self.assertEqual(self.call().status_code, 200)
+
+    def test_a_session_idle_for_forty_minutes_is_refused(self):
+        self.idle_for(40)
+
+        response = self.call()
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["code"], "session_idle")
+        self.assertIn("30 minutes of no activity", response.json()["detail"])
+
+    def test_a_session_idle_for_twenty_nine_minutes_still_works(self):
+        self.idle_for(29)
+
+        self.assertEqual(self.call().status_code, 200)
+
+    def test_a_request_moves_the_clock_forward(self):
+        from apps.accounts.models import TokenActivity
+
+        self.idle_for(25)
+        self.assertEqual(self.call().status_code, 200)
+
+        row = TokenActivity.objects.get(token=self.token)
+        self.assertLess((timezone.now() - row.last_seen).total_seconds(), 5)
+
+    def test_the_stamp_is_not_written_on_every_request(self):
+        from apps.accounts.models import TokenActivity
+
+        self.call()
+        first = TokenActivity.objects.get(token=self.token).last_seen
+        self.call()
+        second = TokenActivity.objects.get(token=self.token).last_seen
+
+        # Two requests inside the touch window, one write.
+        self.assertEqual(first, second)
+
+    @override_settings(AUTH_IDLE_MINUTES=0)
+    def test_zero_turns_the_idle_check_off(self):
+        self.idle_for(600)
+
+        self.assertEqual(self.call().status_code, 200)
+
+    def test_a_token_with_no_activity_row_is_stamped_rather_than_refused(self):
+        # A token issued before this check existed must not lock everyone out.
+        self.assertEqual(self.call().status_code, 200)
+        self.assertTrue(
+            __import__(
+                "apps.accounts.models", fromlist=["TokenActivity"]
+            ).TokenActivity.objects.filter(token=self.token).exists()
+        )
+
+    def test_signing_out_removes_the_activity_row(self):
+        from apps.accounts.models import TokenActivity
+
+        self.call()
+        self.client.post(
+            "/api/v1/auth/logout/", HTTP_AUTHORIZATION=f"Token {self.token.key}"
+        )
+
+        self.assertEqual(TokenActivity.objects.filter(token_id=self.token.pk).count(), 0)
+
+
+class UnlockLoginCommandTests(TestCase):
+    """The rescue hatch: five wrong passwords is a fifteen-minute lock."""
+
+    def test_the_command_clears_a_lock(self):
+        from apps.accounts.lockout import current_lock, record_failure
+        from django.core.management import call_command
+
+        email = "2024-131313@rtu.edu.ph"
+        make_user(email)
+        for _ in range(5):
+            record_failure(email)
+        self.assertIsNotNone(current_lock(email))
+
+        call_command("unlock_login", email, verbosity=0)
+
+        self.assertIsNone(current_lock(email))

@@ -20,6 +20,9 @@ import type { User } from '@/common/types'
  * and is sent as `Authorization: Token <key>`.
  */
 
+/** Where the sign-in screen reads the reason it was sent back (SE-05). */
+export const SESSION_NOTICE_KEY = 'rtu_session_notice'
+
 const STUDENT_EMAIL = /^\d{4}-\d{6}@rtu\.edu\.ph$/i
 const LOGIN_EMAIL = /^[^@\s]+@rtu\.edu\.ph$/i
 
@@ -93,6 +96,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
+  }, [])
+
+  // -----------------------------------------------------------------------
+  // The session ended while it was open (SE-05: half an hour of no activity,
+  // or a token that aged out). The client has already dropped the token; here
+  // the app lets go of the user and leaves a sentence for the sign-in screen.
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    const onExpired = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail
+      sessionStorage.setItem(
+        SESSION_NOTICE_KEY,
+        detail?.message ?? 'Your session has ended. Sign in again to continue.',
+      )
+      setUser(null)
+      setOtp(null)
+    }
+    window.addEventListener('rtu:session-expired', onExpired)
+    return () => window.removeEventListener('rtu:session-expired', onExpired)
   }, [])
 
   // -----------------------------------------------------------------------

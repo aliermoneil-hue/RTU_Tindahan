@@ -372,6 +372,33 @@ class PasswordResetCode(models.Model):
         return f"Password reset code for {self.user.email}"
 
 
+class TokenActivity(models.Model):
+    """SE-05: when a sign-in token was last used.
+
+    The token itself records only when it was issued, which cannot tell a
+    session that is open from one that was abandoned three hours ago. One row
+    per token, touched at most once a minute, so "30 minutes of no activity"
+    is a fact about use rather than a guess about age.
+
+    A ladder of two limits, not one: `AUTH_IDLE_MINUTES` ends a session that
+    stopped being used, and `AUTH_TOKEN_TTL_DAYS` is still the outer bound for
+    a session that is used forever.
+    """
+
+    token = models.OneToOneField(
+        "authtoken.Token",
+        on_delete=models.CASCADE,
+        related_name="activity",
+    )
+    last_seen = models.DateTimeField(db_index=True)
+
+    class Meta:
+        verbose_name_plural = "token activity"
+
+    def __str__(self):
+        return f"token for user {self.token.user_id} at {self.last_seen:%Y-%m-%d %H:%M}"
+
+
 class LoginAttempt(models.Model):
     """Failed login attempt counter used for login lockout (SE-05).
 

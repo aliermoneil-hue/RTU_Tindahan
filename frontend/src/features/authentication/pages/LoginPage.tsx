@@ -4,7 +4,7 @@ import { navigate } from '@/common/router/router'
 import { peekAfterLogin } from '@/common/utils/afterLogin'
 import { apiFetch, ApiRequestError } from '@/common/api/client'
 import { LoginForm } from '../components/LoginForm'
-import { useAuth } from '../AuthContext'
+import { SESSION_NOTICE_KEY, useAuth } from '../AuthContext'
 import { Icon } from '@/common/components/Icon'
 import logoImg from '@/assets/logo-removebg-preview.png'
 import img0 from '@/assets/SampleImages/0.webp'
@@ -128,7 +128,15 @@ function LoginCarousel({ images }: { images: { src: string; alt: string }[] }) {
 export function LoginPage() {
   const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // SE-05: if the app sent us here because the session ended, say so once.
+  // Read in a state initialiser but cleared in an effect: under StrictMode the
+  // initialiser runs twice, and clearing it there threw the sentence away.
+  const [error, setError] = useState<string | null>(
+    () => sessionStorage.getItem(SESSION_NOTICE_KEY),
+  )
+  useEffect(() => {
+    sessionStorage.removeItem(SESSION_NOTICE_KEY)
+  }, [])
   const [lock, setLock] = useState<{ kind: 'cooldown' | 'restricted'; until: number } | null>(null)
   const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null)
   const [nextPenalty, setNextPenalty] = useState<string | null>(null)

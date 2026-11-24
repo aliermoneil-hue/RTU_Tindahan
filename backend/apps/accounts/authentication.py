@@ -6,9 +6,16 @@ This class adds an age check on top, without changing the token format, so the
 React app keeps sending `Authorization: Token <key>` and nothing on the client
 changes.
 
-`AUTH_TOKEN_TTL_DAYS` in `backend/.env` sets the lifetime. Zero (or empty)
-disables the check and restores the old behaviour, which is what a team that
-has not migrated yet should set.
+Two limits, because a session can end in two ways:
+
+  `AUTH_IDLE_MINUTES` (default 30)  SE-05: no request for half an hour and the
+                                    session is over, however new the token is.
+  `AUTH_TOKEN_TTL_DAYS` (default 14) an outer bound, so a session that is used
+                                    every day still ends eventually.
+
+Either can be set to 0 to switch that limit off. Idleness is measured from
+`TokenActivity.last_seen`, which is touched at most once a minute so that a
+busy screen does not write a row per request.
 
 An expired token is refused, not deleted: the row stays as evidence until the
 account signs in again or a moderator removes it. Deleting on failure would
@@ -21,6 +28,16 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+
+
+def idle_limit() -> timedelta | None:
+    """How long a session may sit unused. None means "no idle limit"."""
+    minutes = getattr(settings, "AUTH_IDLE_MINUTES", 30)
+    try:
+        minutes = int(minutes or 0)
+    except (TypeError, ValueError):
+        minutes = 0
+    return timedelta(minutes=minutes) if minutes > 0 else None
 
 
 def token_lifetime() -> timedelta | None:
@@ -56,4 +73,37 @@ class ExpiringTokenAuthentication(TokenAuthentication):
                     code="token_expired",
                 )
 
+        self._check_activity(token)
+
         return user, token
+
+    def _check_activity(self, token):
+        """SE-05: end a session that has not been used for `AUTH_IDLE_MINUTES`."""
+        idle = idle_limit()
+        if idle is None:
+            return
+
+        from .models import TokenActivity
+
+        now = timezone.now()
+        row = TokenActivity.objects.filter(token=token).first()
+
+        if row is None:
+            # A token issued before this check existed, or the first request of
+            # a session: stamp it now rather than refusing a working sign-in.
+            TokenActivity.objects.create(token=token, last_seen=now)
+            return
+
+        if now - row.last_seen > idle:
+            minutes = int(idle.total_seconds() // 60)
+            raise AuthenticationFailed(
+                f"You were signed out after {minutes} minutes of no activity. "
+                "Sign in again to continue.",
+                code="session_idle",
+            )
+
+        # Touch at most once a minute: a screen that polls every few seconds
+        # must not turn into a write per request.
+        touch_after = int(getattr(settings, "AUTH_IDLE_TOUCH_SECONDS", 60) or 0)
+        if touch_after <= 0 or (now - row.last_seen).total_seconds() >= touch_after:
+            TokenActivity.objects.filter(pk=row.pk).update(last_seen=now)

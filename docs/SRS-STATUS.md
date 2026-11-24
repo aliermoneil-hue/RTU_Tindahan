@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 69 |
+| Implemented, verified | 70 |
 | Implemented | 79 |
-| Partial | 19 |
+| Partial | 18 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
@@ -274,7 +274,7 @@ browser or the tests in this repository.
 | SE-02 | All client-server and external API network traffic shall be encrypted via HTTPS. | Not yet | Implemented, verified | HTTPS public origin, secure cookies and HSTS with DEBUG off |
 | SE-03 | The system shall control access by role (Visitor, User, Office Staff, Moderator, Administrator). | Partly | Implemented | `config/settings.py`, `apps/accounts` |
 | SE-04 | The system shall check all user input and protect against common web attacks such as SQL injection, cross-site scripting, and cross-site request fo... | Partly | Implemented | `config/settings.py`, `apps/accounts` |
-| SE-05 | Sessions shall expire after 30 minutes of no activity. After 5 failed log-ins in a row, the account shall be locked for 15 minutes. | Not yet | Partial | 5-failure cooldown and 7-failure restriction exist; sessions expire after 14 days, not 30 idle minutes |
+| SE-05 | Sessions shall expire after 30 minutes of no activity. After 5 failed log-ins in a row, the account shall be locked for 15 minutes. | Not yet | Implemented, verified | a session ends after 30 idle minutes and 5 failures in a row lock the address for 15 minutes, with unlock_login as the rescue |
 | SE-06 | File uploads shall be limited to image files within a set size limit. | Built | Implemented, verified | type, 5 MB, 100 px side; enforced in the serializer too |
 | SE-07 | Every rule that protects the Official Store (staff only changes, no negative stock, the status rules, windows, and the limits) shall be repeated on... | Not yet | Implemented, verified | store rules run on the server, not the browser |
 | SE-08 | It must not provide or place the email key, password, or provider secret in the front end code. | Partly | Implemented | `config/settings.py`, `apps/accounts` |

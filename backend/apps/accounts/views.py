@@ -529,7 +529,12 @@ class LogoutAllView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        removed, _ = Token.objects.filter(user=request.user).delete()
+        # Count the sessions, not every row the cascade touches: since SE-05
+        # each token also has an activity row, and "you ended 2 sessions" when
+        # only one existed is a lie a test caught.
+        ended = Token.objects.filter(user=request.user).count()
+        Token.objects.filter(user=request.user).delete()
+        removed = ended
         return Response(
             {"detail": "Signed out of every device.", "sessions_ended": removed}
         )

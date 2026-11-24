@@ -223,7 +223,46 @@ curl -s -X POST $BASE/auth/logout-all/  -H "Authorization: Token $TOKEN"
 
 ---
 
-## 8. Files
+## 8. A session ends after thirty minutes of no activity (SE-05)
+
+The token's age answers a different question from "is anybody still there". A
+token issued nine days ago and used a minute ago is a live session; one issued
+an hour ago and never touched again is not. Two limits, then:
+
+| setting | default | what it ends |
+| --- | --- | --- |
+| `AUTH_IDLE_MINUTES` | 30 | a session with no request for half an hour |
+| `AUTH_TOKEN_TTL_DAYS` | 14 | any session, however busy, after two weeks |
+
+Idleness is measured from `TokenActivity.last_seen`, one row per token, touched
+at most once a minute (`AUTH_IDLE_TOUCH_SECONDS`) so a polling screen does not
+write a row per request. `AUTH_IDLE_MINUTES=0` switches the idle check off and
+leaves only the token lifetime — useful on a workstation, not on a server.
+
+A refused session answers **401** with `code: "session_idle"` (or
+`"token_expired"`), and the client drops the stored token and says why on the
+sign-in screen: *"You were signed out after 30 minutes of no activity. Sign in
+again to continue."* The code comes from `config/api_errors.py`, which adds a
+machine-readable `code` beside DRF's prose; nothing else about the error body
+changes.
+
+### Five failures is fifteen minutes, and there is a way out
+
+`LOGIN_COOLDOWN_AFTER=5` failures in a row lock the address for
+`LOGIN_COOLDOWN_SECONDS` (**900**), which is what SE-05 asks for — deliberately
+not a soft 60-second pause. `THROTTLE_LOGIN` must stay above that threshold
+(20/min in `.env`), or the fifth failure is answered by the per-IP throttle
+before the lock can be recorded.
+
+A lock is exactly long enough to ruin a demonstration, so:
+
+    manage.py unlock_login 2024-200374@rtu.edu.ph
+    manage.py unlock_login --all --dry-run
+
+It deletes the failed-attempt record for that address. It does not weaken the
+rule, and the audit log keeps whatever the attempts produced.
+
+## 9. Files
 
 | File | Change |
 | --- | --- |
@@ -239,7 +278,12 @@ curl -s -X POST $BASE/auth/logout-all/  -H "Authorization: Token $TOKEN"
 | `backend/apps/accounts/lockout.py` | cooldown / restriction policy and its lock rows |
 | `backend/apps/accounts/migrations/0006_loginattempt.py` | `LoginAttempt` table |
 | `backend/apps/accounts/tests/test_login_lockout.py` | lockout tests |
-| `backend/config/settings.py` | auth class, `AUTH_TOKEN_TTL_DAYS`, throttle scopes, `LOGIN_*` |
+| `backend/config/settings.py` | auth class, `AUTH_TOKEN_TTL_DAYS`, `AUTH_IDLE_MINUTES`, throttle scopes, `LOGIN_*` |
+| `backend/apps/accounts/models.py` | `TokenActivity` (one row per token) |
+| `backend/apps/accounts/migrations/0007_tokenactivity.py` | the activity table |
+| `backend/apps/accounts/authentication.py` | the idle check and the throttled touch |
+| `backend/apps/accounts/management/commands/unlock_login.py` | the rescue hatch |
+| `backend/config/api_errors.py` | `code` beside `detail`, so two 401s can be told apart |
 
 Run `python manage.py migrate` after pulling this, or the reset and lockout
 tables are missing.

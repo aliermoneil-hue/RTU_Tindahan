@@ -99,6 +99,22 @@ async function parse<T>(response: Response): Promise<T> {
       data && typeof data === 'object' && typeof (data as { code?: unknown }).code === 'string'
         ? ((data as { code: string }).code)
         : undefined
+
+    // SE-05: the session ended while it was open — idle for half an hour, or the
+    // token aged out. The stored token will never work again, so it goes now and
+    // the app is told, rather than every later request failing one at a time.
+    if (response.status === 401 && (code === 'session_idle' || code === 'token_expired')) {
+      setToken(null)
+      window.dispatchEvent(
+        new CustomEvent('rtu:session-expired', {
+          detail: {
+            code,
+            message: messageFrom(data, 'Your session has ended. Sign in again to continue.'),
+          },
+        }),
+      )
+    }
+
     throw new ApiRequestError(messageFrom(data, 'Something went wrong. Please try again.'), response.status, code)
   }
   return data as T

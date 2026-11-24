@@ -104,14 +104,15 @@ class LoginLockoutTests(APITestCase):
         result = record_failure(self.user.email)
         self.assertTrue(result.locked)
         self.assertEqual(result.kind, "cooldown")
-        self.assertEqual(result.retry_after, 60)
+        # SE-05: five failures in a row, fifteen minutes.
+        self.assertEqual(result.retry_after, 900)
 
     def test_sixth_failure_after_cooldown_shows_one_attempt_left(self):
         # Reach cooldown (5 failures)
         for _ in range(5):
             record_failure(self.user.email)
-        # Move time past the 60-second cooldown
-        future = timezone.now() + timezone.timedelta(seconds=61)
+        # Move time past the fifteen-minute cooldown
+        future = timezone.now() + timezone.timedelta(seconds=901)
         with patch("apps.accounts.lockout.timezone.now", return_value=future):
             # current_lock should see the expired cooldown and KEEP the count at 5
             lock = current_lock(self.user.email)

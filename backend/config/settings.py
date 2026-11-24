@@ -182,7 +182,11 @@ PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
 # Login lockout (failed attempt protection)
 # ---------------------------------------------------------------------------
 LOGIN_COOLDOWN_AFTER = int(os.getenv("LOGIN_COOLDOWN_AFTER", "5"))
-LOGIN_COOLDOWN_SECONDS = int(os.getenv("LOGIN_COOLDOWN_SECONDS", "60"))
+# SE-05 says five failures in a row locks the account for fifteen minutes, so
+# that is the default. It is deliberately not a soft 60-second pause: the panel
+# asked for fifteen minutes and the number should be the one they asked for.
+# `manage.py unlock_login <email>` clears it when a demo needs rescuing.
+LOGIN_COOLDOWN_SECONDS = int(os.getenv("LOGIN_COOLDOWN_SECONDS", "900"))
 LOGIN_RESTRICT_AFTER = int(os.getenv("LOGIN_RESTRICT_AFTER", "7"))
 LOGIN_RESTRICT_SECONDS = int(os.getenv("LOGIN_RESTRICT_SECONDS", "900"))
 LOGIN_ATTEMPT_WINDOW_HOURS = int(os.getenv("LOGIN_ATTEMPT_WINDOW_HOURS", "24"))
@@ -192,6 +196,9 @@ LOGIN_ATTEMPT_WINDOW_HOURS = int(os.getenv("LOGIN_ATTEMPT_WINDOW_HOURS", "24"))
 # ---------------------------------------------------------------------------
 
 REST_FRAMEWORK = {
+    # The client needs a machine-readable code beside the prose, so an idle
+    # session (SE-05) can be told apart from an aged-out token.
+    "EXCEPTION_HANDLER": "config.api_errors.code_enriched_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         # AV-06 hardening: a token older than AUTH_TOKEN_TTL_DAYS is refused.
         # The format is unchanged, so the React client needed no edit.
@@ -220,6 +227,13 @@ REST_FRAMEWORK = {
 
 # AV-06: how long a sign-in lasts. Zero disables the check (the old behaviour).
 AUTH_TOKEN_TTL_DAYS = int(os.getenv("AUTH_TOKEN_TTL_DAYS", "14") or 0)
+
+# SE-05: a session ends after 30 minutes without a request. 0 turns the idle
+# check off and leaves only the token lifetime above.
+AUTH_IDLE_MINUTES = int(os.getenv("AUTH_IDLE_MINUTES", "30") or 0)
+# How often the activity stamp is refreshed, in seconds. Small enough that the
+# window is honest, large enough that a polling screen writes once a minute.
+AUTH_IDLE_TOUCH_SECONDS = int(os.getenv("AUTH_IDLE_TOUCH_SECONDS", "60") or 0)
 
 # PR-05: how long a finished record is kept. Two years is the working default;
 # the SRS (Appendix B.2) leaves the number to the University, so it is a setting
