@@ -38,6 +38,8 @@ export interface ApiForumComment {
   parent: number | null
   deleted: boolean
   hidden: { by: string; ts: string } | null
+  moderation_status: 'visible' | 'needs_review'
+  screening: ApiForumScreening | null
   created_at: string
   edited_at: string | null
 }
@@ -274,6 +276,8 @@ function commentFromApi(row: ApiForumComment, viewerEmail: string): ForumComment
     edited: row.edited_at ?? undefined,
     deleted: row.deleted,
     hidden: row.hidden ?? undefined,
+    held: row.moderation_status === 'needs_review',
+    screening: row.screening ?? undefined,
   }
 }
 

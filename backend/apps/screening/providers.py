@@ -235,6 +235,15 @@ class TextSubject:
             kind="post",
         )
 
+    @classmethod
+    def for_comment(cls, comment):
+        return cls(
+            title="",
+            description=comment.text or "",
+            price=None,
+            kind="comment",
+        )
+
 
 def as_subject(item) -> TextSubject:
     """Accept a `TextSubject`, or a listing/post model for convenience.
@@ -380,9 +389,13 @@ class GeminiProvider:
 
     def _payload(self, subject) -> dict:
         instruction = (
-            GEMINI_POST_INSTRUCTION if subject.kind == "post" else GEMINI_INSTRUCTION
+            GEMINI_INSTRUCTION
+            if subject.kind == "listing"
+            else GEMINI_POST_INSTRUCTION
         )
         text = f"Title: {subject.title}\nText: {subject.description}"
+        if subject.kind == "comment":
+            text = subject.description
         if subject.kind == "listing":
             text = (
                 f"Title: {subject.title}\n"

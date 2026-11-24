@@ -32,6 +32,15 @@ class ScreeningResult(models.Model):
         on_delete=models.CASCADE,
         related_name="screening_results",
     )
+    # Comments are screened by the same providers; the audit row names the
+    # comment when that is what was judged.
+    comment = models.ForeignKey(
+        "forum.ForumComment",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="screening_results",
+    )
     verdict = models.CharField(max_length=10, choices=Verdict.choices, db_index=True)
 
     # 0 = certainly harmless, 100 = certainly prohibited. Null when the
@@ -51,13 +60,19 @@ class ScreeningResult(models.Model):
         indexes = [
             models.Index(fields=["listing", "-created_at"]),
             models.Index(fields=["post", "-created_at"]),
+            models.Index(fields=["comment", "-created_at"]),
         ]
         constraints = [
             models.CheckConstraint(
                 name="screening_result_exactly_one_target",
                 condition=(
-                    models.Q(listing__isnull=False, post__isnull=True)
-                    | models.Q(listing__isnull=True, post__isnull=False)
+                    models.Q(listing__isnull=False, post__isnull=True, comment__isnull=True)
+                    | models.Q(
+                        listing__isnull=True, post__isnull=False, comment__isnull=True
+                    )
+                    | models.Q(
+                        listing__isnull=True, post__isnull=True, comment__isnull=False
+                    )
                 ),
             )
         ]
@@ -71,6 +86,8 @@ class ScreeningResult(models.Model):
             return f"listing {self.listing_id}"
         if self.post_id:
             return f"post {self.post_id}"
+        if self.comment_id:
+            return f"comment {self.comment_id}"
         return "unattached result"
 
     @property

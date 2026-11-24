@@ -1,7 +1,7 @@
 # Content screening (AI-01 to AI-16)
 
-Every listing — and now every forum post — passes a screening step before it
-can be seen by the public. This file explains where that step lives, how to
+Every listing, every forum post and every forum comment passes a screening step
+before it can be seen by the public. This file explains where that step lives, how to
 test it today, and how to put a real language model behind it later without
 touching the rest of the system.
 
@@ -65,6 +65,22 @@ written. So the gate inverts, and the safe default stays safe.
 
 A held post is **not hidden**: it keeps its row, its author still sees it (so
 it does not vanish without explanation), staff see it, and nobody else does.
+
+### Forum comments
+
+A comment is the loudest channel on the site: it publishes inside somebody
+else's thread the moment it is typed. It runs the same gate as a post —
+`run_comment_screening` on create and again on edit — with the same shape: a
+flagged comment is held (`moderation_status=needs_review`), leaves the thread
+for everyone but its author and staff, notifies its author once, and notifies
+the moderators. It is released by the comment `moderate` action with
+`{"action": "restore"}`, which also clears the hold, and it appears under
+**Held comments** in Staff → Forum reports next to the held posts.
+
+Reviews are deliberately **not** screened: a review is a buyer's opinion of a
+completed order, and holding one because it contains a word like "fake" would
+suppress legitimate complaints. If the panel wants a review gate, it should be
+a separate, narrower rule set.
 Hiding is a separate human decision on top of the hold. An edit re-screens the
 post, because an edit changes the words a moderator would have judged; a clean
 re-screening does **not** release a held post, because releasing is a
@@ -233,10 +249,11 @@ Posts use the same shape on the forum endpoint:
 
     GET /api/v1/forum/posts/?moderation=needs_review
 
-The frontend queue is **Staff → Forum reports**, which lists held posts at the
-top under "Held by screening", with the moderator's reason, an *Open* link, and
-*Release* / *Delete*. Release calls the existing `moderate` action with
-`{"action": "restore"}`.
+The frontend queue is **Staff → Forum reports**, which lists held posts under
+"Held by screening" and held comments under "Held comments", each with the
+moderator's reason, an *Open* link, and *Release* / *Delete*. Release calls the
+existing `moderate` action with `{"action": "restore"}` on the post or the
+comment.
 
 Each listing in that response carries, for moderators only:
 
@@ -255,10 +272,9 @@ Each listing in that response carries, for moderators only:
 
 ## 6. What is not done
 
-- **Comments and reviews are not screened.** Posts and listings are; a forum
-  comment or a review still relies on reporting and moderator action. The
-  entry point is ready for them — `run_post_screening` takes a `TextSubject`,
-  so a comment only needs an adapter and a `ScreeningResult` target.
+- **Reviews are not screened, on purpose.** Listings, posts and comments are;
+  a review relies on reporting and moderator action. Screening a rating is a
+  product-policy decision (see above), not a missing adapter.
 - **Nothing publishes automatically.** A clean verdict still waits for a
   moderator on a listing, and a flagged post is held rather than deleted.
   Auto-publishing would be a deliberate change to `run_screening` plus its
@@ -307,9 +323,9 @@ curl -X POST http://localhost:8000/api/v1/forum/posts/<id>/moderate/ \
 The audit trail is in Django admin under **Screening results**: target
 (listing or post), verdict, score, reasons, provider, and when it ran.
 
-Tests: `python manage.py test apps.screening` (provider boundary, both
-targets) and `python manage.py test apps.forum` (the feed, the hold, the
-queue filter, the release, the re-screen on edit).
+Tests: `python manage.py test apps.screening` (provider boundary, all three
+targets) and `python manage.py test apps.forum` (the feed, the post hold, the
+comment hold, the queue filter, the releases, the re-screen on edit).
 
 ---
 

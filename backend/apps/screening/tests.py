@@ -538,3 +538,93 @@ class ForumPostScreeningTests(TestCase):
                 ScreeningResult.objects.create(
                     verdict=ScreeningResult.Verdict.CLEAN, provider="stub"
                 )
+
+
+@override_settings(SCREENING_PROVIDER="stub", SCREENING_FALLBACK=True)
+class ForumCommentScreeningTests(TestCase):
+    """AI-03 one level down: a comment publishes inside someone's thread."""
+
+    def setUp(self):
+        from apps.forum.models import ForumPost
+
+        self.author = User.objects.create_user(
+            email="2024-555555@rtu.edu.ph",
+            display_name="Commenter",
+            password="SecurePass123!",
+            member_type=User.MemberType.STUDENT,
+            college="College of ICT",
+            year_level=2,
+        )
+        self.author.verify()
+        self.post = ForumPost.objects.create(
+            kind=ForumPost.Kind.POST,
+            topic="General",
+            title="Reviewer for ITP311",
+            body="Sharing my notes, comment if you want a copy.",
+            author=self.author,
+        )
+
+    def comment(self, text):
+        from apps.forum.models import ForumComment
+
+        return ForumComment.objects.create(
+            post=self.post, author=self.author, text=text
+        )
+
+    def test_a_prohibited_comment_is_held(self):
+        from apps.forum.models import ForumComment
+        from apps.notifications.models import Notification
+        from apps.screening.services import run_comment_screening
+
+        row = self.comment("Selling answer keys, 300 pesos, message me.")
+
+        result = run_comment_screening(row)
+
+        row.refresh_from_db()
+        self.assertEqual(result.verdict, "flagged")
+        self.assertEqual(result.comment_id, row.pk)
+        self.assertEqual(row.moderation_status, ForumComment.ModerationStatus.NEEDS_REVIEW)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.author, link_kind="post", link_id=str(self.post.pk)
+            ).exists()
+        )
+
+    def test_an_ordinary_comment_stays_visible(self):
+        from apps.forum.models import ForumComment
+        from apps.screening.services import run_comment_screening
+
+        row = self.comment("Interested! Where do we meet?")
+
+        result = run_comment_screening(row)
+
+        row.refresh_from_db()
+        self.assertEqual(result.verdict, "clean")
+        self.assertEqual(row.moderation_status, ForumComment.ModerationStatus.VISIBLE)
+
+    def test_a_comment_is_judged_by_prohibited_content_only(self):
+        from apps.screening.services import run_comment_screening
+
+        row = self.comment("See the thread here https://example.test/x — DM me at 09171234567")
+
+        result = run_comment_screening(row)
+
+        self.assertEqual(result.verdict, "clean")
+
+    @override_settings(
+        SCREENING_PROVIDER="gemini", SCREENING_API_KEY="***", SCREENING_FALLBACK=False
+    )
+    def test_a_dead_provider_holds_the_comment(self):
+        from apps.forum.models import ForumComment
+        from apps.screening.services import run_comment_screening
+
+        row = self.comment("Anything at all")
+
+        with patch(
+            "apps.screening.providers.post_json", side_effect=TimeoutError("slow")
+        ):
+            result = run_comment_screening(row)
+
+        row.refresh_from_db()
+        self.assertEqual(result.provider, "error")
+        self.assertEqual(row.moderation_status, ForumComment.ModerationStatus.NEEDS_REVIEW)

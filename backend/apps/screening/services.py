@@ -30,7 +30,7 @@ from django.conf import settings
 from django.db import transaction
 
 from apps.catalog.models import Listing
-from apps.forum.models import ForumPost
+from apps.forum.models import ForumComment, ForumPost
 from apps.notifications.models import Notification
 from apps.notifications.services import notify, notify_staff
 
@@ -151,5 +151,40 @@ def run_post_screening(post) -> ScreeningResult:
     notify_staff(
         f'A forum post was held by screening: "{summary}". {reason}'[:240],
         link_id=post.pk,
+    )
+    return result
+
+
+@transaction.atomic
+def run_comment_screening(comment) -> ScreeningResult:
+    """Screen one forum comment and hold it if the verdict flags it (AI-03).
+
+    A comment is the loudest channel on the site — it publishes inside someone
+    else's thread the moment it is typed. A flagged one is held out of the
+    thread for everyone but its author and staff; releasing it is the same
+    moderator action that restores a hidden comment.
+    """
+    result = _run({"comment": comment}, TextSubject.for_comment(comment))
+
+    if not result.is_flagged:
+        return result
+    if comment.moderation_status == ForumComment.ModerationStatus.NEEDS_REVIEW:
+        return result
+
+    comment.hold_for_review()
+    summary = (comment.text or f"Comment {comment.pk}").strip()[:60]
+    reason = (result.reasons or ["It matched the automatic screening rules."])[0]
+
+    if comment.author_id:
+        notify(
+            comment.author,
+            f'Your comment "{summary}" is held for review: {reason}'[:240],
+            kind=Notification.Kind.SYSTEM,
+            link_kind="post",
+            link_id=comment.post_id,
+        )
+    notify_staff(
+        f'A forum comment was held by screening: "{summary}". {reason}'[:240],
+        link_id=comment.post_id,
     )
     return result

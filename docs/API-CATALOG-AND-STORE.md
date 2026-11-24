@@ -288,12 +288,12 @@ carry the backend listing id, so an item stays rateable after it sells out.
 | GET | `/api/v1/forum/posts/<id>/` | public | Includes comments, react counts and the caller's own reaction; `screening` is populated for moderators only |
 | PATCH | `/api/v1/forum/posts/<id>/` | the author | Blocked while staff have the post hidden; a title/body/topic edit is re-screened |
 | DELETE | `/api/v1/forum/posts/<id>/` | author or moderator | Staff deletion closes open reports on it |
-| POST | `/api/v1/forum/posts/<id>/comments/` | verified members | `{text, parent}`; a reply must belong to the same post |
-| PATCH | `/api/v1/forum/comments/<id>/` | the author | |
+| POST | `/api/v1/forum/posts/<id>/comments/` | verified members | `{text, parent}`; a reply must belong to the same post; screened like a post, so a flagged comment returns `moderation_status=needs_review` and is hidden from everyone but its author and staff |
+| PATCH | `/api/v1/forum/comments/<id>/` | the author | An edit is re-screened |
 | DELETE | `/api/v1/forum/comments/<id>/` | author or moderator | A comment with replies is soft-deleted into a tombstone |
 | POST | `/api/v1/forum/posts/<id>/react/` | verified members | `{key}` from like/love/haha/wow/sad; same key removes |
 | POST | `/api/v1/forum/posts/<id>/moderate/` | moderators | `hide`, `restore` (also clears a screening hold), `pin`, `unpin`, `delete` |
-| POST | `/api/v1/forum/comments/<id>/moderate/` | moderators | `hide`, `restore`, `delete` |
+| POST | `/api/v1/forum/comments/<id>/moderate/` | moderators | `hide`, `restore` (also clears a screening hold), `delete` |
 | POST | `/api/v1/forum/reports/` | verified members | `{type: post|comment|order, post, comment, order, reason, details}` |
 | GET | `/api/v1/forum/reports/` | staff see all; a member sees their own | `?status=`, `?type=` |
 | POST | `/api/v1/forum/reports/<id>/resolve/` | moderators | `{status, action, note}`; `hide`/`restore`/`delete` change the content, `warn` does not |

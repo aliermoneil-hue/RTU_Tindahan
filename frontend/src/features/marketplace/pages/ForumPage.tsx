@@ -60,7 +60,8 @@ export function ForumPage() {
 
   const fpVisible = (f: ForumPost) =>
     (!f.hidden && !f.held) || isStaffUser || f.authorEmail === currentAccount.email
-  const cmLive = (c: { deleted?: boolean; hidden?: unknown }) => !c.deleted && !c.hidden
+  const cmLive = (c: { deleted?: boolean; hidden?: unknown; held?: unknown }) =>
+    !c.deleted && !c.hidden && !c.held
   const cmCount = (f: ForumPost) => (f.comments || []).filter(cmLive).length
   const popScore = (f: ForumPost) => Object.keys(f.reacts || {}).length + cmCount(f)
 

@@ -30,7 +30,7 @@ from rest_framework.response import Response
 from apps.accounts.permissions import IsVerifiedUser
 from apps.audit.services import record
 from apps.notifications.services import notify, notify_staff
-from apps.screening.services import run_post_screening
+from apps.screening.services import run_comment_screening, run_post_screening
 
 from .models import ForumComment, ForumPost, ForumReaction, ForumReport
 from .serializers import (
@@ -106,6 +106,7 @@ class ForumPostViewSet(
             .prefetch_related(
                 "comments__author",
                 "comments__hidden_by",
+                "comments__screening_results",
                 "reactions",
                 "screening_results",
             )
@@ -262,6 +263,9 @@ class ForumPostViewSet(
             text=payload.validated_data["text"],
             parent=parent,
         )
+        # Screen before anyone else can read it: a flagged comment is held out
+        # of the thread instead of publishing inside someone's post.
+        run_comment_screening(comment)
         if post.author_id and post.author_id != request.user.id:
             notify(
                 post.author,
@@ -368,7 +372,9 @@ class ForumCommentViewSet(
     permission_classes = [IsVerifiedUser]
 
     def get_queryset(self):
-        return ForumComment.objects.select_related("author", "hidden_by", "post")
+        return ForumComment.objects.select_related("author", "hidden_by", "post").prefetch_related(
+            "screening_results"
+        )
 
     def update(self, request, *args, **kwargs):
         comment = self.get_object()
@@ -381,6 +387,8 @@ class ForumCommentViewSet(
         comment.text = payload.validated_data["text"]
         comment.edited_at = timezone.now()
         comment.save(update_fields=["text", "edited_at"])
+        # An edit changes the words a moderator judged, so screen it again.
+        run_comment_screening(comment)
         return Response(ForumCommentSerializer(comment, context=self.get_serializer_context()).data)
 
     def destroy(self, request, *args, **kwargs):
@@ -404,6 +412,7 @@ class ForumCommentViewSet(
             hide_comment(comment, request.user)
         elif act == "restore":
             restore_comment(comment)
+            comment.release_from_review()
         elif act == "delete":
             delete_comment(comment)
             record(

@@ -7,6 +7,7 @@ class ForumCommentInline(admin.TabularInline):
     model = ForumComment
     extra = 0
     raw_id_fields = ("author", "parent")
+    fields = ("post", "author", "text", "parent", "moderation_status", "hidden_at")
 
 
 @admin.register(ForumPost)

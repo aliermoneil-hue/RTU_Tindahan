@@ -104,7 +104,12 @@ export function ForumPostPage() {
       r.postId === f.id &&
       r.reporterEmail === currentAccount.email,
   )
-  const cmLive = (c: ForumComment) => !c.deleted && !c.hidden
+  // A held comment is out of the thread for everyone but its author and
+  // staff, exactly like a held post (AI-03).
+  const cmLive = (c: ForumComment) =>
+    !c.deleted &&
+    !c.hidden &&
+    (!c.held || isStaffUser || (Boolean(c.email) && c.email === currentAccount.email))
   const nReact = Object.keys(f.reacts || {}).length
   const nCm = (f.comments || []).filter(cmLive).length
   const postMenuKey = `p:${f.id}`
@@ -215,6 +220,18 @@ export function ForumPostPage() {
                   <span className="pill red">Hidden</span>
                 </>
               )}
+              {c.held && (
+                <>
+                  {' '}
+                  <span className="pill red">Held for review</span>
+                  {isStaffUser && c.screening?.reasons?.length ? (
+                    <span className="tiny muted" title={c.screening.reasons.join(' ')}>
+                      {' '}
+                      {c.screening.reasons[0]}
+                    </span>
+                  ) : null}
+                </>
+              )}
             </b>
             {c.text}
           </div>
@@ -299,7 +316,7 @@ export function ForumPostPage() {
                           }}
                         >
                           <Icon name="eye" size="sm" />
-                          <span>{c.hidden ? 'Restore comment' : 'Hide comment'}</span>
+                          <span>{c.hidden ? 'Restore comment' : c.held ? 'Release comment' : 'Hide comment'}</span>
                         </button>
                       )}
                       {(cMine || isStaffUser) && (
@@ -334,7 +351,7 @@ export function ForumPostPage() {
                     </span>
                   </>
                 )}
-                {!c.hidden && depth < 5 && (
+                {!c.hidden && !c.held && depth < 5 && (
                   <>
                     {' '}
                     ·{' '}

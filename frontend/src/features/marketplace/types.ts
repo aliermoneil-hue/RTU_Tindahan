@@ -295,6 +295,15 @@ export interface ForumComment {
   edited?: string
   deleted?: boolean
   hidden?: { by: string; ts: string }
+  /** Held by automatic screening: out of the thread for everyone else. */
+  held?: boolean
+  screening?: {
+    verdict: 'clean' | 'flagged'
+    score: number | null
+    reasons: string[]
+    provider: string
+    model: string
+  }
 }
 
 export interface ForumPost {

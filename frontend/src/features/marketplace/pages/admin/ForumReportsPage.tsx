@@ -28,6 +28,8 @@ export function ForumReportsPage() {
     openModal,
     toggleHidePost,
     deleteForumPost,
+    toggleHideComment,
+    deleteForumComment,
   } = useTindahan()
 
   const [frTab, setFrTab] = useState<'open' | 'reviewed' | 'dismissed' | 'actioned' | 'all'>('open')
@@ -54,6 +56,11 @@ export function ForumReportsPage() {
   // Screening holds a post before anyone reports it, so these rows have no
   // report behind them: the queue has to read the feed itself (AI-03).
   const held = db.feed.filter((f) => f.held)
+  const heldComments = db.feed.flatMap((f) =>
+    (f.comments || [])
+      .filter((c) => c.held && !c.deleted)
+      .map((c) => ({ post: f, comment: c })),
+  )
 
   return (
     <div className="fcol wide">
@@ -119,6 +126,54 @@ export function ForumReportsPage() {
               {f.screening?.reasons?.length ? (
                 <p className="small muted" style={{ margin: 0, overflowWrap: 'anywhere' }}>
                   {f.screening.reasons.join(' ')}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      {heldComments.length ? (
+        <section className="card stack" style={{ gap: 10 }} aria-label="Held comments">
+          <div className="row between wrap" style={{ gap: 8 }}>
+            <b>Held comments ({heldComments.length})</b>
+            <span className="tiny muted">
+              Held by automatic screening. Out of the thread until a moderator releases them.
+            </span>
+          </div>
+          {heldComments.map(({ post, comment }) => (
+            <div key={comment.id} className="card stack" style={{ gap: 6, padding: 10 }}>
+              <div className="row between wrap" style={{ gap: 8 }}>
+                <div className="row wrap grow" style={{ gap: 6 }}>
+                  <span className="pill red">Held</span>
+                  <b style={{ overflowWrap: 'anywhere' }}>{comment.text.slice(0, 120)}</b>
+                  <span className="tiny muted">
+                    by {comment.by} on "{postTitle(post)}" · {stamp(comment.ts)}
+                  </span>
+                </div>
+                <div className="row" style={{ gap: 6 }}>
+                  <button type="button" className="btn ghost sm" onClick={() => openPost(post.id)}>
+                    Open
+                  </button>
+                  <button
+                    type="button"
+                    className="btn sm"
+                    onClick={() => toggleHideComment(post.id, comment.id)}
+                  >
+                    Release
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={() => deleteForumComment(post.id, comment.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+              {comment.screening?.reasons?.length ? (
+                <p className="small muted" style={{ margin: 0, overflowWrap: 'anywhere' }}>
+                  {comment.screening.reasons.join(' ')}
                 </p>
               ) : null}
             </div>

@@ -83,6 +83,10 @@ class ForumPost(models.Model):
 
 
 class ForumComment(models.Model):
+    class ModerationStatus(models.TextChoices):
+        VISIBLE = "visible", "Visible"
+        NEEDS_REVIEW = "needs_review", "Held for review"
+
     post = models.ForeignKey(ForumPost, on_delete=models.CASCADE, related_name="comments")
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -92,6 +96,15 @@ class ForumComment(models.Model):
         related_name="forum_comments",
     )
     text = models.TextField(blank=True)
+    # A comment is public the moment it is written, so screening holds it the
+    # same way it holds a post: out of the thread for everyone but its author
+    # and staff, until a moderator releases it (AI-03).
+    moderation_status = models.CharField(
+        max_length=16,
+        choices=ModerationStatus.choices,
+        default=ModerationStatus.VISIBLE,
+        db_index=True,
+    )
     parent = models.ForeignKey(
         "self",
         null=True,
@@ -122,6 +135,18 @@ class ForumComment(models.Model):
     @property
     def is_hidden(self):
         return self.hidden_at is not None
+
+    @property
+    def is_held(self):
+        return self.moderation_status == self.ModerationStatus.NEEDS_REVIEW
+
+    def hold_for_review(self):
+        self.moderation_status = self.ModerationStatus.NEEDS_REVIEW
+        self.save(update_fields=["moderation_status"])
+
+    def release_from_review(self):
+        self.moderation_status = self.ModerationStatus.VISIBLE
+        self.save(update_fields=["moderation_status"])
 
     def __str__(self):
         return self.text[:40] or f"Comment {self.pk}"

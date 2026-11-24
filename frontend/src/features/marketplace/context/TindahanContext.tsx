@@ -6318,13 +6318,21 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       const f = db.feed.find((x) => x.id === postId)
       const c = f?.comments.find((x) => x.id === commentId)
       if (!f || !c) return
-      const act = c.hidden ? 'restore' : 'hide'
+      // A held comment is released by the same moderation call that restores
+      // a hidden one; the server clears both in that path.
+      const act = c.hidden || c.held ? 'restore' : 'hide'
       const apiId = apiForumId(commentId)
       if (apiId !== null) {
         void moderateForumComment(apiId, act)
           .then(async () => {
             await refreshForum()
-            toast(act === 'hide' ? 'Comment hidden from members.' : 'Comment restored.')
+            toast(
+              act === 'hide'
+                ? 'Comment hidden from members.'
+                : c.held && !c.hidden
+                  ? 'Comment released to the thread.'
+                  : 'Comment restored.',
+            )
           })
           .catch((err) =>
             toast(err instanceof ApiRequestError ? err.message : 'That decision could not be saved.'),

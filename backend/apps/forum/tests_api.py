@@ -637,3 +637,95 @@ class ForumScreeningApiTests(APITestCase):
                 user=self.other, kind=Notification.Kind.ANNOUNCEMENT
             ).exists()
         )
+
+
+@override_settings(SCREENING_PROVIDER="stub", SCREENING_FALLBACK=True)
+class ForumCommentScreeningApiTests(APITestCase):
+    """AI-03: a comment that trips the gate waits for a moderator."""
+
+    def setUp(self):
+        self.author = make_user("2024-944444@rtu.edu.ph")
+        self.other = make_user("2024-955555@rtu.edu.ph")
+        self.moderator = make_user("2024-966666@rtu.edu.ph", role=User.Role.MODERATOR)
+
+    def make_post(self):
+        self.client.force_authenticate(self.author)
+        return self.client.post(
+            "/api/v1/forum/posts/",
+            {"kind": "post", "topic": "General", "title": "Reviewer", "body": "Notes inside."},
+            format="json",
+        ).json()["id"]
+
+    def comment(self, post_id, text, author=None):
+        self.client.force_authenticate(author or self.author)
+        return self.client.post(
+            f"/api/v1/forum/posts/{post_id}/comments/", {"text": text}, format="json"
+        )
+
+    def read_post(self, post_id, user=None):
+        self.client.force_authenticate(user)
+        return self.client.get(f"/api/v1/forum/posts/{post_id}/").json()
+
+    def test_a_flagged_comment_is_held_out_of_the_thread(self):
+        post_id = self.make_post()
+
+        response = self.comment(post_id, "Selling answer keys for the final, 300 pesos.")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["moderation_status"], "needs_review")
+
+        # Another member reads the thread: the comment is not there.
+        theirs = self.read_post(post_id, self.other)
+        self.assertEqual(theirs["comments"], [])
+        self.assertEqual(theirs["comment_count"], 0)
+        # Its author still sees it, so it did not vanish without explanation.
+        mine = self.read_post(post_id, self.author)
+        self.assertEqual(len(mine["comments"]), 1)
+        self.assertEqual(mine["comments"][0]["moderation_status"], "needs_review")
+        # Staff see it with the reason.
+        staff = self.read_post(post_id, self.moderator)
+        self.assertEqual(staff["comments"][0]["screening"]["verdict"], "flagged")
+
+    def test_an_ordinary_comment_is_public_at_once(self):
+        post_id = self.make_post()
+        self.comment(post_id, "Interested, where do we meet?")
+
+        theirs = self.read_post(post_id, self.other)
+
+        self.assertEqual(len(theirs["comments"]), 1)
+        self.assertEqual(theirs["comment_count"], 1)
+        self.assertEqual(theirs["comments"][0]["moderation_status"], "visible")
+        self.assertIsNone(theirs["comments"][0]["screening"])
+
+    def test_a_moderator_restore_releases_the_comment(self):
+        post_id = self.make_post()
+        comment_id = self.comment(
+            post_id, "Selling answer keys for the final, 300 pesos."
+        ).json()["id"]
+
+        self.client.force_authenticate(self.moderator)
+        response = self.client.post(
+            f"/api/v1/forum/comments/{comment_id}/moderate/",
+            {"action": "restore"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["moderation_status"], "visible")
+        self.assertEqual(len(self.read_post(post_id, self.other)["comments"]), 1)
+
+    def test_an_edit_is_screened_again(self):
+        post_id = self.make_post()
+        comment_id = self.comment(post_id, "Nice notes, thanks!").json()["id"]
+        self.assertEqual(len(self.read_post(post_id, self.other)["comments"]), 1)
+
+        self.client.force_authenticate(self.author)
+        response = self.client.patch(
+            f"/api/v1/forum/comments/{comment_id}/",
+            {"text": "Actually, I am selling answer keys for the final."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["moderation_status"], "needs_review")
+        self.assertEqual(self.read_post(post_id, self.other)["comments"], [])

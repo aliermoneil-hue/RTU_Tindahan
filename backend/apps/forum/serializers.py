@@ -66,6 +66,7 @@ class ForumCommentSerializer(serializers.ModelSerializer):
     is_mine = serializers.SerializerMethodField()
     deleted = serializers.BooleanField(source="is_deleted", read_only=True)
     hidden = serializers.SerializerMethodField()
+    screening = serializers.SerializerMethodField()
 
     class Meta:
         model = ForumComment
@@ -78,6 +79,8 @@ class ForumCommentSerializer(serializers.ModelSerializer):
             "parent",
             "deleted",
             "hidden",
+            "moderation_status",
+            "screening",
             "created_at",
             "edited_at",
         )
@@ -100,6 +103,25 @@ class ForumCommentSerializer(serializers.ModelSerializer):
         return {
             "by": short_name(obj.hidden_by) if obj.hidden_by_id else "Staff",
             "ts": obj.hidden_at,
+        }
+
+    def get_screening(self, obj):
+        """Latest verdict for a comment, staff only (AI-03)."""
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not (user and user.is_authenticated and getattr(user, "is_moderator", False)):
+            return None
+
+        latest = next(iter(obj.screening_results.all()), None)
+        if latest is None:
+            return None
+        return {
+            "verdict": latest.verdict,
+            "score": latest.score,
+            "reasons": latest.reasons,
+            "provider": latest.provider,
+            "model": latest.model_name,
+            "at": latest.created_at,
         }
 
 
@@ -164,9 +186,24 @@ class ForumPostSerializer(serializers.ModelSerializer):
             "ts": obj.hidden_at,
         }
 
+    def visible_comments(self, obj):
+        """Comments this caller may read: a held one only for its author, and
+        for staff — the same rule posts get, so nothing vanishes silently."""
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        staff = bool(
+            user and user.is_authenticated and getattr(user, "is_moderator", False)
+        )
+        comments = list(obj.comments.select_related("author", "hidden_by"))
+        if staff:
+            return comments
+        if user and user.is_authenticated:
+            return [c for c in comments if not c.is_held or c.author_id == user.id]
+        return [c for c in comments if not c.is_held]
+
     def get_comments(self, obj):
         return ForumCommentSerializer(
-            obj.comments.select_related("author", "hidden_by"), many=True, context=self.context
+            self.visible_comments(obj), many=True, context=self.context
         ).data
 
     def get_screening(self, obj):
@@ -194,7 +231,7 @@ class ForumPostSerializer(serializers.ModelSerializer):
         }
 
     def get_comment_count(self, obj):
-        return sum(1 for c in obj.comments.all() if not c.is_deleted and not c.is_hidden)
+        return sum(1 for c in self.visible_comments(obj) if not c.is_deleted and not c.is_hidden)
 
     def get_react_counts(self, obj):
         counts = {}
