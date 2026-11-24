@@ -91,7 +91,7 @@ export const SVC_UNITS = ['per page', 'per hour', 'per day', 'per session', 'per
 
 export const CONDITIONS = ['Fresh / made today', 'Brand new', 'Like new', 'Pre-loved']
 
-export const VAR_LIMITS = { options: 10, opts: 10, combos: 120, name: 30, attrName: 24, optName: 30, stock: 999 }
+export const VAR_LIMITS = { options: 10, opts: 10, combos: 120, name: 30, attrName: 24, optName: 30 }
 
 export const PROGRAMS = [
   'BS Information Technology',

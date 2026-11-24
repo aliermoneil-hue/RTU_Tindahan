@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Icon } from '@/common/components/Icon'
 import { navigate } from '@/common/router/router'
 import { REACTS, TOPICS, ago, peso, priceLabel, stamp } from '../constants'
@@ -40,11 +40,15 @@ export function ForumPage() {
   const [forumSort, setForumSort] = useState<'latest' | 'popular'>('latest')
   const [fpLimit, setFpLimit] = useState(10)
 
+  // Create post modal state (Facebook two-step pattern)
+  const [createPostOpen, setCreatePostOpen] = useState(false)
+  const [showPhotos, setShowPhotos] = useState(false)
+  const [posting, setPosting] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [topic, setTopic] = useState<string>(TOPICS[0])
-  const [asNotice, setAsNotice] = useState(false)
   const [imgs, setImgs] = useState<string[]>([])
+  const [asNotice, setAsNotice] = useState(false)
   // CF-05: a selling schedule is an appointment, so the composer asks for one.
   const [eventDate, setEventDate] = useState('')
   const [eventStart, setEventStart] = useState('')
@@ -52,8 +56,27 @@ export function ForumPage() {
   const [eventPlace, setEventPlace] = useState('')
   const [eventErr, setEventErr] = useState<string | null>(null)
   const isSellingSchedule = topic === 'Selling schedule'
+  const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null)
   const [openReactPostId, setOpenReactPostId] = useState<string | null>(null)
+
+  const closeCreatePost = useCallback(() => {
+    setCreatePostOpen(false)
+    setShowPhotos(false)
+    setTitle('')
+    setBody('')
+    setTopic(TOPICS[0])
+    setImgs([])
+    setPosting(false)
+    setAsNotice(false)
+    setEventDate('')
+    setEventStart('')
+    setEventEnd('')
+    setEventPlace('')
+    setEventErr(null)
+    bodyTextareaRef.current = null
+  }, [])
 
   useEffect(() => {
     if (!openMenuKey && !openReactPostId) return
@@ -64,6 +87,63 @@ export function ForumPage() {
     window.addEventListener('click', onDocClick)
     return () => window.removeEventListener('click', onDocClick)
   }, [openMenuKey, openReactPostId])
+
+  // Close Create post modal on Escape; lock body scroll while open
+  useEffect(() => {
+    if (!createPostOpen) return
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeCreatePost()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.removeProperty('overflow')
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [createPostOpen, closeCreatePost])
+
+  const notice = isStaffUser && asNotice
+
+  const handleCreatePost = useCallback(() => {
+    // CF-05: a selling schedule is an appointment, and an appointment without a
+    // date, a time and a place is not one. The backend refuses it; say so here.
+    if (isSellingSchedule && !notice) {
+      if (!eventDate || !eventStart || !eventPlace.trim()) {
+        setEventErr('A selling schedule needs a date, a start time and a campus location.')
+        return
+      }
+      if (eventEnd && eventEnd <= eventStart) {
+        setEventErr('The end time must be after the start time.')
+        return
+      }
+    }
+    setEventErr(null)
+
+    if (posting || (!body.trim() && !imgs.length)) return
+    setPosting(true)
+    const schedule =
+      isSellingSchedule && !notice
+        ? {
+            date: eventDate,
+            start: eventStart,
+            end: eventEnd || undefined,
+            place: eventPlace.trim(),
+          }
+        : undefined
+    const ok = createForumPost(title, body, topic, notice, imgs || [], schedule)
+    if (ok) {
+      closeCreatePost()
+      setForumSort('latest')
+    } else {
+      setPosting(false)
+    }
+  }, [
+    title, body, topic, imgs, posting, notice, isSellingSchedule,
+    eventDate, eventStart, eventEnd, eventPlace,
+    closeCreatePost, createForumPost, setForumSort,
+  ])
+
+  const firstName = currentAccount?.first || 'Student'
 
   if (!currentAccount) return null
 
@@ -95,8 +175,6 @@ export function ForumPage() {
   const nOpenReports = isStaffUser
     ? db.freports.filter((r) => r.status !== 'resolved').length
     : 0
-  const notice = isStaffUser && asNotice
-
   const tabs: ['all' | 'post' | 'listing' | 'notice', string][] = [
     ['all', 'All posts'],
     ['post', 'Discussions'],
@@ -137,151 +215,185 @@ export function ForumPage() {
         </div>
       )}
 
-      <form
-        className="card stack"
-        style={{ gap: 10 }}
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (isSellingSchedule && !notice) {
-            if (!eventDate || !eventStart || !eventPlace.trim()) {
-              setEventErr(
-                'A selling schedule needs a date, a start time and a campus location.',
-              )
-              return
-            }
-            if (eventEnd && eventEnd <= eventStart) {
-              setEventErr('The end time must be after the start time.')
-              return
-            }
-          }
-          setEventErr(null)
-          const schedule =
-            isSellingSchedule && !notice
-              ? {
-                  date: eventDate,
-                  start: eventStart,
-                  end: eventEnd || undefined,
-                  place: eventPlace.trim(),
-                }
-              : undefined
-          if (createForumPost(title, body, topic, notice, imgs, schedule)) {
-            setTitle('')
-            setBody('')
-            setImgs([])
-            setAsNotice(false)
-            setEventDate('')
-            setEventStart('')
-            setEventEnd('')
-            setEventPlace('')
-            setForumSort('latest')
-          }
-        }}
-      >
-        <div className="row" style={{ alignItems: 'flex-start' }}>
-          <AvatarBadge account={currentAccount} isStaff={isStaffUser} size="md" />
-          <div className="stack grow" style={{ gap: 8, minWidth: 0 }}>
+      {/* Compact "What's on your mind?" trigger bar (Facebook two-step pattern) */}
+      <div className="composer-trigger card">
+        <AvatarBadge account={currentAccount} isStaff={isStaffUser} size="md" />
+        <button
+          type="button"
+          className="composer-pill"
+          aria-label="Create post"
+          onClick={() => {
+            setShowPhotos(false)
+            setCreatePostOpen(true)
+          }}
+        >
+          What's on your mind, {firstName}?
+        </button>
+        <button
+          type="button"
+          className="composer-photo-btn"
+          aria-label="Add photo"
+          title="Add photo"
+          onClick={() => {
+            setShowPhotos(true)
+            setCreatePostOpen(true)
+          }}
+        >
+          <Icon name="img" size="sm" />
+        </button>
+      </div>
+
+      {/* "Create post" popup modal */}
+      {createPostOpen && (
+        <div
+          className="create-post-modal"
+          onClick={closeCreatePost}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Create post"
+        >
+          <div
+            className="create-post-shell"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="create-post-header">
+              <h2 className="create-post-title-text">Create post</h2>
+              <button
+                type="button"
+                className="create-post-close"
+                aria-label="Close"
+                onClick={closeCreatePost}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="create-post-author">
+              <AvatarBadge account={currentAccount} isStaff={isStaffUser} size="sm" />
+              <div className="create-post-author-info">
+                <div className="create-post-author-name">
+                  {currentAccount.name}
+                </div>
+                <select
+                  className="create-post-topic"
+                  id="fp-topic"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                >
+                  {TOPICS.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <input
-              className="input"
+              className="create-post-title-input"
               id="fp-title"
               maxLength={120}
               value={title}
-              placeholder={notice ? 'Notice title' : 'Title (optional)'}
-              aria-label={notice ? 'Notice title' : 'Post title'}
+              placeholder="Title (optional)"
+              aria-label="Post title"
               autoComplete="off"
               onChange={(e) => setTitle(e.target.value)}
             />
+
             <textarea
-              className="input"
+              className="create-post-body-input"
               id="fp-text"
               maxLength={2000}
-              placeholder={`What is on your mind, ${currentAccount.first}?`}
+              placeholder={`What's on your mind, ${firstName}?`}
               aria-label="Write a post"
               value={body}
+              ref={bodyTextareaRef}
               onChange={(e) => setBody(e.target.value)}
+              onFocus={() => {
+                if (!showPhotos) setShowPhotos(false)
+              }}
             />
-          </div>
-        </div>
 
-        <PhotoUploader
-          ids={imgs}
-          max={IMG_RULES.post}
-          label="Photos (optional)"
-          onChange={setImgs}
-        />
-
-        {isSellingSchedule && !notice && (
-          <div className="stack" style={{ gap: 6 }}>
-            <div className="row wrap small" style={{ gap: 10 }}>
-              <label className="small" style={{ gap: 4 }}>
-                Selling on
-                <input
-                  className="input"
-                  type="date"
-                  value={eventDate}
-                  onChange={(e) => setEventDate(e.target.value)}
-                />
-              </label>
-              <label className="small" style={{ gap: 4 }}>
-                From
-                <input
-                  className="input"
-                  type="time"
-                  value={eventStart}
-                  onChange={(e) => setEventStart(e.target.value)}
-                />
-              </label>
-              <label className="small" style={{ gap: 4 }}>
-                To (optional)
-                <input
-                  className="input"
-                  type="time"
-                  value={eventEnd}
-                  onChange={(e) => setEventEnd(e.target.value)}
-                />
-              </label>
-              <label className="small grow" style={{ gap: 4 }}>
-                Campus location
-                <input
-                  className="input"
-                  maxLength={120}
-                  value={eventPlace}
-                  placeholder="Main lobby, beside the guard house"
-                  onChange={(e) => setEventPlace(e.target.value)}
-                />
-              </label>
-            </div>
-            {eventErr && (
-              <p className="small" role="alert" style={{ color: 'var(--danger, #b3261e)' }}>
-                {eventErr}
-              </p>
-            )}
-          </div>
-        )}
-
-        <ScreeningNotice />
-
-        <div className="row between wrap">
-          <span className="row wrap" style={{ gap: 10 }}>
-            <label className="row small" style={{ gap: 6 }}>
-              Topic{' '}
-              <select
-                className="input"
-                id="fp-topic"
-                style={{ width: 'auto' }}
-                disabled={notice}
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
+            <div className="create-post-add-bar">
+              <span className="create-post-add-label">Add to your post</span>
+              <button
+                type="button"
+                className="create-post-photo-toggle"
+                aria-label="Add photo"
+                title="Add photo"
+                onClick={() => setShowPhotos((prev) => !prev)}
               >
-                {TOPICS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <Icon name="img" size="sm" />
+              </button>
+            </div>
+
+            {showPhotos && (
+              <div className="create-post-photos">
+                <PhotoUploader
+                  ids={imgs}
+                  max={IMG_RULES.post}
+                  label="Photos (optional)"
+                  onChange={setImgs}
+                />
+                <button
+                  type="button"
+                  className="create-post-photos-hide"
+                  onClick={() => setShowPhotos(false)}
+                >
+                  Hide photos
+                </button>
+              </div>
+            )}
+
+            {isSellingSchedule && !notice && (
+              <div className="create-post-schedule stack" style={{ gap: 6 }}>
+                <div className="row wrap small" style={{ gap: 10 }}>
+                  <label className="small" style={{ gap: 4 }}>
+                    Selling on
+                    <input
+                      className="input"
+                      type="date"
+                      value={eventDate}
+                      onChange={(e) => setEventDate(e.target.value)}
+                    />
+                  </label>
+                  <label className="small" style={{ gap: 4 }}>
+                    From
+                    <input
+                      className="input"
+                      type="time"
+                      value={eventStart}
+                      onChange={(e) => setEventStart(e.target.value)}
+                    />
+                  </label>
+                  <label className="small" style={{ gap: 4 }}>
+                    To (optional)
+                    <input
+                      className="input"
+                      type="time"
+                      value={eventEnd}
+                      onChange={(e) => setEventEnd(e.target.value)}
+                    />
+                  </label>
+                  <label className="small grow" style={{ gap: 4 }}>
+                    Campus location
+                    <input
+                      className="input"
+                      maxLength={120}
+                      value={eventPlace}
+                      placeholder="Main lobby, beside the guard house"
+                      onChange={(e) => setEventPlace(e.target.value)}
+                    />
+                  </label>
+                </div>
+                {eventErr && (
+                  <p className="small" role="alert" style={{ color: 'var(--danger, #b3261e)' }}>
+                    {eventErr}
+                  </p>
+                )}
+              </div>
+            )}
+
             {isStaffUser && (
-              <label className="check">
+              <label className="check create-post-notice">
                 <input
                   type="checkbox"
                   id="fp-notice"
@@ -291,13 +403,22 @@ export function ForumPage() {
                 Official notice (alerts every member)
               </label>
             )}
-          </span>
-          <button type="submit" className="btn yellow">
-            <Icon name="send" size="sm" />
-            {notice ? 'Post notice' : 'Post'}
-          </button>
+
+            <ScreeningNotice />
+
+            <div className="create-post-footer">
+              <button
+                type="button"
+                className="create-post-post-btn"
+                disabled={posting || (!body.trim() && !imgs.length)}
+                onClick={handleCreatePost}
+              >
+                {posting ? 'Posting…' : 'Post'}
+              </button>
+            </div>
+          </div>
         </div>
-      </form>
+      )}
 
       <div className="row between wrap" style={{ gap: 10 }}>
         <div className="tabs" role="tablist" aria-label="Forum filter">

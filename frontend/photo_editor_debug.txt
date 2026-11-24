@@ -1,0 +1,809 @@
+﻿=== C:\Users\Lian Andrew\Desktop\RTU_Tindahan_Capstone\RTU_Tindahan_Final\RTU_Tindahan\frontend\src\features\marketplace\components\PhotoUploader.tsx ===
+import {
+  useCallback,
+  useId,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  type TouchEvent as ReactTouchEvent,
+} from 'react'
+import { Icon } from '@/common/components/Icon'
+import type { IconName } from '@/common/components/icons'
+import { IMG_RULES, imgAdd, imgSrc, imgsOf, replaceImgData } from '../imageStore'
+import { useTindahan } from '../context/TindahanContext'
+import type { PrototypeProduct } from '../types'
+import './PhotoUploader.css'
+
+interface PhotoUploaderProps {
+  ids: string[]
+  max?: number
+  label?: string
+  hint?: string
+  errorMsg?: string
+  onChange: (nextIds: string[]) => void
+  onError?: (err: string) => void
+}
+
+interface CropModalProps {
+  imgId: string
+  onClose: () => void
+  onSave: () => void
+}
+
+function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
+  const { toast, bumpImgVersion } = useTindahan()
+  const src = imgSrc(imgId)
+
+  const [zoom, setZoom] = useState(1.0)
+  const [rotation, setRotation] = useState(0) // 0, 90, 180, 270
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [startPan, setStartPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+
+  const viewportRef = useRef<HTMLDivElement | null>(null)
+  const imgRef = useRef<HTMLImageElement | null>(null)
+
+  // Viewport dimensions: 4:3 aspect ratio
+  const VIEW_W = 400
+  const VIEW_H = 300
+
+  // Load natural dimensions
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.currentTarget
+    setImgSize({ w: target.naturalWidth, h: target.naturalHeight })
+    setPan({ x: 0, y: 0 })
+  }
+
+  // Calculate clamped pan to prevent dragging beyond boundaries
+  const clampPan = useCallback(
+    (nextX: number, nextY: number, curZoom: number, curRot: number) => {
+      if (!imgSize) return { x: 0, y: 0 }
+      const isRotated90 = curRot === 90 || curRot === 270
+      const iw = isRotated90 ? imgSize.h : imgSize.w
+      const ih = isRotated90 ? imgSize.w : imgSize.h
+
+      const baseScale = Math.max(VIEW_W / iw, VIEW_H / ih)
+      const renderedW = iw * baseScale * curZoom
+      const renderedH = ih * baseScale * curZoom
+
+      const maxPanX = Math.max(0, (renderedW - VIEW_W) / 2)
+      const maxPanY = Math.max(0, (renderedH - VIEW_H) / 2)
+
+      return {
+        x: Math.max(-maxPanX, Math.min(maxPanX, nextX)),
+        y: Math.max(-maxPanY, Math.min(maxPanY, nextY)),
+      }
+    },
+    [imgSize],
+  )
+
+  const handleZoomChange = (newZoom: number) => {
+    const clampedZoom = Math.max(1.0, Math.min(3.0, newZoom))
+    setZoom(clampedZoom)
+    setPan((prev) => clampPan(prev.x, prev.y, clampedZoom, rotation))
+  }
+
+  const handleRotate = () => {
+    const nextRot = (rotation + 90) % 360
+    setRotation(nextRot)
+    setPan((prev) => clampPan(prev.x, prev.y, zoom, nextRot))
+  }
+
+  const handleReset = () => {
+    setZoom(1.0)
+    setRotation(0)
+    setPan({ x: 0, y: 0 })
+  }
+
+  // Drag handling
+  const onMouseDown = (e: ReactMouseEvent) => {
+    e.preventDefault()
+    setDragging(true)
+    setDragStart({ x: e.clientX, y: e.clientY })
+    setStartPan(pan)
+  }
+
+  const onMouseMove = (e: ReactMouseEvent) => {
+    if (!dragging) return
+    const dx = e.clientX - dragStart.x
+    const dy = e.clientY - dragStart.y
+    const clamped = clampPan(startPan.x + dx, startPan.y + dy, zoom, rotation)
+    setPan(clamped)
+  }
+
+  const onMouseUp = () => {
+    setDragging(false)
+  }
+
+  // Touch drag
+  const onTouchStart = (e: ReactTouchEvent) => {
+    if (e.touches.length === 1) {
+      setDragging(true)
+      setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY })
+      setStartPan(pan)
+    }
+  }
+
+  const onTouchMove = (e: ReactTouchEvent) => {
+    if (!dragging || e.touches.length !== 1) return
+    const dx = e.touches[0].clientX - dragStart.x
+    const dy = e.touches[0].clientY - dragStart.y
+    const clamped = clampPan(startPan.x + dx, startPan.y + dy, zoom, rotation)
+    setPan(clamped)
+  }
+
+  const onTouchEnd = () => {
+    setDragging(false)
+  }
+
+  // Save the cropped image to canvas
+  const handleSaveCrop = () => {
+    if (!imgRef.current || !imgSize) {
+      onClose()
+      return
+    }
+
+    const canvas = document.createElement('canvas')
+    const OUT_W = 800
+    const OUT_H = 600
+    canvas.width = OUT_W
+    canvas.height = OUT_H
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      toast('Failed to adjust image.')
+      onClose()
+      return
+    }
+
+    const isRotated90 = rotation === 90 || rotation === 270
+    const iw = isRotated90 ? imgSize.h : imgSize.w
+    const ih = isRotated90 ? imgSize.w : imgSize.h
+
+    const baseScale = Math.max(VIEW_W / iw, VIEW_H / ih)
+    const scaleFactor = OUT_W / VIEW_W // 2x
+
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, OUT_W, OUT_H)
+
+    ctx.save()
+    ctx.translate(OUT_W / 2 + pan.x * scaleFactor, OUT_H / 2 + pan.y * scaleFactor)
+    ctx.rotate((rotation * Math.PI) / 180)
+    ctx.scale(baseScale * zoom * scaleFactor, baseScale * zoom * scaleFactor)
+
+    ctx.drawImage(imgRef.current, -imgSize.w / 2, -imgSize.h / 2)
+    ctx.restore()
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+    replaceImgData(imgId, dataUrl, OUT_W, OUT_H)
+    bumpImgVersion()
+    toast('Photo adjusted.')
+    onSave()
+    onClose()
+  }
+
+  // Base scale calculation for preview styling
+  const isRotated90 = rotation === 90 || rotation === 270
+  const iw = imgSize ? (isRotated90 ? imgSize.h : imgSize.w) : VIEW_W
+  const ih = imgSize ? (isRotated90 ? imgSize.w : imgSize.h) : VIEW_H
+  const baseScale = Math.max(VIEW_W / iw, VIEW_H / ih)
+
+  return (
+    <div className="crop-overlay" role="dialog" aria-modal="true" aria-label="Adjust photo preview">
+      <div className="crop-modal card">
+        <div className="row between" style={{ marginBottom: 12 }}>
+          <div>
+            <b>Adjust photo preview</b>
+            <div className="tiny muted">
+              Drag to reposition Â· Zoom in to frame the best view without empty borders.
+            </div>
+          </div>
+          <button type="button" className="iconbtn" aria-label="Close" onClick={onClose}>
+            <Icon name="x" size="sm" />
+          </button>
+        </div>
+
+        <div
+          ref={viewportRef}
+          className={`crop-viewport ${dragging ? 'is-dragging' : ''}`}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onMouseLeave={onMouseUp}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          <img
+            ref={imgRef}
+            src={src}
+            alt="Adjusting"
+            draggable={false}
+            onLoad={handleImageLoad}
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px) rotate(${rotation}deg) scale(${baseScale * zoom})`,
+              transformOrigin: 'center center',
+              userSelect: 'none',
+              pointerEvents: 'none',
+              maxWidth: 'none',
+              maxHeight: 'none',
+            }}
+          />
+          <div className="crop-grid-overlay" />
+        </div>
+
+        <div className="crop-controls stack" style={{ gap: 12, marginTop: 14 }}>
+          <div className="row wrap" style={{ alignItems: 'center', gap: 10 }}>
+            <span className="small muted">Zoom</span>
+            <button
+              type="button"
+              className="btn ghost sm"
+              aria-label="Zoom out"
+              onClick={() => handleZoomChange(zoom - 0.2)}
+            >
+              âˆ’
+            </button>
+            <input
+              type="range"
+              min="1.0"
+              max="3.0"
+              step="0.05"
+              value={zoom}
+              onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
+              style={{ flex: 1, minWidth: 120 }}
+            />
+            <button
+              type="button"
+              className="btn ghost sm"
+              aria-label="Zoom in"
+              onClick={() => handleZoomChange(zoom + 0.2)}
+            >
+              +
+            </button>
+            <span className="tiny tnum muted">{Math.round(zoom * 100)}%</span>
+          </div>
+
+          <div className="row wrap" style={{ gap: 8, justifyContent: 'space-between' }}>
+            <div className="row" style={{ gap: 6 }}>
+              <button type="button" className="btn ghost sm" onClick={handleRotate}>
+                <Icon name="arrow" size="sm" />
+                Rotate 90Â°
+              </button>
+              <button type="button" className="btn ghost sm" onClick={handleReset}>
+                Reset
+              </button>
+            </div>
+
+            <div className="row" style={{ gap: 6 }}>
+              <button type="button" className="btn ghost sm" onClick={onClose}>
+                Cancel
+              </button>
+              <button type="button" className="btn yellow sm" onClick={handleSaveCrop}>
+                Apply & Save
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function PhotoUploader({
+  ids,
+  max = IMG_RULES.listing,
+  label = 'Photos',
+  hint,
+  errorMsg,
+  onChange,
+  onError,
+}: PhotoUploaderProps) {
+  const { toast, bumpImgVersion } = useTindahan()
+  const inputId = useId()
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [localErr, setLocalErr] = useState('')
+  const [cropTargetId, setCropTargetId] = useState<string | null>(null)
+
+  const cleanIds = (ids || []).filter((id) => imgSrc(id)).slice(0, max)
+
+  const handleFiles = async (files: File[]) => {
+    if (!files.length || busy) return
+    const room = max - cleanIds.length
+    if (room <= 0) {
+      const msg = `You can upload up to ${max} photo${max > 1 ? 's' : ''}. Remove one first.`
+      setLocalErr(msg)
+      toast(msg)
+      onError?.(msg)
+      return
+    }
+
+    const errs: string[] = []
+    let todo = files
+    if (todo.length > room) {
+      errs.push(
+        `Maximum of ${max} photos allowed. Only ${room} more photo${
+          room === 1 ? '' : 's'
+        } fit${room === 1 ? 's' : ''}; the rest were skipped.`,
+      )
+      todo = todo.slice(0, room)
+    }
+
+    setBusy(true)
+    setLocalErr('')
+    const next = [...cleanIds]
+    let firstNewId: string | null = null
+
+    for (const file of todo) {
+      if (next.length >= max) break
+      const res = await imgAdd(file)
+      if (res.id) {
+        next.push(res.id)
+        if (!firstNewId) firstNewId = res.id
+      } else if (res.err) {
+        errs.push(res.err)
+      }
+    }
+
+    setBusy(false)
+    if (errs.length) {
+      const joined = errs.join(' ')
+      setLocalErr(joined)
+      toast(joined)
+      onError?.(joined)
+    }
+    bumpImgVersion()
+    onChange(next.slice(0, max))
+
+    if (firstNewId) {
+      setCropTargetId(firstNewId)
+    }
+  }
+
+  const moveImage = (fromIdx: number, toIdx: number) => {
+    if (toIdx < 0 || toIdx >= cleanIds.length) return
+    const copy = [...cleanIds]
+    const [picked] = copy.splice(fromIdx, 1)
+    copy.splice(toIdx, 0, picked)
+    onChange(copy)
+  }
+
+  const shownErr = errorMsg || localErr
+
+  return (
+    <div className="field">
+      <div className="row between">
+        <label htmlFor={inputId}>{label}</label>
+        <span className="tiny muted tnum" style={{ fontWeight: 700 }}>
+          {cleanIds.length}/{max} Photos
+        </span>
+      </div>
+
+      <div
+        className={`row wrap upl ${dragOver ? 'drag' : ''}`.trim()}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragOver(true)
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragOver(false)
+          const dropped = Array.from(e.dataTransfer?.files || [])
+          void handleFiles(dropped)
+        }}
+      >
+        {cleanIds.map((id, i) => {
+          const src = imgSrc(id)
+          if (!src) return null
+          return (
+            <div key={id} className="uthumb">
+              <img src={src} alt={`Photo ${i + 1} preview`} />
+              {i === 0 && max > 1 && <span className="ubadge">Main</span>}
+              {i > 0 && max > 1 && (
+                <button
+                  type="button"
+                  className="ubadge btn-mini"
+                  title="Use as main primary photo"
+                  aria-label={`Make photo ${i + 1} the main photo`}
+                  onClick={() => {
+                    const copy = [...cleanIds]
+                    const [picked] = copy.splice(i, 1)
+                    copy.unshift(picked)
+                    onChange(copy)
+                  }}
+                >
+                  Make main
+                </button>
+              )}
+              {cleanIds.length > 1 && (
+                <div className="uorder-row" role="group" aria-label={`Reorder photo ${i + 1}`}>
+                  <button
+                    type="button"
+                    className="uorder-btn"
+                    disabled={i === 0}
+                    title="Move earlier"
+                    aria-label={`Move photo ${i + 1} left`}
+                    onClick={() => moveImage(i, i - 1)}
+                  >
+                    â€¹
+                  </button>
+                  <button
+                    type="button"
+                    className="uorder-btn"
+                    disabled={i === cleanIds.length - 1}
+                    title="Move later"
+                    aria-label={`Move photo ${i + 1} right`}
+                    onClick={() => moveImage(i, i + 1)}
+                  >
+                    â€º
+                  </button>
+                </div>
+              )}
+              <button
+                type="button"
+                className="uadjust"
+                title="Adjust position & zoom"
+                aria-label={`Adjust photo ${i + 1}`}
+                onClick={() => setCropTargetId(id)}
+              >
+                Adjust
+              </button>
+              <button
+                type="button"
+                className="uremove"
+                aria-label={`Remove photo ${i + 1}`}
+                onClick={() => {
+                  const copy = cleanIds.filter((_, idx) => idx !== i)
+                  onChange(copy)
+                }}
+              >
+                <Icon name="x" size="sm" />
+              </button>
+            </div>
+          )
+        })}
+
+        {cleanIds.length < max && (
+          <>
+            <label htmlFor={inputId} className={`uadd ${busy ? 'busy' : ''}`.trim()}>
+              <Icon name="plus" />
+              <span className="tiny">{busy ? 'Adding photos' : 'Add photo'}</span>
+            </label>
+            <input
+              ref={inputRef}
+              id={inputId}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple={max > 1}
+              hidden
+              disabled={busy}
+              onChange={(e) => {
+                const selected = Array.from(e.target.files || [])
+                e.target.value = ''
+                void handleFiles(selected)
+              }}
+            />
+          </>
+        )}
+      </div>
+
+      <span className="tiny muted">
+        {hint ||
+          `Upload up to ${max} photos (JPEG, PNG or WebP, up to 5 MB each). The first photo is used as the primary listing image. Tap "Adjust" to crop or use â€¹ â€º to rearrange.`}
+      </span>
+      {shownErr && (
+        <span className="err" role="alert">
+          {shownErr}
+        </span>
+      )}
+
+      {cropTargetId && (
+        <ImageAdjustModal
+          imgId={cropTargetId}
+          onClose={() => setCropTargetId(null)}
+          onSave={() => {
+            onChange([...cleanIds])
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+export function ProductGallery({
+  product,
+  favButton,
+}: {
+  product: PrototypeProduct
+  favButton?: ReactNode
+}) {
+  const list = imgsOf(product)
+  const [selectedIdx, setSelectedIdx] = useState(0)
+
+  if (!list.length) {
+    return (
+      <div className="rel">
+        <div
+          className={`photo ${product.tone || 't-study'} nophoto-tile`}
+          style={{ aspectRatio: '4 / 3', borderRadius: 16 }}
+        >
+          <Icon name={(product.icon || 'bag') as IconName} />
+          <span className="tag">{product.tag || ''}</span>
+          <span className="nophoto">No photo yet</span>
+        </div>
+        {favButton}
+      </div>
+    )
+  }
+
+  const clampedIdx = Math.min(selectedIdx, Math.max(0, list.length - 1))
+  const activeId = list[clampedIdx] || list[0]
+  const activeSrc = imgSrc(activeId) || imgSrc(list[0]) || ''
+
+  return (
+    <div className="stack" style={{ gap: 10 }}>
+      <div className="rel gal-main">
+        <img
+          className="gal-img pimg"
+          src={activeSrc}
+          alt={`${product.name}, photo ${clampedIdx + 1} of ${list.length}`}
+        />
+        <span className="tag gal-tag">{product.tag || ''}</span>
+        {favButton}
+      </div>
+      {list.length > 1 && (
+        <div className="row wrap">
+          {list.map((id, i) => {
+            const src = imgSrc(id)
+            if (!src) return null
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`gal-th ${i === clampedIdx ? 'on' : ''}`.trim()}
+                aria-label={`Show photo ${i + 1}`}
+                aria-pressed={i === clampedIdx}
+                onClick={() => setSelectedIdx(i)}
+              >
+                <img src={src} alt="" />
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+=== C:\Users\Lian Andrew\Desktop\RTU_Tindahan_Capstone\RTU_Tindahan_Final\RTU_Tindahan\frontend\src\features\marketplace\components\PhotoUploader.css ===
+/* ==========================================================================
+   PHOTO UPLOADER & PRODUCT GALLERY (prototype: .upl, .uthumb, .uremove, .ubadge, .uadd, .gal-main, .gal-th)
+   ========================================================================== */
+
+.upl {
+  gap: 10px;
+}
+.uthumb {
+  position: relative;
+  width: 96px;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--soft);
+}
+.uthumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.uremove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.92);
+  color: #12233d;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+.uadjust {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(18, 35, 61, 0.85);
+  color: #fff;
+  border: 0;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 0.15s;
+}
+.uadjust:hover {
+  background: var(--blue, #2251a3);
+}
+.ubadge {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: rgba(18, 35, 61, 0.85);
+  color: #fff;
+  border: 0;
+  z-index: 2;
+}
+.btn-mini {
+  cursor: pointer;
+}
+.btn-mini:hover {
+  background: var(--yellow, #e5a712);
+  color: #12233d;
+}
+.uadd {
+  width: 96px;
+  height: 96px;
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  color: var(--muted);
+  text-align: center;
+}
+.uadd:hover,
+.uadd:focus-within {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.uadd.busy {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* --------------------------------------------------------------------------
+   IMAGE ADJUST / CROP MODAL
+   -------------------------------------------------------------------------- */
+.crop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(10, 20, 38, 0.75);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.crop-modal {
+  width: 100%;
+  max-width: 480px;
+  background: var(--card, #fff);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 16px 48px rgba(10, 20, 38, 0.28);
+}
+.crop-viewport {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  aspect-ratio: 4 / 3;
+  margin: 0 auto;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #111b2b;
+  cursor: grab;
+  border: 2px solid var(--blue, #2251a3);
+}
+.crop-viewport.is-dragging {
+  cursor: grabbing;
+}
+.crop-grid-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, rgba(255, 255, 255, 0.15) 1px, transparent 1px) 0 0 / 33.33% 100%,
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.15) 1px, transparent 1px) 0 0 / 100% 33.33%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+}
+
+.gal-main {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+}
+.gal-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.gal-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #12233d;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+.gal-th {
+  width: 68px;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--soft);
+  cursor: pointer;
+}
+.gal-th.on {
+  border-color: var(--yellow);
+}
+.gal-th img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.uorder-row {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  gap: 2px;
+  z-index: 2;
+}
+.uorder-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.92);
+  color: #12233d;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.uorder-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.uorder-btn:not(:disabled):hover {
+  background: var(--yellow, #e5a712);
+}
+

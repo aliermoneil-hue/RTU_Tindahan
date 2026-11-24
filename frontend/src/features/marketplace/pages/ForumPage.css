@@ -233,7 +233,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   aspect-ratio: 4 / 3;
 }
 .fimgs.n3 .fimg:first-child {
@@ -252,7 +253,8 @@
   width: 64px;
   height: 64px;
   border-radius: 10px;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   flex: none;
 }
 .amenu-wrap {
@@ -305,4 +307,362 @@
 .amenu-item[disabled] {
   opacity: 0.5;
   cursor: default;
+}
+
+/* ==========================================================================
+   FACEBOOK-STYLE CREATE POST COMPOSER (trigger bar + modal)
+   ========================================================================== */
+
+/* Compact trigger bar card */
+.composer-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+:root[data-theme='dark'] .composer-trigger {
+  background: var(--card);
+  border-color: var(--line);
+}
+.composer-pill {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.composer-pill:hover {
+  background: #e2e8f2;
+  color: var(--ink);
+}
+:root[data-theme='dark'] .composer-pill {
+  background: #1e2026;
+  color: var(--muted);
+}
+:root[data-theme='dark'] .composer-pill:hover {
+  background: #2a2d33;
+  color: var(--ink);
+}
+.composer-photo-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  background: #eaf7ea;
+  color: #1e8e5a;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  flex: none;
+}
+.composer-photo-btn:hover {
+  background: #d4e9d4;
+  color: #1a7a4d;
+}
+:root[data-theme='dark'] .composer-photo-btn {
+  background: #2d4a30;
+  color: #8fdd9a;
+}
+:root[data-theme='dark'] .composer-photo-btn:hover {
+  background: #3a5b3d;
+  color: #a3e6a3;
+}
+
+/* Modal backdrop */
+.create-post-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(10, 20, 38, 0.65);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  animation: fadeIn 0.18s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Modal shell */
+.create-post-shell {
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  background: var(--card);
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(10, 20, 38, 0.3);
+  animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Header */
+.create-post-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+}
+.create-post-title-text {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+.create-post-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.create-post-close:hover {
+  background: #e2e8f2;
+  color: var(--ink);
+}
+:root[data-theme='dark'] .create-post-close {
+  background: #1e2026;
+  color: var(--muted);
+}
+:root[data-theme='dark'] .create-post-close:hover {
+  background: #2a2d33;
+  color: var(--ink);
+}
+
+/* Author row */
+.create-post-author {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 20px 10px;
+}
+.create-post-author-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.create-post-author-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.create-post-topic {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  appearance: none;
+  transition: border-color 0.15s ease;
+}
+.create-post-topic:hover {
+  border-color: var(--blue);
+}
+.create-post-topic:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+:root[data-theme='dark'] .create-post-topic {
+  background: #1e2026;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+/* Title input */
+.create-post-title-input {
+  width: 100%;
+  padding: 10px 20px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  font-size: 15px;
+  color: var(--ink);
+  outline: none;
+}
+.create-post-title-input::placeholder {
+  color: var(--muted);
+}
+
+/* Body textarea */
+.create-post-body-input {
+  width: 100%;
+  min-height: 120px;
+  padding: 14px 20px;
+  border: 0;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+  outline: none;
+  resize: none;
+}
+.create-post-body-input::placeholder {
+  color: var(--muted);
+}
+.create-post-body-input:focus {
+  outline: none;
+}
+
+/* Add to your post bar */
+.create-post-add-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--soft);
+}
+.create-post-add-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.create-post-photo-toggle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.create-post-photo-toggle:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+
+/* Photo attachment section */
+.create-post-photos {
+  padding: 14px 20px 20px;
+  background: var(--soft);
+}
+.create-post-photos-hide {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.create-post-photos-hide:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--ink);
+}
+:root[data-theme='dark'] .create-post-photos-hide {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+}
+:root[data-theme='dark'] .create-post-photos-hide:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+}
+
+/* Footer */
+.create-post-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
+.create-post-post-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--blue);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+.create-post-post-btn:hover:not(:disabled) {
+  background: #1a5293;
+}
+.create-post-post-btn:disabled {
+  background: var(--line);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* Mobile: tighter padding on modal shell */
+@media (max-width: 375px) {
+  .create-post-modal {
+    padding: 12px;
+  }
+  .create-post-shell {
+    max-height: 92vh;
+    border-radius: 16px;
+  }
+  .create-post-header,
+  .create-post-author,
+  .create-post-title-input,
+  .create-post-body-input,
+  .create-post-add-bar,
+  .create-post-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .create-post-body-input {
+    min-height: 100px;
+  }
+}
+
+/* CF-05 inside the two-step composer: the appointment row wraps rather than
+   forcing the modal wider than the phone it is being used on. */
+.create-post-schedule {
+  border-top: 1px solid var(--line, rgba(0, 0, 0, 0.08));
+  padding-top: 10px;
+}
+
+.create-post-schedule .input {
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+.create-post-notice {
+  font-size: 13px;
+  padding: 2px 0 4px;
 }

@@ -48,8 +48,12 @@ interface AuthValue {
   user: User | null
   /** true while restoring the session on first load */
   isLoading: boolean
-  /** true while the login() API call is in flight (drives the persistent BrandLoader) */
+  /** true while the login() API call is in flight (drives the local submit button spinner) */
   isSigningIn: boolean
+  /** true after a successful login, drives the BrandLoader transition into the marketplace */
+  isTransitioning: boolean
+  /** Clears isTransitioning so BrandLoader can exit after the transition */
+  clearTransitioning: () => void
   /** The pending sign-up code request (null before one has been sent) */
   otp: OtpState | null
   /** Clear the pending code request (used when starting over on step 1). */
@@ -70,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isSigningIn, setIsSigningIn] = useState<boolean>(false)
+  const [isTransitioning, setIsTransitioning] = useState<boolean>(false)
   const [otp, setOtp] = useState<OtpState | null>(null)
 
   // -----------------------------------------------------------------------
@@ -135,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       setToken(data.token)
       setUser(data.user)
+      setIsTransitioning(true)
     } finally {
       setIsSigningIn(false)
     }
@@ -204,6 +210,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOtp(null)
   }, [])
 
+  const clearTransitioning = useCallback(() => {
+    setIsTransitioning(false)
+  }, [])
+
   // -----------------------------------------------------------------------
   // Sign out
   // -----------------------------------------------------------------------
@@ -223,15 +233,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isLoading,
       isSigningIn,
+      isTransitioning,
       otp,
       clearOtp,
+      clearTransitioning,
       login,
       register,
       resendCode,
       confirmCode,
       logout,
     }),
-    [user, isLoading, isSigningIn, otp, clearOtp, login, register, resendCode, confirmCode, logout],
+    [user, isLoading, isSigningIn, isTransitioning, otp, clearOtp, clearTransitioning, login, register, resendCode, confirmCode, logout],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

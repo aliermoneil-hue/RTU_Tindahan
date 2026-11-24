@@ -103,7 +103,7 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
   timeScale = 1,
   immediate = false,
 }) => {
-  const [shouldRender, setShouldRender] = useState<boolean>(false);
+  const [shouldRender, setShouldRender] = useState<boolean>(() => isLoading && immediate);
   const [isExiting, setIsExiting] = useState<boolean>(false);
   const [isSlowLoad, setIsSlowLoad] = useState<boolean>(false);
 
@@ -149,7 +149,7 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
   // also bypass the delay so fast logins don't delay or skip the animation.
   // Subsequent loading states (route changes, data refetches) still get the
   // 150ms debounce to avoid flicker.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isLoading) return;
     if (shouldRender) return;
 
@@ -615,7 +615,12 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
     }
   }, [isLoading, shouldRender]);
 
-  if (!shouldRender) return null;
+  // Frame-0 guarantee: if isLoading && immediate, render the opaque overlay
+  // immediately (no setTimeout, no waiting for a second render). This covers
+  // the screen on the exact same frame the user updates so the Marketplace
+  // never flashes underneath.
+  const isVisible = shouldRender || (isLoading && immediate);
+  if (!isVisible) return null;
 
   return (
     <div
