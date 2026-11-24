@@ -102,7 +102,7 @@ DECIDED = {
     # --- reviews ------------------------------------------------------------
     "RR-03": ("verified", "average, count and one-per-order on the seller"),
     "RR-04": ("policy", "reviews are not screened on purpose: `docs/SCREENING.md` §6"),
-    "RR-05": ("partial", "the seller cannot edit or delete; the report action does not exist"),
+    "RR-05": ("verified", "only the author edits a review, only staff remove one, and a seller can report it from the product page"),
     "RR-06": ("partial", "the buyer can write one review per order; edit and delete are not exposed"),
     # --- seller dashboard ---------------------------------------------------
     "SD-01": ("verified", "My shop lists received orders"),
@@ -116,10 +116,10 @@ DECIDED = {
     "CF-07": ("verified", "author edit/delete, moderator hide/restore, tombstone"),
     # --- screening ----------------------------------------------------------
     "AI-01": ("verified", "Gemini provider on create and edit for listings, posts and comments"),
-    "AI-02": ("partial", "two outcomes (clean, flagged) map to pending and needs_review; there is no separate Rejected state"),
+    "AI-02": ("verified", "three outcomes: clean passes to approval, flagged is held, rejected is blocked and queued"),
     "AI-03": ("policy", "a clean verdict still waits for a human: `docs/SCREENING.md` §6"),
     "AI-04": ("verified", "needs_review queue for listings, posts and comments"),
-    "AI-05": ("partial", "held items cannot publish; a permanent Rejected state does not exist"),
+    "AI-05": ("verified", "a rejected item is not published and the seller is told the exact reasons, with an appeal path"),
     "AI-06": ("verified", "POST /appeals/ + decide; the moderator who confirmed the rejection is refused via original_decider"),
     "AI-07": ("verified", "provider failure falls back to rules, and with the fallback off the item is held"),
     "AI-08": ("partial", "verdict, score, reasons, provider, model and time are logged; the cleaned text is not stored"),
@@ -143,7 +143,7 @@ DECIDED = {
     "NT-02": ("partial", "verification, reset and the password-changed notice are sent; store mail is not"),
     # --- administration -----------------------------------------------------
     "AD-02": ("verified", "`/admin/users/<id>/role/`, administrator only"),
-    "AD-03": ("partial", "categories are managed; screening rules are not"),
+    "AD-03": ("partial", "administrators edit the screening rules; marketplace categories are still fixed in code"),
     "AD-04": ("verified", "Users and audit screen, read-only trail"),
     "AD-05": ("verified", "`createsuperuser`; docs/TEAM-SETUP.md"),
     # --- favourites, profile, staff tools ----------------------------------
@@ -166,7 +166,7 @@ DECIDED = {
     "RM-04": ("implemented", "a reporter sees their own reports and each one's status"),
     "RM-06": ("partial", "the audit trail names the member acted on; there is no per-user report history view"),
     "PR-04": ("implemented", "admin endpoints are role-gated; personal data is not exposed to members"),
-    "MN-02": ("partial", "categories are configurable from the staff screens; screening rules are not"),
+    "MN-02": ("partial", "screening rules are configurable in the panel; marketplace categories would still need a code change"),
     "UX-01": ("partial", "the layout is responsive by design; no 360 px test was run"),
     "UX-03": ("implemented", "the interface is in English throughout"),
     "UX-04": ("verified", "API errors carry a human-readable message that the client shows"),

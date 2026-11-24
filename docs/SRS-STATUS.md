@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 66 |
+| Implemented, verified | 69 |
 | Implemented | 79 |
-| Partial | 22 |
+| Partial | 19 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
@@ -168,7 +168,7 @@ browser or the tests in this repository.
 | RR-02 | The system shall allow only one review per completed order. | Built | Implemented | `apps/reviews` |
 | RR-03 | The system shall show on each seller profile the average rating, the number of reviews, and the number of completed transactions. | Partly | Implemented, verified | average, count and one-per-order on the seller |
 | RR-04 | The system shall hold review text for AI screening before it is published. | Not yet | Deliberately not done | reviews are not screened on purpose: `docs/SCREENING.md` §6 |
-| RR-05 | The system shall not let a seller edit or delete a review. A seller may report a review. | Partly | Partial | the seller cannot edit or delete; the report action does not exist |
+| RR-05 | The system shall not let a seller edit or delete a review. A seller may report a review. | Partly | Implemented, verified | only the author edits a review, only staff remove one, and a seller can report it from the product page |
 | RR-06 | The system shall let a buyer edit or delete their own review. An edited review shall be screened again before the change is published. | Partly | Partial | the buyer can write one review per order; edit and delete are not exposed |
 | RR-07 | The system shall count only published reviews in the average and the number of reviews. Reviews that are waiting, rejected, or removed shall not co... | Built | Implemented | `apps/reviews` |
 | RR-08 | The system shall not ask for reviews on official orders, because the Official Store has no seller account. | Partly | Implemented | `apps/reviews` |
@@ -199,10 +199,10 @@ browser or the tests in this repository.
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
 | AI-01 | The system shall use an LLM to check the text of each new listing, each edited listing (as set in LS-05), and each new or edited forum post, commen... | Not yet | Implemented, verified | Gemini provider on create and edit for listings, posts and comments |
-| AI-02 | The system shall classify each screened submission into one of three distinct outcomes: Approved, Needs Review, or Rejected. | Not yet | Partial | two outcomes (clean, flagged) map to pending and needs_review; there is no separate Rejected state |
+| AI-02 | The system shall classify each screened submission into one of three distinct outcomes: Approved, Needs Review, or Rejected. | Not yet | Implemented, verified | three outcomes: clean passes to approval, flagged is held, rejected is blocked and queued |
 | AI-03 | The system shall automatically publish submissions that receive an Approved classification. | Not yet | Deliberately not done | a clean verdict still waits for a human: `docs/SCREENING.md` §6 |
 | AI-04 | The system shall hold content marked Needs Review and place it in the moderator queue. A human moderator shall make the final decision. | Partly | Implemented, verified | needs_review queue for listings, posts and comments |
-| AI-05 | The system shall block the publication of submissions classified as Rejected and present the submitting user with the specific reason for rejection. | Partly | Partial | held items cannot publish; a permanent Rejected state does not exist |
+| AI-05 | The system shall block the publication of submissions classified as Rejected and present the submitting user with the specific reason for rejection. | Partly | Implemented, verified | a rejected item is not published and the seller is told the exact reasons, with an appeal path |
 | AI-06 | The system shall let a user appeal a Rejected decision after a moderator has confirmed it (AI-11). A different moderator, or an Administrator, shal... | Not yet | Implemented, verified | POST /appeals/ + decide; the moderator who confirmed the rejection is refused via original_decider |
 | AI-07 | The system shall send content to the moderator queue, and not publish it, if the LLM service is unavailable or returns an error. | Not yet | Implemented, verified | provider failure falls back to rules, and with the fallback off the item is held |
 | AI-08 | The system shall keep a log of every screening: the content ID, the cleaned text that was sent to the LLM, the outcome, the reason, the confidence... | Not yet | Partial | verdict, score, reasons, provider, model and time are logged; the cleaned text is not stored |
@@ -241,7 +241,7 @@ browser or the tests in this repository.
 | --- | --- | --- | --- | --- |
 | AD-01 | The system shall let an Administrator activate, suspend, and reactivate accounts, including carrying out a suspension that a moderator recommended. | Built | Implemented | `apps/accounts/admin_api.py` |
 | AD-02 | The system shall allow an Administrator to assign and revoke Office Staff and Moderator role privileges. | Not yet | Implemented, verified | `/admin/users/<id>/role/`, administrator only |
-| AD-03 | The system shall allow an Administrator to create, edit, and manage marketplace categories and AI screening policy rules. | Partly | Partial | categories are managed; screening rules are not |
+| AD-03 | The system shall allow an Administrator to create, edit, and manage marketplace categories and AI screening policy rules. | Partly | Partial | administrators edit the screening rules; marketplace categories are still fixed in code |
 | AD-04 | The system shall let an Administrator view the audit logs. The audit log shall record role changes, account state changes, screening rule changes,... | Partly | Implemented, verified | Users and audit screen, read-only trail |
 | AD-05 | The system shall have a first Administrator account created by the project team when the system is set up, and shall let an Administrator give the... | Partly | Implemented, verified | `createsuperuser`; docs/TEAM-SETUP.md |
 
@@ -315,7 +315,7 @@ browser or the tests in this repository.
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
 | MN-01 | Application source code shall be structured into modular components and accompanied by clear technical documentation to facilitate maintenance by f... | Built | Implemented | 11 apps, 30 models, docs/ set |
-| MN-02 | Marketplace product categories and AI screening policy rules shall be configurable directly through the Administrator Panel without requiring code... | Partly | Partial | categories are configurable from the staff screens; screening rules are not |
+| MN-02 | Marketplace product categories and AI screening policy rules shall be configurable directly through the Administrator Panel without requiring code... | Partly | Partial | screening rules are configurable in the panel; marketplace categories would still need a code change |
 | MN-03 | A software upgrade must change the saved data safely: it shall be repeatable, keep the TXN references and its history, and must not delete nothing. | Built | Implemented | 11 apps, 30 models, docs/ set |
 
 ## What is still open
