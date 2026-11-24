@@ -562,7 +562,7 @@ class ForumScreeningApiTests(APITestCase):
         )
 
         staff_row = self.feed(self.moderator)[0]
-        self.assertEqual(staff_row["screening"]["verdict"], "flagged")
+        self.assertEqual(staff_row["screening"]["verdict"], "rejected")
         self.assertTrue(staff_row["screening"]["reasons"])
         self.assertEqual(staff_row["screening"]["provider"], "stub")
 
@@ -687,7 +687,7 @@ class ForumCommentScreeningApiTests(APITestCase):
         self.assertEqual(mine["comments"][0]["moderation_status"], "needs_review")
         # Staff see it with the reason.
         staff = self.read_post(post_id, self.moderator)
-        self.assertEqual(staff["comments"][0]["screening"]["verdict"], "flagged")
+        self.assertEqual(staff["comments"][0]["screening"]["verdict"], "rejected")
 
     def test_an_ordinary_comment_is_public_at_once(self):
         post_id = self.make_post()

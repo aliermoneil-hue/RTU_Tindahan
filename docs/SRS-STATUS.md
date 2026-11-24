@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 64 |
+| Implemented, verified | 66 |
 | Implemented | 79 |
-| Partial | 24 |
+| Partial | 22 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
@@ -208,8 +208,8 @@ browser or the tests in this repository.
 | AI-08 | The system shall keep a log of every screening: the content ID, the cleaned text that was sent to the LLM, the outcome, the reason, the confidence... | Not yet | Partial | verdict, score, reasons, provider, model and time are logged; the cleaned text is not stored |
 | AI-09 | The system shall send to the LLM service only the content being checked, and only after removing names, contact numbers, and other identifying deta... | Not yet | Partial | only the content is sent, but names and numbers inside it are not redacted |
 | AI-10 | The system shall let an Administrator update the screening rules without changing the program code. | Not yet | Implemented, verified | ScreeningRule table seeded from the code list, editable by an administrator; both providers read it, audited |
-| AI-11 | The system shall place every Rejected item in the moderator queue so a moderator can confirm or reverse the rejection. A reversed rejection shall b... | Not yet | Partial | held items reach the queue and a moderator decides; there is no rejected-then-appeal path |
-| AI-12 | The system shall have the LLM give a confidence level with each outcome, and shall treat a low confidence result as Needs Review. | Not yet | Partial | a 0-100 score is stored and the threshold flags; no confidence mapping |
+| AI-11 | The system shall place every Rejected item in the moderator queue so a moderator can confirm or reverse the rejection. A reversed rejection shall b... | Not yet | Implemented, verified | a definite violation is rejected into the queue, and a moderator confirms or reverses it; a reversal publishes |
+| AI-12 | The system shall have the LLM give a confidence level with each outcome, and shall treat a low confidence result as Needs Review. | Not yet | Implemented, verified | every outcome carries a confidence, and anything below the floor is treated as needs review |
 | AI-13 | The system shall tell users in plain language, at registration and on the posting screens, that content is screened automatically and how to appeal... | Not yet | Implemented, verified | ScreeningNotice at sign-up, create-listing, forum composer and comment box |
 | AI-14 | The system shall screen content written in English, Filipino, or a mix of both (Taglish). | Not yet | Implemented, verified | Taglish and Filipino phrases in both rule lists, with tests for a flag and for ordinary talk staying clean |
 | AI-15 | The system shall store, for each screened item, the AI outcome and the moderator's final decision, so accuracy, precision, and recall can be measured. | Not yet | Implemented, verified | screening audit row plus the item's moderation status |

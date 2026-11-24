@@ -39,12 +39,20 @@ export function ModerationPage() {
         id: `api-flag:${dto.slug}`,
         lid: `${API_ID_PREFIX}${dto.slug}`,
         state: 'open',
-        pri: 'Waiting for approval',
+        // AI-11: a row the screening rejected says so, because the moderator's
+        // decision is the opposite one: confirm it, or publish over it.
+        pri:
+          dto.screening?.verdict === 'rejected'
+            ? 'Screening rejected — confirm or reverse'
+            : 'Waiting for approval',
         // The panel below reads these three straight off the row, so carry the
         // listing's own values instead of leaving them blank.
         title: dto.title,
         price: Number(dto.price),
         seller: dto.seller_name,
+        // The screening card is red when the screening said no, green when it
+        // merely passed the item along.
+        risky: dto.screening ? dto.screening.verdict !== 'clean' : false,
       }) as (typeof db.flags)[number],
   )
   const openFlags = [...apiRows, ...db.flags.filter((x) => x.state === 'open')]
@@ -55,6 +63,10 @@ export function ModerationPage() {
     f && String(f.id).startsWith('api-flag:') ? String(f.id).slice('api-flag:'.length) : ''
   const lst = f ? db.userListings.find((l) => l.lid === f.lid) : undefined
   const p = lst?.product
+  const screeningNow = f
+    ? pendingListings.find((d) => `${API_ID_PREFIX}${d.slug}` === f.lid)?.screening ?? null
+    : null
+  const screeningRejected = screeningNow?.verdict === 'rejected'
 
   // Reset image index when switching selected flag
   useEffect(() => {
@@ -409,6 +421,23 @@ export function ModerationPage() {
               >
                 <b className="small">Automatic screening</b>
                 <span className="small">{f.reason}</span>
+                {screeningNow && (
+                  <span className="small muted">
+                    {screeningNow.verdict === 'rejected'
+                      ? 'The screening rejected this listing'
+                      : screeningNow.verdict === 'flagged'
+                        ? 'The screening flagged this listing'
+                        : 'The screening passed it'}{' '}
+                    with{' '}
+                    {screeningNow.confidence === null
+                      ? 'no stated confidence'
+                      : `${Math.round(screeningNow.confidence * 100)}% confidence`}
+                    {screeningNow.confidence !== null &&
+                    screeningNow.confidence < 0.7 &&
+                      ' — below the floor, so a person decides'}
+                    . The AI is never the final authority.
+                  </span>
+                )}
                 <button
                   type="button"
                   className="link"
@@ -446,7 +475,7 @@ export function ModerationPage() {
                       }}
                     >
                       <Icon name="check" size="sm" />
-                      Approve and publish
+                      {screeningRejected ? 'Reverse the rejection and publish' : 'Approve and publish'}
                     </button>
                     <button
                       type="button"
@@ -457,7 +486,7 @@ export function ModerationPage() {
                         setModNote('')
                       }}
                     >
-                      Reject & message seller
+                      {screeningRejected ? 'Uphold the rejection' : 'Reject & message seller'}
                     </button>
                   </div>
                 </div>

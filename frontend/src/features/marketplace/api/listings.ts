@@ -72,6 +72,18 @@ export interface ApiListing {
   seller_email: string
   photos: ApiPhoto[]
   variants: ApiVariant[]
+  /** Staff responses only: what the screening said, and how sure it was. */
+  screening?: {
+    verdict: 'clean' | 'flagged' | 'rejected'
+    score: number | null
+    confidence: number | null
+    reasons: string[]
+    provider: string
+    model: string
+    decision: '' | 'confirmed' | 'reversed'
+    decided_by: string | null
+    at: string
+  } | null
 }
 
 export interface ApiCategory {

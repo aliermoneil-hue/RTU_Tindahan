@@ -302,6 +302,11 @@ SCREENING_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "6"))
 # a moderator still approves everything. See docs/SCREENING.md.
 SCREENING_FALLBACK = env_bool("LLM_FALLBACK", True)
 
+# AI-12: below this confidence the item goes to a moderator whatever the
+# provider answered. A clean guess is still a guess; 0.7 keeps an honest model's
+# uncertainty in front of a person without turning every listing into a queue.
+SCREENING_CONFIDENCE_FLOOR = float(os.getenv("LLM_CONFIDENCE_FLOOR", "0.7"))
+
 # ---------------------------------------------------------------------------
 # Email
 #

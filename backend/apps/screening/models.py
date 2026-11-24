@@ -15,6 +15,14 @@ class ScreeningResult(models.Model):
     class Verdict(models.TextChoices):
         CLEAN = "clean", "Clean"
         FLAGGED = "flagged", "Flagged"
+        # AI-11: a definite violation. It is not final — the item sits in the
+        # moderator queue until a person confirms or reverses it.
+        REJECTED = "rejected", "Rejected"
+
+    class Decision(models.TextChoices):
+        PENDING = "", "Awaiting a moderator"
+        CONFIRMED = "confirmed", "Confirmed by a moderator"
+        REVERSED = "reversed", "Reversed by a moderator"
 
     listing = models.ForeignKey(
         "catalog.Listing",
@@ -48,6 +56,30 @@ class ScreeningResult(models.Model):
     # provider could not be reached, which is a different thing from "clean".
     score = models.PositiveSmallIntegerField(null=True, blank=True)
     reasons = models.JSONField(default=list, blank=True)
+
+    # AI-12: what the provider thought of its own answer. Null on rows written
+    # before this field existed, and on a provider error where there is nothing
+    # to be confident about.
+    confidence = models.FloatField(null=True, blank=True)
+
+    # AI-11 and AI-15: the moderator's final decision, recorded next to the AI's
+    # so the two can be compared (accuracy, precision, recall).
+    decision = models.CharField(
+        max_length=10,
+        choices=Decision.choices,
+        default=Decision.PENDING,
+        blank=True,
+        db_index=True,
+    )
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="screening_decisions",
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.CharField(max_length=300, blank=True)
 
     # Which implementation answered, so a verdict can be explained later.
     provider = models.CharField(max_length=40)

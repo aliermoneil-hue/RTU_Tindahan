@@ -159,6 +159,11 @@ PHONE_RE = re.compile(r"(?:\+63|0)9\d{9}")
 # anything by itself (LS-05).
 FLAG_THRESHOLD = 50
 
+# AI-11: a definite, rule-level violation is *rejected* by the screening rather
+# than merely held. A rejection is not final — it lands in the moderator queue
+# for confirmation, and a reversed rejection is published.
+REJECT_SCORE = 90
+
 MIN_DESCRIPTION = 20
 EXCESSIVE_PRICE = 50_000
 
@@ -185,6 +190,10 @@ Also raise the score for these guideline signals: a banned word ("replica", "ans
 text, or an all-capitals title. An all-capitals title alone is a spam shape, not a violation.
 Ordinary second-hand goods, food, uniforms, school supplies and services are clean.
 Score 0-100: 0 certainly harmless, 100 certainly prohibited. 50 or above means flagged.
+Answer "rejected" only for a definite, named violation (counterfeit, exam cheating, a weapon, an illegal
+drug, a vape for sale); answer "flagged" when it needs a human decision; otherwise "clean".
+Give a confidence from 0 to 1 for your own answer. Be honest: a low confidence sends the item to a
+moderator, which is the right place for a guess.
 Give at most three short reasons, each one sentence, written for a moderator."""
 
 GEMINI_POST_INSTRUCTION = """You screen forum posts for RTU Tindahan, a university campus marketplace in the Philippines.
@@ -203,11 +212,12 @@ Give at most three short reasons, each one sentence, written for a moderator."""
 GEMINI_SCHEMA = {
     "type": "object",
     "properties": {
-        "verdict": {"type": "string", "enum": ["clean", "flagged"]},
+        "verdict": {"type": "string", "enum": ["clean", "flagged", "rejected"]},
         "score": {"type": "integer", "minimum": 0, "maximum": 100},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
         "reasons": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["verdict", "score", "reasons"],
+    "required": ["verdict", "score", "confidence", "reasons"],
 }
 
 
@@ -218,6 +228,10 @@ class Verdict:
     verdict: str
     score: int | None
     reasons: list[str] = field(default_factory=list)
+    # AI-12: how sure the provider is of its own answer, 0.0 to 1.0. Below the
+    # floor the item goes to a human whatever the verdict says, because an
+    # uncertain model is not evidence.
+    confidence: float = 1.0
     provider: str = "stub"
     model: str = ""
     raw: dict = field(default_factory=dict)
@@ -365,10 +379,22 @@ class StubProvider:
                 )
                 score = max(score, 85)
 
+        # AI-12: an exact rule hit is near-certain; a soft signal (a thin
+        # description, an odd price, a bare link) is a judgement call, and the
+        # confidence says so. AI-11: the certain end is a rejection, which a
+        # moderator still has to confirm.
+        if score >= REJECT_SCORE:
+            verdict, confidence = "rejected", 0.97
+        elif score >= FLAG_THRESHOLD:
+            verdict, confidence = "flagged", (0.9 if score >= 85 else 0.65)
+        else:
+            verdict, confidence = "clean", 0.92
+
         return Verdict(
-            verdict="flagged" if score >= FLAG_THRESHOLD else "clean",
+            verdict=verdict,
             score=score,
             reasons=reasons,
+            confidence=confidence,
             provider=self.name,
             model=self.model_name,
             raw={"rules_fired": len(reasons)},
@@ -472,7 +498,16 @@ class GeminiProvider:
         # An answer we cannot read is not a pass. Anything other than an
         # explicit "clean" is treated as flagged: the moderator queue is a
         # cheap place to be wrong, a published counterfeit is not.
-        verdict = "clean" if parsed.get("verdict") == "clean" else "flagged"
+        answered = str(parsed.get("verdict") or "").strip().lower()
+        verdict = answered if answered in ("clean", "flagged", "rejected") else "flagged"
+
+        # A model that does not state its confidence is treated as unsure, so
+        # the item goes to a moderator rather than through.
+        try:
+            confidence = float(parsed.get("confidence"))
+        except (TypeError, ValueError):
+            confidence = 0.5
+        confidence = min(max(confidence, 0.0), 1.0)
 
         score = parsed.get("score")
         try:
@@ -490,6 +525,7 @@ class GeminiProvider:
             verdict=verdict,
             score=score,
             reasons=reasons,
+            confidence=confidence,
             provider=self.name,
             model=self.model,
             raw={

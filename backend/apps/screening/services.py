@@ -3,7 +3,13 @@
 The one rule this module enforces: screening never publishes.
 
 For a listing, a clean verdict leaves it waiting for a moderator exactly as
-before the service existed, and a flagged verdict sends it to `needs_review`.
+before the service existed, a flagged verdict sends it to `needs_review`, and a
+`rejected` verdict — a definite, rule-level violation — marks it rejected and
+leaves it in the moderator queue for confirmation. A rejection is never final:
+a moderator can reverse it, and `reverse` publishes (AI-11).
+
+A verdict with confidence below `SCREENING_CONFIDENCE_FLOOR` is treated as
+needs-review whatever it says (AI-12), because an unsure model is not evidence.
 
 For a forum post there is no "pending" state to leave alone — a post is live
 the moment it is written — so the safe default inverts: clean leaves the post
@@ -28,6 +34,7 @@ auto-approved clean verdicts.
 
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from apps.catalog.models import Listing
 from apps.forum.models import ForumComment, ForumPost
@@ -45,12 +52,13 @@ FALLBACK_REASON = (
 )
 
 
-def _store(target, *, verdict, score, reasons, provider, model="", raw=None):
+def _store(target, *, verdict, score, reasons, provider, model="", confidence=None, raw=None):
     return ScreeningResult.objects.create(
         **target,
         verdict=verdict,
         score=score,
         reasons=reasons,
+        confidence=confidence,
         provider=provider,
         model_name=model,
         raw=raw or {},
@@ -79,6 +87,7 @@ def _run(target, subject) -> ScreeningResult:
                 + fallback.reasons,
                 provider=f"{configured}+fallback",
                 model=fallback.model,
+                confidence=fallback.confidence,
                 raw={"provider_error": error, **fallback.raw},
             )
         else:
@@ -101,22 +110,99 @@ def _run(target, subject) -> ScreeningResult:
             reasons=verdict.reasons,
             provider=verdict.provider,
             model=verdict.model,
+            confidence=verdict.confidence,
             raw=verdict.raw,
         )
 
     return result
 
 
+def confidence_floor() -> float:
+    return float(getattr(settings, "SCREENING_CONFIDENCE_FLOOR", 0.7))
+
+
+def needs_a_human(result) -> bool:
+    """AI-11 and AI-12: anything but a confident clean pass belongs to a person.
+
+    A rejection is in this set on purpose. The AI is never the final authority,
+    so its strongest negative answer still waits for a moderator to confirm it.
+    """
+    if result.verdict == ScreeningResult.Verdict.CLEAN:
+        return result.confidence is not None and result.confidence < confidence_floor()
+    return True
+
+
 @transaction.atomic
 def run_screening(listing) -> ScreeningResult:
     """Screen one listing, store the result, and move the status if needed."""
     result = _run({"listing": listing}, TextSubject.for_listing(listing))
+
+    if result.verdict == ScreeningResult.Verdict.REJECTED:
+        # AI-11: rejected, and queued. The reason travels to the seller so the
+        # notice is not a bare "no".
+        if listing.moderation_status != Listing.ModerationStatus.REJECTED:
+            reason = "; ".join(result.reasons) or "It matched a prohibited-item rule."
+            listing.reject(reason[:300])
+            # AI-11: a rejection is a claim a moderator will check, so the seller
+            # is told the claim, told it is being checked, and told they can
+            # appeal — which is what makes the reversal path reachable at all.
+            summary = (listing.title or f"Listing {listing.pk}").strip()[:60]
+            notify(
+                listing.seller,
+                f'Your listing "{summary}" was rejected by the automatic screening: '
+                f"{reason} A moderator will check it, and you can appeal this decision."
+                [:240],
+                kind=Notification.Kind.LISTING,
+                link_kind="shop",
+                link_id=listing.slug,
+            )
+            notify_staff(
+                f'Screening rejected a listing: "{summary}". {reason}'[:240],
+                link_kind="approval",
+                link_id=listing.slug,
+            )
+        return result
+
+    if list(
+        ScreeningResult.objects.filter(listing=listing, decision="", verdict="rejected")
+    ) and result.verdict != ScreeningResult.Verdict.REJECTED:
+        # A later clean screening of an AI-rejected listing does not silently
+        # publish it: the rejection stays until a moderator decides.
+        return result
+
     if (
-        result.is_flagged
+        needs_a_human(result)
         and listing.moderation_status != Listing.ModerationStatus.NEEDS_REVIEW
     ):
         listing.send_to_review()
     return result
+
+
+def record_moderator_decision(*, target, decision, moderator, note=""):
+    """AI-15: stamp the human's answer on the latest screening row.
+
+    `target` is a listing, a post or a comment. The AI's own verdict is left
+    untouched — the point is to keep the two side by side so accuracy can be
+    measured later, not to overwrite what the machine said.
+    """
+    field = (
+        "listing"
+        if isinstance(target, Listing)
+        else "post"
+        if isinstance(target, ForumPost)
+        else "comment"
+    )
+    latest = (
+        ScreeningResult.objects.filter(**{field: target}).order_by("-created_at").first()
+    )
+    if latest is None:
+        return None
+    latest.decision = decision
+    latest.decided_by = moderator
+    latest.decided_at = timezone.now()
+    latest.decision_note = (note or "")[:300]
+    latest.save(update_fields=["decision", "decided_by", "decided_at", "decision_note"])
+    return latest
 
 
 @transaction.atomic
@@ -131,7 +217,9 @@ def run_post_screening(post) -> ScreeningResult:
     """
     result = _run({"post": post}, TextSubject.for_post(post))
 
-    if not result.is_flagged:
+    # A post has no rejected state: everything that is not a confident clean
+    # pass is held (AI-03), which is also where a low confidence belongs (AI-12).
+    if result.verdict == ScreeningResult.Verdict.CLEAN and not needs_a_human(result):
         return result
     if post.moderation_status == ForumPost.ModerationStatus.NEEDS_REVIEW:
         return result
@@ -166,7 +254,7 @@ def run_comment_screening(comment) -> ScreeningResult:
     """
     result = _run({"comment": comment}, TextSubject.for_comment(comment))
 
-    if not result.is_flagged:
+    if result.verdict == ScreeningResult.Verdict.CLEAN and not needs_a_human(result):
         return result
     if comment.moderation_status == ForumComment.ModerationStatus.NEEDS_REVIEW:
         return result

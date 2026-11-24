@@ -18,8 +18,13 @@ touching the rest of the system.
       apps.screening.services.run_screening(listing)
               |
               +--> provider returns clean   -> status unchanged (pending_screening)
-              |
+              |                                (unless confidence is below the
+              |                                floor, then needs_review: AI-12)
               +--> provider returns flagged -> status becomes needs_review
+              |
+              +--> provider returns rejected -> status becomes rejected, and the
+              |                                row waits in the queue for a
+              |                                moderator to confirm or reverse (AI-11)
               |
               +--> provider raises          -> with LLM_FALLBACK on, the rules provider
               |                                answers and the audit row says so;
@@ -34,6 +39,41 @@ touching the rest of the system.
 Screening never publishes anything. A clean verdict means "no obvious
 problem, a human may approve it", not "publish it". That keeps LS-05 true and
 keeps the approval decision where the SRS puts it.
+
+### Three outcomes, a confidence, and a human at the end (AI-11, AI-12)
+
+The provider answers one of three things and says how sure it is:
+
+| outcome    | when                                          | the listing becomes            |
+|------------|-----------------------------------------------|--------------------------------|
+| `clean`    | nothing tripped, and the provider is sure      | `pending_screening`            |
+| `flagged`  | a soft signal: a thin description, a link, a price far above a campus resale, a pay-first pattern | `needs_review` |
+| `rejected` | a definite, named violation — counterfeit, exam answers, a vape, liquor, stolen goods | `rejected`, **and queued** |
+
+A rejection is a claim, not a sentence. It lands in the moderator queue
+(`GET /listings/?status=rejected&awaiting=ai`) with the AI's reasons, its
+confidence, and two buttons:
+
+- **Reverse the rejection and publish** — `POST /listings/<slug>/approve/`.
+  The listing is approved, put back on the shelf and published; the seller is told.
+- **Uphold the rejection** — `POST /listings/<slug>/reject/` with a reason.
+
+Either way the human's answer is written next to the AI's on the same
+`ScreeningResult` row (`decision`, `decided_by`, `decided_at`, `decision_note`).
+The AI's verdict is never overwritten, which is what AI-15 needs: precision and
+recall can be computed from `verdict` versus `decision`, and the AI's answer is
+never presented as the final one.
+
+**The confidence floor.** `SCREENING_CONFIDENCE_FLOOR` (default `0.7`,
+`LLM_CONFIDENCE_FLOOR` in `.env`) is the point below which an answer is treated
+as `needs_review` whatever it says — a clean guess is still a guess. The rules
+provider states 0.97 for an exact rule hit, 0.9 for a pay-first pattern, 0.65
+for a judgement call (a thin description, an odd price) and 0.92 for clean.
+Gemini is asked for its own confidence, and an answer that omits one is treated
+as 0.5, so it goes to a person.
+
+A post or a comment has no `rejected` state — everything that is not a confident
+clean pass is held, which is where a rejection and a low confidence both land.
 
 A listing is screened again when the seller edits it, because an edit changes
 the words a moderator would have judged.

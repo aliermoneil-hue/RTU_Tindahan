@@ -31,7 +31,7 @@ from apps.accounts.models import User
 from apps.accounts.permissions import IsModerator, IsVerifiedUser
 from apps.audit.services import record
 from apps.notifications.services import notify
-from apps.screening.services import run_screening
+from apps.screening.services import record_moderator_decision, run_screening
 
 from .models import Category, Listing
 from .serializers import (
@@ -236,6 +236,17 @@ class ListingViewSet(viewsets.ModelViewSet):
 
         if moderation_asked:
             queryset = queryset.filter(moderation_status__in=set(moderation_asked))
+
+        # AI-11: `?awaiting=ai` narrows a rejected queue to the rows the
+        # screening rejected and no moderator has confirmed or reversed, which
+        # is what the moderation screen actually wants to show.
+        awaiting = (params.get("awaiting") or "").strip().lower()
+        if awaiting == "ai":
+            queryset = queryset.filter(
+                moderation_status=Listing.ModerationStatus.REJECTED,
+                screening_results__verdict="rejected",
+                screening_results__decision="",
+            ).distinct()
         if availability_asked:
             queryset = queryset.filter(availability_status__in=set(availability_asked))
         if category := params.get("category"):
@@ -335,6 +346,14 @@ class ListingViewSet(viewsets.ModelViewSet):
     def approve(self, request, slug=None):
         listing = self.get_object()
         listing.approve()
+        # AI-11: approving a listing the screening rejected is a reversal, and
+        # the row records that the human overruled the machine.
+        record_moderator_decision(
+            target=listing,
+            decision="reversed",
+            moderator=request.user,
+            note=(request.data.get("note") or "").strip(),
+        )
         record(
             request.user,
             "approve listing",
@@ -361,6 +380,12 @@ class ListingViewSet(viewsets.ModelViewSet):
             )
         listing = self.get_object()
         listing.reject(reason)
+        record_moderator_decision(
+            target=listing,
+            decision="confirmed",
+            moderator=request.user,
+            note=reason,
+        )
         record(
             request.user,
             "reject listing",

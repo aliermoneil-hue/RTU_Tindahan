@@ -1,6 +1,8 @@
 """API tests for the catalogue: visibility, ownership, and moderation."""
 
 import io
+from decimal import Decimal
+from unittest import mock
 
 from PIL import Image
 
@@ -11,6 +13,9 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
 from apps.catalog.models import Category, Listing, ListingPhoto
+from apps.notifications.models import Notification
+from apps.screening.providers import Verdict
+from apps.screening.services import run_screening
 
 
 def png_bytes(width=100, height=100):
@@ -243,7 +248,7 @@ class ListingApiTests(APITestCase):
 
     # -- screening and the moderator queue (AI-01, AI-03) ------------------
 
-    def test_posting_a_prohibited_item_lands_in_review(self):
+    def test_posting_a_prohibited_item_is_rejected_and_queued(self):
         self.client.force_authenticate(self.seller)
 
         response = self.client.post(
@@ -256,7 +261,13 @@ class ListingApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.json()["status"], "needs_review")
+        # AI-11: rejected, and still in front of a moderator.
+        self.assertEqual(response.json()["status"], "rejected")
+
+        self.client.force_authenticate(self.moderator)
+        queue = self.client.get("/api/v1/listings/?status=rejected&awaiting=ai")
+        slugs = [row["slug"] for row in queue.json()["results"]]
+        self.assertIn(response.json()["slug"], slugs)
 
     def test_a_clean_listing_still_waits_for_a_moderator(self):
         self.client.force_authenticate(self.seller)
@@ -283,8 +294,11 @@ class ListingApiTests(APITestCase):
         self.client.force_authenticate(self.moderator)
         seen = self.client.get(f"/api/v1/listings/{slug}/")
 
-        self.assertEqual(seen.json()["screening"]["verdict"], "flagged")
+        self.assertEqual(seen.json()["screening"]["verdict"], "rejected")
         self.assertTrue(seen.json()["screening"]["reasons"])
+        # AI-12: the moderator is shown how sure the screening was.
+        self.assertIsNotNone(seen.json()["screening"]["confidence"])
+        self.assertEqual(seen.json()["screening"]["decision"], "")
 
     def test_the_moderator_queue_asks_for_a_status(self):
         self.make_listing(title="Live one", moderation_status=Listing.ModerationStatus.APPROVED)
@@ -639,3 +653,147 @@ class OwnerDetailRouteTests(APITestCase):
 
         slugs = [row["slug"] for row in response.json()["results"]]
         self.assertNotIn(listing.slug, slugs)
+
+
+class ScreeningAuthorityTests(APITestCase):
+    """AI-11 and AI-12: the screening is never the final authority.
+
+    A rejection lands in the queue; a moderator either confirms it or reverses
+    it, and a reversal publishes. The AI's row is never overwritten — the human
+    decision is stored beside it, which is what AI-15 needs to measure accuracy.
+    """
+
+    def setUp(self):
+        self.seller = make_user("2024-777001@rtu.edu.ph")
+        self.moderator = make_user("2024-777002@rtu.edu.ph", role=User.Role.MODERATOR)
+        self.category = Category.objects.first() or Category.objects.create(name="Misc")
+
+    def payload(self, **overrides):
+        data = {
+            "title": "Answer key, complete",
+            "description": "Complete exam answers for the midterm, message me privately.",
+            "category": self.category.pk,
+            "type": "product",
+            "condition": "used",
+            "price": "150.00",
+            "quantity": 1,
+            "meetup_place": "Main lobby",
+        }
+        data.update(overrides)
+        return data
+
+    def rejected_listing(self):
+        self.client.force_authenticate(self.seller)
+        posted = self.client.post("/api/v1/listings/", self.payload(), format="json")
+        self.assertEqual(posted.status_code, status.HTTP_201_CREATED, posted.json())
+        return Listing.objects.get(slug=posted.json()["slug"])
+
+    def test_a_moderator_reverses_the_rejection_and_it_publishes(self):
+        listing = self.rejected_listing()
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.REJECTED)
+
+        self.client.force_authenticate(self.moderator)
+        reversed_it = self.client.post(f"/api/v1/listings/{listing.slug}/approve/", {}, format="json")
+
+        self.assertEqual(reversed_it.status_code, status.HTTP_200_OK, reversed_it.json())
+        listing.refresh_from_db()
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.APPROVED)
+
+        result = listing.screening_results.first()
+        self.assertEqual(result.verdict, "rejected")  # the AI's answer is kept
+        self.assertEqual(result.decision, "reversed")
+        self.assertEqual(result.decided_by_id, self.moderator.id)
+        self.assertIsNotNone(result.decided_at)
+
+        # Published: a visitor can find it now.
+        self.client.force_authenticate(None)
+        found = self.client.get(f"/api/v1/listings/{listing.slug}/")
+        self.assertEqual(found.status_code, status.HTTP_200_OK)
+
+    def test_a_moderator_confirms_the_rejection(self):
+        listing = self.rejected_listing()
+
+        self.client.force_authenticate(self.moderator)
+        upheld = self.client.post(
+            f"/api/v1/listings/{listing.slug}/reject/",
+            {"reason": "Exam answers are prohibited."},
+            format="json",
+        )
+
+        self.assertEqual(upheld.status_code, status.HTTP_200_OK, upheld.json())
+        listing.refresh_from_db()
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.REJECTED)
+
+        result = listing.screening_results.first()
+        self.assertEqual(result.verdict, "rejected")
+        self.assertEqual(result.decision, "confirmed")
+        self.assertEqual(result.decision_note, "Exam answers are prohibited.")
+
+    def test_a_confirmed_rejection_leaves_the_queue(self):
+        listing = self.rejected_listing()
+        self.client.force_authenticate(self.moderator)
+        self.client.post(
+            f"/api/v1/listings/{listing.slug}/reject/",
+            {"reason": "Prohibited."},
+            format="json",
+        )
+        still_waiting = self.client.get("/api/v1/listings/?status=rejected&awaiting=ai")
+
+        self.assertNotIn(
+            listing.slug, [row["slug"] for row in still_waiting.json()["results"]]
+        )
+
+    def test_a_seller_hears_why_it_was_rejected(self):
+        listing = self.rejected_listing()
+
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.seller, kind="listing", text__icontains="rejected by the automatic screening"
+            ).exists(),
+            "the seller should be told, with the reason",
+        )
+
+    @override_settings(SCREENING_CONFIDENCE_FLOOR=0.7)
+    def test_a_low_confidence_pass_goes_to_a_moderator(self):
+        """AI-12: a clean answer nobody is sure about is not a clean answer."""
+        unsure = Verdict(
+            verdict="clean",
+            score=10,
+            reasons=["I cannot tell from this description."],
+            confidence=0.4,
+            provider="test",
+            model="unsure",
+        )
+
+        listing = self.cargo_listing()
+        with mock.patch(
+            "apps.screening.services.get_provider",
+            return_value=mock.Mock(screen=lambda subject: unsure),
+        ):
+            result = run_screening(listing)
+
+        listing.refresh_from_db()
+        self.assertEqual(result.verdict, "clean")
+        self.assertEqual(result.confidence, 0.4)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.NEEDS_REVIEW)
+
+    @override_settings(SCREENING_CONFIDENCE_FLOOR=0.7)
+    def test_a_confident_pass_still_waits_for_approval_but_is_not_pulled(self):
+        listing = self.cargo_listing()
+        run_screening(listing)
+
+        listing.refresh_from_db()
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.PENDING_SCREENING)
+
+    def cargo_listing(self):
+        return Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Scientific calculator",
+            description="Casio fx-991, working, complete with case and manual.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price=Decimal("800.00"),
+            quantity=1,
+            meetup_place="Main lobby",
+        )

@@ -1217,10 +1217,13 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   const [pendingListings, setPendingListings] = useState<ApiListing[]>([])
   const refreshPendingListings = useCallback(async () => {
     try {
-      const page = await apiFetch<ApiPage<ApiListing>>(
-        '/listings/?status=pending_screening,needs_review',
-      )
-      setPendingListings(page.results ?? [])
+      // AI-11: the queue holds the untouched rows *and* the ones the screening
+      // rejected and nobody has confirmed or reversed yet.
+      const [waiting, rejected] = await Promise.all([
+        apiFetch<ApiPage<ApiListing>>('/listings/?status=pending_screening,needs_review'),
+        apiFetch<ApiPage<ApiListing>>('/listings/?status=rejected&awaiting=ai'),
+      ])
+      setPendingListings([...(waiting.results ?? []), ...(rejected.results ?? [])])
     } catch {
       /* backend offline: leave the queue as it was */
     }

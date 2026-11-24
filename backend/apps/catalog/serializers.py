@@ -155,15 +155,32 @@ class ListingReadSerializer(serializers.ModelSerializer):
         if not (user and user.is_authenticated and user.is_moderator):
             return None
 
-        latest = next(iter(obj.screening_results.all()), None)
+        # A direct query, not the prefetched manager: a moderator's decision is
+        # written moments before this serializer runs, and the prefetch would
+        # still be showing the row as it was before the decision.
+        from apps.screening.models import ScreeningResult
+
+        latest = (
+            ScreeningResult.objects.filter(listing=obj)
+            .select_related("decided_by")
+            .order_by("-created_at")
+            .first()
+        )
         if latest is None:
             return None
         return {
             "verdict": latest.verdict,
             "score": latest.score,
+            "confidence": latest.confidence,
             "reasons": latest.reasons,
             "provider": latest.provider,
             "model": latest.model_name,
+            "decision": latest.decision,
+            "decided_by": (
+                latest.decided_by.display_name or latest.decided_by.email
+                if latest.decided_by_id
+                else None
+            ),
             "at": latest.created_at,
         }
 

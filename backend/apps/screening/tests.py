@@ -69,7 +69,7 @@ class StubProviderTests(TestCase):
         self.assertEqual(verdict.verdict, "clean")
         self.assertEqual(verdict.reasons, [])
 
-    def test_a_prohibited_item_is_flagged_with_a_reason(self):
+    def test_a_prohibited_item_is_rejected_with_a_reason(self):
         listing = make_listing(
             title="Counterfeit RTU uniform",
             description="Exact copy of the official uniform, no one will notice.",
@@ -77,8 +77,11 @@ class StubProviderTests(TestCase):
 
         verdict = StubProvider().screen(listing)
 
-        self.assertEqual(verdict.verdict, "flagged")
-        self.assertGreaterEqual(verdict.score, 50)
+        # AI-11: a named violation is rejected, not merely held — and rejected
+        # still means queued, because the AI is never the final authority.
+        self.assertEqual(verdict.verdict, "rejected")
+        self.assertGreaterEqual(verdict.score, 90)
+        self.assertGreaterEqual(verdict.confidence, 0.9)
         self.assertTrue(any("prohibited item" in reason for reason in verdict.reasons))
 
     def test_a_link_in_the_text_is_flagged(self):
@@ -90,7 +93,7 @@ class StubProviderTests(TestCase):
 
         self.assertEqual(verdict.verdict, "flagged")
 
-    def test_vapes_are_flagged_even_though_they_are_not_a_scam(self):
+    def test_vapes_are_rejected_even_though_they_are_not_a_scam(self):
         listing = make_listing(
             title="Vape starter kit",
             description="Barely used vape with charger and two pods.",
@@ -98,7 +101,7 @@ class StubProviderTests(TestCase):
 
         verdict = StubProvider().screen(listing)
 
-        self.assertEqual(verdict.verdict, "flagged")
+        self.assertEqual(verdict.verdict, "rejected")
         self.assertTrue(any("prohibited item" in reason for reason in verdict.reasons))
 
     def test_a_pay_first_off_app_pattern_is_flagged(self):
@@ -112,13 +115,15 @@ class StubProviderTests(TestCase):
         self.assertGreaterEqual(verdict.score, 50)
         self.assertTrue(any("off-app" in reason for reason in verdict.reasons))
 
-    def test_a_short_description_is_flagged(self):
+    def test_a_short_description_is_flagged_and_carries_a_low_confidence(self):
         listing = make_listing(description="Calculator.")
 
         verdict = StubProvider().screen(listing)
 
         self.assertEqual(verdict.verdict, "flagged")
         self.assertTrue(any("too short" in reason for reason in verdict.reasons))
+        # AI-12: a judgement call, not a rule hit, and the number says so.
+        self.assertLess(verdict.confidence, 0.7)
 
     def test_a_price_above_fifty_thousand_is_flagged(self):
         listing = make_listing(
@@ -183,7 +188,7 @@ class StubProviderTests(TestCase):
 
         self.assertEqual(verdict.verdict, "clean")
 
-    def test_stolen_goods_still_flags(self):
+    def test_stolen_goods_are_rejected(self):
         listing = make_listing(
             title="Stolen goods",
             description="Brand new phone, still boxed, no questions asked, meet at the gate.",
@@ -191,10 +196,10 @@ class StubProviderTests(TestCase):
 
         verdict = StubProvider().screen(listing)
 
-        self.assertEqual(verdict.verdict, "flagged")
+        self.assertEqual(verdict.verdict, "rejected")
         self.assertTrue(any("prohibited item" in reason for reason in verdict.reasons))
 
-    def test_liquor_still_flags(self):
+    def test_liquor_is_rejected(self):
         listing = make_listing(
             title="Liquor for sale",
             description="Unopened bottle, picked up at the main gate after class.",
@@ -202,7 +207,7 @@ class StubProviderTests(TestCase):
 
         verdict = StubProvider().screen(listing)
 
-        self.assertEqual(verdict.verdict, "flagged")
+        self.assertEqual(verdict.verdict, "rejected")
 
     def test_the_stub_is_deterministic(self):
         listing = make_listing()
@@ -232,7 +237,7 @@ class RunScreeningTests(TestCase):
         self.assertEqual(listing.moderation_status, Listing.ModerationStatus.PENDING_SCREENING)
         self.assertEqual(listing.screening_results.count(), 1)
 
-    def test_a_flagged_listing_is_pulled_to_review(self):
+    def test_a_prohibited_listing_is_rejected_and_left_in_the_queue(self):
         listing = make_listing(
             title="Answer key for sale",
             description="Complete exam answers for the midterm, message me.",
@@ -241,9 +246,12 @@ class RunScreeningTests(TestCase):
         result = run_screening(listing)
 
         listing.refresh_from_db()
-        self.assertEqual(result.verdict, ScreeningResult.Verdict.FLAGGED)
-        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.NEEDS_REVIEW)
+        self.assertEqual(result.verdict, ScreeningResult.Verdict.REJECTED)
+        self.assertEqual(listing.moderation_status, Listing.ModerationStatus.REJECTED)
         self.assertTrue(result.reasons)
+        # Still waiting on a person: the rejection is a claim, not a sentence.
+        self.assertEqual(result.decision, ScreeningResult.Decision.PENDING)
+        self.assertFalse(listing.is_published)
 
     @override_settings(SCREENING_PROVIDER="some-model-nobody-registered")
     def test_a_misnamed_provider_falls_back_to_the_rules(self):
@@ -279,11 +287,12 @@ class RunScreeningTests(TestCase):
         self.assertIsNone(listing.published_at)
 
 
-def gemini_reply(verdict="clean", score=0, reasons=None, finish="STOP"):
+def gemini_reply(verdict="clean", score=0, reasons=None, finish="STOP", confidence=0.95):
     """The shape Gemini returns, with a schema-constrained JSON answer inside."""
-    inner = json.dumps(
-        {"verdict": verdict, "score": score, "reasons": reasons or []}
-    )
+    answer = {"verdict": verdict, "score": score, "reasons": reasons or []}
+    if confidence is not None:
+        answer["confidence"] = confidence
+    inner = json.dumps(answer)
     return {
         "candidates": [
             {"content": {"parts": [{"text": inner}]}, "finishReason": finish}
@@ -454,7 +463,7 @@ class ForumPostScreeningTests(TestCase):
         result = run_post_screening(post)
 
         post.refresh_from_db()
-        self.assertEqual(result.verdict, "flagged")
+        self.assertEqual(result.verdict, "rejected")
         self.assertEqual(result.post_id, post.pk)
         self.assertIsNone(result.listing_id)
         self.assertTrue(any("prohibited item" in r for r in result.reasons))
@@ -605,7 +614,7 @@ class ForumCommentScreeningTests(TestCase):
         result = run_comment_screening(row)
 
         row.refresh_from_db()
-        self.assertEqual(result.verdict, "flagged")
+        self.assertEqual(result.verdict, "rejected")
         self.assertEqual(result.comment_id, row.pk)
         self.assertEqual(row.moderation_status, ForumComment.ModerationStatus.NEEDS_REVIEW)
         self.assertTrue(
@@ -703,7 +712,7 @@ class ScreeningRuleTableTests(APITestCase):
         self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.json())
 
         verdict = StubProvider().screen(clean)
-        self.assertEqual(verdict.verdict, "flagged")
+        self.assertEqual(verdict.verdict, "rejected")
         self.assertIn("campus cap", " ".join(verdict.reasons))
 
     def test_switching_a_phrase_off_stops_it_flagging(self):
@@ -713,7 +722,7 @@ class ScreeningRuleTableTests(APITestCase):
         rule.is_active = True
         rule.save(update_fields=["is_active"])
         item = self.listing("Lab gown, size M")
-        self.assertEqual(StubProvider().screen(item).verdict, "flagged")
+        self.assertEqual(StubProvider().screen(item).verdict, "rejected")
 
         self.client.force_authenticate(self.admin)
         patched = self.client.patch(
@@ -793,7 +802,7 @@ class ScreeningRuleTableTests(APITestCase):
 
         self.assertIn("answer key", rules.phrases("prohibited"))
         item = self.listing("Answer key for sale")
-        self.assertEqual(StubProvider().screen(item).verdict, "flagged")
+        self.assertEqual(StubProvider().screen(item).verdict, "rejected")
 
 
 class TaglishScreeningTests(TestCase):
@@ -807,8 +816,8 @@ class TaglishScreeningTests(TestCase):
             self.subject("Answer key, complete", "May answer key ako sa exam, lahat ng subject.")
         )
 
-        self.assertEqual(verdict.verdict, "flagged")
-        self.assertEqual(verdict.score, 90)
+        self.assertEqual(verdict.verdict, "rejected")
+        self.assertGreaterEqual(verdict.score, 90)
         self.assertIn("may answer key ako", " ".join(verdict.reasons))
 
     def test_a_taglish_offer_to_take_an_exam_is_flagged(self):
@@ -816,7 +825,7 @@ class TaglishScreeningTests(TestCase):
             self.subject("Tutor for finals", "Sagot ko exam mo, guaranteed pasado.")
         )
 
-        self.assertEqual(verdict.verdict, "flagged")
+        self.assertEqual(verdict.verdict, "rejected")
         self.assertIn("sagot ko exam mo", " ".join(verdict.reasons))
 
     def test_a_taglish_pay_first_pattern_is_flagged_as_a_scam(self):

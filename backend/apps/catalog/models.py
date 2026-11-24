@@ -237,10 +237,28 @@ class Listing(models.Model):
     # -- State transitions -------------------------------------------------
 
     def approve(self):
+        # A rejection took the listing off the shelf as well as out of the
+        # catalogue, so approving a rejected one has to put it back: a reversed
+        # rejection is published, not merely relabelled (AI-11).
+        restored = (
+            self.moderation_status == self.ModerationStatus.REJECTED
+            and self.availability_status == self.AvailabilityStatus.UNAVAILABLE
+        )
         self.moderation_status = self.ModerationStatus.APPROVED
+        if restored:
+            self.availability_status = self.AvailabilityStatus.AVAILABLE
+            self.rejection_reason = ""
         if self.published_at is None:
             self.published_at = timezone.now()
-        self.save(update_fields=["moderation_status", "published_at", "updated_at"])
+        self.save(
+            update_fields=[
+                "moderation_status",
+                "availability_status",
+                "rejection_reason",
+                "published_at",
+                "updated_at",
+            ]
+        )
 
     def reject(self, reason=""):
         self.moderation_status = self.ModerationStatus.REJECTED

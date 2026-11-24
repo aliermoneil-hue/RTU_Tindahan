@@ -30,7 +30,11 @@ from rest_framework.response import Response
 from apps.accounts.permissions import IsVerifiedUser
 from apps.audit.services import record
 from apps.notifications.services import notify, notify_staff
-from apps.screening.services import run_comment_screening, run_post_screening
+from apps.screening.services import (
+    record_moderator_decision,
+    run_comment_screening,
+    run_post_screening,
+)
 
 from .models import ForumComment, ForumPost, ForumReaction, ForumReport
 from .serializers import (
@@ -177,8 +181,15 @@ class ForumPostViewSet(
         )
         # Screen before anyone is told about it: a notice that screening holds
         # must not fan out to the whole campus first.
-        result = run_post_screening(post)
-        if kind == ForumPost.Kind.NOTICE and not result.is_flagged:
+        run_post_screening(post)
+        post.refresh_from_db(fields=["moderation_status"])
+        # Only a notice that survived screening is announced. Asking the post
+        # itself, rather than the verdict, keeps a rejected one — which is not
+        # "flagged" but is certainly held — out of every member's inbox.
+        if (
+            kind == ForumPost.Kind.NOTICE
+            and post.moderation_status == ForumPost.ModerationStatus.VISIBLE
+        ):
             # A notice is an announcement: every verified member hears it once.
             from apps.accounts.models import User
 
@@ -337,9 +348,16 @@ class ForumPostViewSet(
             hide_post(post, request.user)
         elif act == "restore":
             # Restoring means "this is fit to be seen": it puts the post back
-            # in the feed and clears a hold that screening left on it.
+            # in the feed and clears a hold that screening left on it. When the
+            # hold came from the screening, that is a reversal (AI-11, AI-15).
             restore_post(post)
             post.release_from_review()
+            record_moderator_decision(
+                target=post,
+                decision="reversed",
+                moderator=request.user,
+                note=(request.data.get("note") or "").strip(),
+            )
         elif act == "pin":
             post.pinned = True
             post.save(update_fields=["pinned"])
@@ -416,9 +434,21 @@ class ForumCommentViewSet(
         target_name = comment.text[:60] or f"Comment {comment.pk}"
         if act == "hide":
             hide_comment(comment, request.user)
+            record_moderator_decision(
+                target=comment,
+                decision="confirmed",
+                moderator=request.user,
+                note=(request.data.get("note") or "").strip(),
+            )
         elif act == "restore":
             restore_comment(comment)
             comment.release_from_review()
+            record_moderator_decision(
+                target=comment,
+                decision="reversed",
+                moderator=request.user,
+                note=(request.data.get("note") or "").strip(),
+            )
         elif act == "delete":
             delete_comment(comment)
             record(
