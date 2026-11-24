@@ -1,9 +1,14 @@
 from django.urls import path
 
 from .views import (
+    ChangePasswordView,
+    DeleteAccountView,
+    LoginStatusView,
     LoginView,
     LogoutView,
     MeView,
+    PasswordResetConfirmView,
+    PasswordResetView,
     RegisterView,
     ResendCodeView,
     ResendVerificationView,
@@ -26,6 +31,19 @@ urlpatterns = [
         name="resend-verification",
     ),
     path("auth/login/", LoginView.as_view(), name="login"),
+    path("auth/login-status/", LoginStatusView.as_view(), name="login-status"),
+    path("auth/password-reset/", PasswordResetView.as_view(), name="password-reset"),
+    path(
+        "auth/password-reset/confirm/",
+        PasswordResetConfirmView.as_view(),
+        name="password-reset-confirm",
+    ),
     path("auth/logout/", LogoutView.as_view(), name="logout"),
     path("auth/me/", MeView.as_view(), name="me"),
+    path(
+        "auth/change-password/", ChangePasswordView.as_view(), name="change-password"
+    ),
+    path(
+        "auth/delete-account/", DeleteAccountView.as_view(), name="delete-account"
+    ),
 ]

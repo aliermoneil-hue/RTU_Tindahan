@@ -3,6 +3,7 @@ import { Icon } from '@/common/components/Icon'
 import type { IconName } from '@/common/components/icons'
 import { navigate } from '@/common/router/router'
 import { useAuth } from '@/features/authentication'
+import { Banderitas } from '@/common/components/Banderitas'
 import './HelpCenterPage.css'
 
 export interface HelpArticle {
@@ -449,6 +450,8 @@ export function HelpCenterPage() {
 
       {/* Clean Search Hero */}
       <section className="hc-hero" aria-label="Help Center search">
+        <Banderitas compact opacity={0.75} surface="dark" variant="corner-left" />
+        <Banderitas opacity={0.85} surface="dark" variant="corner-right" />
         <div className="hc-hero-top">
           <span className="hc-hero-eyebrow">
             <Icon name="shield" size="sm" />
@@ -636,7 +639,9 @@ export function HelpCenterPage() {
                               </span>
                               {faq.q}
                             </span>
-                            <span className="hc-faq-toggle">{isOpen ? '−' : '+'}</span>
+                            <span className="hc-faq-toggle" aria-hidden="true">
+                              <Icon name="chev" size="sm" />
+                            </span>
                           </button>
                           {isOpen && <div className="hc-faq-a">{faq.a}</div>}
                         </div>
@@ -705,7 +710,9 @@ export function HelpCenterPage() {
                           </span>
                           {faq.q}
                         </span>
-                        <span className="hc-faq-toggle">{isOpen ? '−' : '+'}</span>
+                        <span className="hc-faq-toggle" aria-hidden="true">
+                          <Icon name="chev" size="sm" />
+                        </span>
                       </button>
                       {isOpen && <div className="hc-faq-a">{faq.a}</div>}
                     </div>

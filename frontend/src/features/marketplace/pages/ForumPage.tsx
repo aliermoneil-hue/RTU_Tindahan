@@ -31,6 +31,7 @@ export function ForumPage() {
     togglePinPost,
     toggleHidePost,
     openModal,
+    toast,
   } = useTindahan()
 
   const [forumTab, setForumTab] = useState<'all' | 'post' | 'listing' | 'notice'>('all')
@@ -43,13 +44,17 @@ export function ForumPage() {
   const [asNotice, setAsNotice] = useState(false)
   const [imgs, setImgs] = useState<string[]>([])
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null)
+  const [openReactPostId, setOpenReactPostId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!openMenuKey) return
-    const onDocClick = () => setOpenMenuKey(null)
+    if (!openMenuKey && !openReactPostId) return
+    const onDocClick = () => {
+      setOpenMenuKey(null)
+      setOpenReactPostId(null)
+    }
     window.addEventListener('click', onDocClick)
     return () => window.removeEventListener('click', onDocClick)
-  }, [openMenuKey])
+  }, [openMenuKey, openReactPostId])
 
   if (!currentAccount) return null
 
@@ -278,6 +283,29 @@ export function ForumPage() {
           const prodImgs = liveProd ? imgsOf(liveProd) : []
           const postImgs = f.imgs || []
 
+          const reactTrayOpen = openReactPostId === f.id
+
+          const reactLabels: Record<string, string> = {}
+          REACTS.forEach((r) => {
+            reactLabels[r[0]] = r[2]
+          })
+
+          const topReacts: Array<[string, number]> = Object.entries(
+            f.reacts || {},
+          )
+            .filter(([, c]) => typeof c === 'number' && c > 0)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 3)
+
+          const firstReactEmoji =
+            f.reacts && Object.keys(f.reacts).length > 0
+              ? REACTS.find((r) => r[0] === f.reacts[currentAccount.email])?.[1] ||
+                REACTS[0][1]
+              : REACTS[0][1]
+
+          const myReact = f.reacts[currentAccount.email]
+          const reactLabel = myReact ? reactLabels[myReact] || 'React' : 'React'
+
           return (
             <article
               key={f.id}
@@ -286,285 +314,354 @@ export function ForumPage() {
               }`.trim()}
               id={`post-${f.id}`}
             >
-              <div className="fhead">
-                <AvatarBadge
-                  account={f.kind !== 'notice' ? author : undefined}
-                  name={by}
-                  isStaff={isStaffPost}
-                  size="md"
-                />
-                <div className="grow">
-                  <div className="row wrap" style={{ gap: 6 }}>
-                    <b style={{ fontSize: 14 }}>{by}</b>
-                    {isStaffPost && <span className="pill navy">Staff</span>}
-                    {f.kind === 'notice' && <span className="pill yellow">Notice</span>}
-                    {(f.kind === 'student' || f.kind === 'school') && (
-                      <span className={`srcpill ${f.kind}`}>
-                        {f.kind === 'school' ? 'Official RTU Store' : 'Student seller'}
-                      </span>
-                    )}
-                    {f.topic && f.kind === 'post' && <span className="pill">{f.topic}</span>}
-                    {f.pinned && <span className="pill yellow">Pinned</span>}
-                    {f.hidden && <span className="pill red">Hidden by staff</span>}
-                    {nrep > 0 && (
-                      <button
-                        type="button"
-                        className="pill red linkpill"
-                        title="Open Forum Reports"
-                        onClick={() => navigate('forum-reports')}
-                      >
-                        {nrep} open report{nrep === 1 ? '' : 's'}
-                      </button>
-                    )}
-                  </div>
-                  <div className="tiny muted" title={ago(f.ts)}>
-                    {stamp(f.ts)} · {ago(f.ts)}
-                    {f.edited && (
-                      <>
-                        {' '}
-                        ·{' '}
-                        <span className="edited-tag" title={`Edited ${stamp(f.edited)}`}>
-                          edited
+              <div className="fpost-top">
+                <div className="fhead">
+                  <AvatarBadge
+                    account={f.kind !== 'notice' ? author : undefined}
+                    name={by}
+                    isStaff={isStaffPost}
+                    size="md"
+                  />
+                  <div className="grow">
+                    <div className="row wrap" style={{ gap: 6 }}>
+                      <b style={{ fontSize: 14 }}>{by}</b>
+                      {isStaffPost && <span className="pill navy">Staff</span>}
+                      {f.kind === 'notice' && <span className="pill yellow">Notice</span>}
+                      {(f.kind === 'student' || f.kind === 'school') && (
+                        <span className={`srcpill ${f.kind}`}>
+                          {f.kind === 'school' ? 'Official RTU Store' : 'Student seller'}
                         </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="amenu-wrap" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    className="iconbtn amenu-btn"
-                    aria-haspopup="menu"
-                    aria-expanded={menuOpen}
-                    aria-label="More actions for this post"
-                    title="More actions"
-                    onClick={() =>
-                      setOpenMenuKey((cur) => (cur === menuKey ? null : menuKey))
-                    }
-                  >
-                    <Icon name="dots" size="sm" />
-                  </button>
-                  {menuOpen && (
-                    <div className="amenu" role="menu">
-                      {mine && f.kind === 'post' && !f.hidden && (
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="amenu-item"
-                          onClick={() => {
-                            setOpenMenuKey(null)
-                            openModal({ kind: 'forum-edit-post', postId: f.id })
-                          }}
-                        >
-                          <Icon name="edit" size="sm" />
-                          <span>Edit post</span>
-                        </button>
                       )}
-                      {!mine && f.kind !== 'notice' && (
+                      {f.topic && f.kind === 'post' && <span className="pill">{f.topic}</span>}
+                      {f.pinned && <span className="pill yellow">Pinned</span>}
+                      {f.hidden && <span className="pill red">Hidden by staff</span>}
+                      {nrep > 0 && (
                         <button
                           type="button"
-                          role="menuitem"
-                          className="amenu-item"
-                          disabled={reported}
-                          onClick={() => {
-                            setOpenMenuKey(null)
-                            openModal({
-                              kind: 'forum-report',
-                              postId: f.id,
-                              commentId: null,
-                            })
-                          }}
+                          className="pill red linkpill"
+                          title="Open Forum Reports"
+                          onClick={() => navigate('forum-reports')}
                         >
-                          <Icon name="flag" size="sm" />
-                          <span>{reported ? 'Reported' : 'Report post'}</span>
-                        </button>
-                      )}
-                      {isStaffUser && (
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="amenu-item"
-                          onClick={() => {
-                            setOpenMenuKey(null)
-                            togglePinPost(f.id)
-                          }}
-                        >
-                          <Icon name="pin" size="sm" />
-                          <span>{f.pinned ? 'Unpin post' : 'Pin post'}</span>
-                        </button>
-                      )}
-                      {isStaffUser && (
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="amenu-item"
-                          onClick={() => {
-                            setOpenMenuKey(null)
-                            toggleHidePost(f.id)
-                          }}
-                        >
-                          <Icon name="eye" size="sm" />
-                          <span>{f.hidden ? 'Restore post' : 'Hide post'}</span>
-                        </button>
-                      )}
-                      {(mine || isStaffUser) && (
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="amenu-item danger"
-                          onClick={() => {
-                            setOpenMenuKey(null)
-                            deleteForumPost(f.id)
-                          }}
-                        >
-                          <Icon name="trash" size="sm" />
-                          <span>Delete post</span>
+                          {nrep} open report{nrep === 1 ? '' : 's'}
                         </button>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {showTitle && (
-                <h3 className="ftitle">
-                  <button
-                    type="button"
-                    className="ftitle-btn"
-                    onClick={() => openPost(f.id)}
-                  >
-                    {postTitle(f)}
-                  </button>
-                </h3>
-              )}
-
-              {showTitle ? (
-                bodyStr &&
-                !(f.kind === 'post' && !String(f.title || '').trim() && bodyStr.length <= 70) && (
-                  <div className="fbody">
-                    {bodyStr.length > 280
-                      ? bodyStr.slice(0, 280).trim() + '...'
-                      : bodyStr}
-                    {bodyStr.length > 280 && (
-                      <>
-                        {' '}
-                        <button
-                          type="button"
-                          className="link"
-                          onClick={() => openPost(f.id)}
-                        >
-                          Read more
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )
-              ) : (
-                <div className="fprod">
-                  {prodImgs.length > 0 && imgSrc(prodImgs[0]) && (
-                    <img
-                      className="fprod-img"
-                      src={imgSrc(prodImgs[0])}
-                      alt={f.title || ''}
-                    />
-                  )}
-                  <div className="grow" style={{ minWidth: 180 }}>
-                    <b>
-                      {f.svc ? 'New service: ' : 'New: '}
-                      {f.title}
-                    </b>
-                    <div className="small muted" style={{ overflowWrap: 'anywhere' }}>
-                      {bodyStr.length > 200 ? bodyStr.slice(0, 200) + '...' : bodyStr}
-                    </div>
-                    <div className="small tnum" style={{ marginTop: 2 }}>
-                      {liveProd ? priceLabel(liveProd) : peso(f.price || 0)}
-                      {f.tag ? ` · ${f.tag}` : ''}
+                    <div className="tiny muted" title={ago(f.ts)}>
+                      {stamp(f.ts)} · {ago(f.ts)}
+                      {f.edited && (
+                        <>
+                          {' '}
+                          ·{' '}
+                          <span className="edited-tag" title={`Edited ${stamp(f.edited)}`}>
+                            edited
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
-                  {liveProd ? (
+
+                  <div className="amenu-wrap" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
-                      className="btn sm"
-                      onClick={() => openProduct(liveProd.id)}
+                      className="iconbtn amenu-btn"
+                      aria-haspopup="menu"
+                      aria-expanded={menuOpen}
+                      aria-label="More actions for this post"
+                      title="More actions"
+                      onClick={() =>
+                        setOpenMenuKey((cur) => (cur === menuKey ? null : menuKey))
+                      }
                     >
-                      View {f.svc ? 'service' : 'listing'}
+                      <Icon name="dots" size="sm" />
                     </button>
-                  ) : (
-                    <span className="pill">No longer available</span>
-                  )}
+                    {menuOpen && (
+                      <div className="amenu" role="menu">
+                        {mine && f.kind === 'post' && !f.hidden && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="amenu-item"
+                            onClick={() => {
+                              setOpenMenuKey(null)
+                              openModal({ kind: 'forum-edit-post', postId: f.id })
+                            }}
+                          >
+                            <Icon name="edit" size="sm" />
+                            <span>Edit post</span>
+                          </button>
+                        )}
+                        {!mine && f.kind !== 'notice' && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="amenu-item"
+                            disabled={reported}
+                            onClick={() => {
+                              setOpenMenuKey(null)
+                              openModal({
+                                kind: 'forum-report',
+                                postId: f.id,
+                                commentId: null,
+                              })
+                            }}
+                          >
+                            <Icon name="flag" size="sm" />
+                            <span>{reported ? 'Reported' : 'Report post'}</span>
+                          </button>
+                        )}
+                        {isStaffUser && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="amenu-item"
+                            onClick={() => {
+                              setOpenMenuKey(null)
+                              togglePinPost(f.id)
+                            }}
+                          >
+                            <Icon name="pin" size="sm" />
+                            <span>{f.pinned ? 'Unpin post' : 'Pin post'}</span>
+                          </button>
+                        )}
+                        {isStaffUser && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="amenu-item"
+                            onClick={() => {
+                              setOpenMenuKey(null)
+                              toggleHidePost(f.id)
+                            }}
+                          >
+                            <Icon name="eye" size="sm" />
+                            <span>{f.hidden ? 'Restore post' : 'Hide post'}</span>
+                          </button>
+                        )}
+                        {(mine || isStaffUser) && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="amenu-item danger"
+                            onClick={() => {
+                              setOpenMenuKey(null)
+                              deleteForumPost(f.id)
+                            }}
+                          >
+                            <Icon name="trash" size="sm" />
+                            <span>Delete post</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
 
-              {postImgs.length > 0 && (
-                <div className={`fimgs n${Math.min(postImgs.length, 4)}`}>
-                  {postImgs.map((id, idx) => {
-                    const src = imgSrc(id)
-                    if (!src) {
-                      return (
-                        <div key={`${id}-${idx}`} className="fimg-miss">
-                          <Icon name="info" size="sm" />
-                          <span>Image unavailable</span>
-                        </div>
-                      )
-                    }
-                    return (
+                {showTitle && (
+                  <h3 className="ftitle">
+                    <button
+                      type="button"
+                      className="ftitle-btn"
+                      onClick={() => openPost(f.id)}
+                    >
+                      {postTitle(f)}
+                    </button>
+                  </h3>
+                )}
+
+                {showTitle ? (
+                  bodyStr &&
+                  !(f.kind === 'post' && !String(f.title || '').trim() && bodyStr.length <= 70) && (
+                    <div className="fbody">
+                      {bodyStr.length > 280
+                        ? bodyStr.slice(0, 280).trim() + '...'
+                        : bodyStr}
+                      {bodyStr.length > 280 && (
+                        <>
+                          {' '}
+                          <button
+                            type="button"
+                            className="link"
+                            onClick={() => openPost(f.id)}
+                          >
+                            Read more
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <div className="fprod">
+                    {prodImgs.length > 0 && imgSrc(prodImgs[0]) && (
+                      <img
+                        className="fprod-img"
+                        src={imgSrc(prodImgs[0])}
+                        alt={f.title || ''}
+                      />
+                    )}
+                    <div className="grow" style={{ minWidth: 180 }}>
+                      <b>
+                        {f.svc ? 'New service: ' : 'New: '}
+                        {f.title}
+                      </b>
+                      <div className="small muted" style={{ overflowWrap: 'anywhere' }}>
+                        {bodyStr.length > 200 ? bodyStr.slice(0, 200) + '...' : bodyStr}
+                      </div>
+                      <div className="small tnum" style={{ marginTop: 2 }}>
+                        {liveProd ? priceLabel(liveProd) : peso(f.price || 0)}
+                        {f.tag ? ` · ${f.tag}` : ''}
+                      </div>
+                    </div>
+                    {liveProd ? (
                       <button
-                        key={`${id}-${idx}`}
                         type="button"
-                        className="fimg"
-                        aria-label={`Open photo ${idx + 1} of ${postImgs.length}`}
-                        onClick={() =>
-                          openModal({ kind: 'forum-photo', postId: f.id, index: idx })
-                        }
+                        className="btn sm"
+                        onClick={() => openProduct(liveProd.id)}
                       >
-                        <img
-                          src={src}
-                          alt={`Photo ${idx + 1} attached to the post ${postTitle(f)}`}
-                          loading="lazy"
-                        />
+                        View {f.svc ? 'service' : 'listing'}
                       </button>
+                    ) : (
+                      <span className="pill">No longer available</span>
+                    )}
+                  </div>
+                )}
+
+                {postImgs.length > 0 && (
+                  <div className={`fimgs n${Math.min(postImgs.length, 4)}`}>
+                    {postImgs.map((id, idx) => {
+                      const src = imgSrc(id)
+                      if (!src) {
+                        return (
+                          <div key={`${id}-${idx}`} className="fimg-miss">
+                            <Icon name="info" size="sm" />
+                            <span>Image unavailable</span>
+                          </div>
+                        )
+                      }
+                      return (
+                        <button
+                          key={`${id}-${idx}`}
+                          type="button"
+                          className="fimg"
+                          aria-label={`Open photo ${idx + 1} of ${postImgs.length}`}
+                          onClick={() =>
+                            openModal({ kind: 'forum-photo', postId: f.id, index: idx })
+                          }
+                        >
+                          <img
+                            src={src}
+                            alt={`Photo ${idx + 1} attached to the post ${postTitle(f)}`}
+                            loading="lazy"
+                          />
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="fpost-foot">
+                <div className="fact-group">
+                  <div className="freact-wrap" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className={`fact-btn ${myReact ? 'on' : ''}`}
+                      aria-pressed={Boolean(myReact)}
+                      aria-label={`React: ${reactLabel}`}
+                      title={reactLabel}
+                      onClick={() => {
+                        setOpenMenuKey(null)
+                        setOpenReactPostId((cur) => (cur === f.id ? null : f.id))
+                      }}
+                    >
+                      <span>{firstReactEmoji}</span>{' '}
+                      {nReact > 0 ? `${nReact}` : reactLabel}
+                    </button>
+                    {reactTrayOpen && (
+                      <div className="freact-tray" role="menu">
+                        {REACTS.map((r) => {
+                          const myReactFor = f.reacts[currentAccount.email]
+                          const already = myReactFor === r[0]
+                          return (
+                            <button
+                              key={r[0]}
+                              type="button"
+                              className={`freact-pick ${already ? 'on' : ''}`}
+                              aria-pressed={already}
+                              aria-label={r[2]}
+                              title={r[2]}
+                              onClick={() => {
+                                toggleForumReaction(f.id, r[0])
+                                setOpenReactPostId(null)
+                              }}
+                            >
+                              {r[1]}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="fact-btn"
+                    aria-label="Comment"
+                    title="Comment"
+                    onClick={() => {
+                      setOpenMenuKey(null)
+                      setOpenReactPostId(null)
+                      openPost(f.id)
+                    }}
+                  >
+                    <Icon name="msg" size="sm" />{' '}
+                    {nCm > 0 ? `${nCm}` : 'Comment'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="fact-btn"
+                    aria-label="Share post"
+                    title="Share post"
+                    onClick={() => {
+                      setOpenMenuKey(null)
+                      setOpenReactPostId(null)
+                      const url = `${window.location.origin}${window.location.pathname}#/post?id=${f.id}`
+                      navigator.clipboard?.writeText(url).then(() => {
+                        toast('Post link copied.')
+                      })
+                    }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M14 2H6c-2.8 0-4.2 0-4.8 0C1 2 0 3 0 5v15c0 2 1 4 4 4h13c3 0 4 0 5-1 1-1 1-2 1-4V6c0-2-1-3-4-3zM19 5l-4 4-4-4"/>
+                    </svg>{' '}
+                    Share
+                  </button>
+                </div>
+
+                <div className="freact-stack">
+                  {topReacts.map(([emoji, count]) => {
+                    const label = reactLabels[emoji] || emoji
+                    return (
+                      <span
+                        key={emoji}
+                        className="freact-badge"
+                        title={`${label} (${count})`}
+                        aria-hidden="true"
+                      >
+                        {emoji}
+                      </span>
                     )
                   })}
                 </div>
-              )}
-
-              <div className="fcount">
-                <span>
-                  {nReact ? `${nReact} reaction${nReact === 1 ? '' : 's'}` : 'No reactions yet'}
-                </span>
-                <span>
-                  {nCm ? `${nCm} comment${nCm === 1 ? '' : 's'}` : 'No comments yet'}
-                </span>
-              </div>
-
-              <div className="freacts" role="group" aria-label="React to this post">
-                {REACTS.map((r) => {
-                  const myReact = f.reacts[currentAccount.email]
-                  const n = Object.values(f.reacts || {}).filter((x) => x === r[0]).length
-                  return (
-                    <button
-                      key={r[0]}
-                      type="button"
-                      className={`rbtn ${myReact === r[0] ? 'on' : ''}`.trim()}
-                      aria-pressed={myReact === r[0]}
-                      aria-label={`${r[2]}${n ? `, ${n}` : ''}`}
-                      onClick={() => toggleForumReaction(f.id, r[0])}
-                    >
-                      <span className="e">{r[1]}</span>
-                      {n ? <span className="tnum">{n}</span> : <span className="muted">{r[2]}</span>}
-                    </button>
-                  )
-                })}
-                <span className="grow" />
-                <button
-                  type="button"
-                  className="btn ghost sm"
-                  onClick={() => openPost(f.id)}
-                >
-                  <Icon name="msg" size="sm" />
-                  {nCm ? `Comments (${nCm})` : 'Comment'}
-                </button>
               </div>
             </article>
           )

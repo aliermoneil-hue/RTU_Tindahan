@@ -30,4 +30,17 @@
   .pgrid2 {
     grid-template-columns: 1fr;
   }
+
+  .pgrid2-left {
+    display: contents;
+  }
+  .pgrid2-media {
+    order: 1;
+  }
+  .pgrid2-right {
+    order: 2;
+  }
+  .pgrid2-about {
+    order: 3;
+  }
 }

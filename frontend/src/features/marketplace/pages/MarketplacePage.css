@@ -9,6 +9,12 @@
   gap: 8px;
   min-width: 0;
 }
+
+/* Navy "Today at RTU Pasig" banner card with banderitas drapes */
+.market-banner {
+  position: relative;
+  overflow: hidden;
+}
 .catrow {
   position: relative;
   display: block;
@@ -122,3 +128,5 @@
     display: none;
   }
 }
+
+

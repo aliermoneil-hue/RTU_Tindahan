@@ -139,6 +139,23 @@
   flex-shrink: 0;
 }
 
+/* Appearance toggle — blend with signed-in icon buttons */
+.top .theme-toggle {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--side-ink);
+}
+.top .theme-toggle:hover,
+.top .theme-toggle.open {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+:root[data-theme='dark'] .top .theme-toggle {
+  color: var(--yellow);
+}
+
 /* Badge locked absolutely inside the fixed icon box */
 .dot {
   position: absolute;

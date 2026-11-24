@@ -1,0 +1,1209 @@
+﻿/* ==========================================================================
+   MY ORDERS PAGE (prototype: .orders-two, .ticket, .tk-id, .bstep)
+   ========================================================================== */
+
+.orders-two {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 1.3fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.ticket {
+  border: 1.5px dashed var(--blue);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--soft);
+}
+
+.tk-id {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+
+:root[data-theme='dark'] .tk-id {
+  color: var(--yellow);
+}
+
+.bstep {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+}
+
+.bstep li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.bstep li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: calc(50% + 16px);
+  right: calc(-50% + 16px);
+  height: 3px;
+  background: var(--line);
+  border-radius: 2px;
+}
+
+.bstep li.done:not(:last-child)::after {
+  background: var(--green);
+}
+
+.bstep .dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  background: var(--card);
+  border: 2px solid var(--line);
+  color: var(--muted);
+}
+
+.bstep .lbl {
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.bstep li.done .dot {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.bstep li.done,
+.bstep li.cur {
+  color: var(--ink);
+}
+
+.bstep li.cur .dot {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--navy);
+}
+
+.bstep li.cur .lbl,
+.bstep li.hold .lbl,
+.bstep li.stop .lbl {
+  font-weight: 700;
+}
+
+.bstep li.hold .dot {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+
+.bstep li.stop .dot {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.bstep li.hold,
+.bstep li.stop {
+  color: var(--ink);
+}
+
+.bstep .dot svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Tab bar â€” matches Browse page segmented tabs (All / Students / RTU Store) */
+.orders-tabs {
+  display: flex;
+  width: 100%;
+  gap: 4px;
+  background: var(--soft);
+  padding: 4px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.orders-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.orders-tabs .tab {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: center;
+  justify-content: center;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.orders-tabs .tab.on {
+  background: var(--navy);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(26, 47, 87, 0.25);
+}
+
+:root[data-theme='dark'] .orders-tabs .tab.on {
+  background: var(--yellow);
+  color: var(--yellow-ink);
+}
+
+.orders-tabs .tab .tnum {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .orders-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .orders-tabs .tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 1000px) {
+  .orders-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 540px) {
+  .order-actions .btn {
+    flex: 1 1 calc(50% - 8px);
+  }
+  .order-actions .btn:first-child {
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 540px) {
+  .bstep {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 12px;
+  }
+  .bstep li::after {
+    display: none;
+  }
+}
+
+import { useState, useEffect } from 'react'
+import { Icon } from '@/common/components/Icon'
+import type { IconName } from '@/common/components/icons'
+import { navigate } from '@/common/router/router'
+import {
+  BAO_PILL,
+  BAO_STEPS,
+  baoClaimNotes,
+  baoDate,
+  baoIsOfficialOrder,
+  baoIsOfficialTxn,
+  baoProgress,
+  baoStatusOf,
+  baoTxnFor,
+} from '../baoHelpers'
+import { PLACES, TIMES, getSellerTimeWindows, peso, stamp } from '../constants'
+import { useTindahan } from '../context/TindahanContext'
+import { imgSrc, imgsOf } from '../imageStore'
+import type { OrderRecord, TransactionRecord } from '../types'
+import { StarPicker, StarsDisplay } from '../components/StarRating'
+import './OrdersPage.css'
+
+export function BaoProgressBar({ txn }: { txn: TransactionRecord }) {
+  const p = baoProgress(txn)
+  return (
+    <ol className="bstep" aria-label="Request progress">
+      {BAO_STEPS.map((s, i) => {
+        let cls = i < p.idx ? 'done' : i === p.idx ? 'cur' : 'todo'
+        let mark: React.ReactNode = i < p.idx ? <Icon name="check" size="sm" /> : String(i + 1)
+        let label: string = s
+
+        if (i === p.idx && p.cur === 'Claimed') {
+          cls = 'done'
+          mark = <Icon name="check" size="sm" />
+        }
+        if (i === p.idx && p.hold) {
+          cls = 'hold'
+          mark = 'II'
+          label = 'On Hold'
+        }
+        if (i === p.idx && p.cancelled) {
+          cls = 'stop'
+          mark = 'X'
+          label = 'Cancelled'
+        }
+        return (
+          <li key={s} className={cls}>
+            <span className="dot">{mark}</span>
+            <span className="lbl">{label}</span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+export function OrdersPage() {
+  const {
+    db,
+    currentAccount,
+    orderTab,
+    setOrderTab,
+    selectedOrderId,
+    setSelectedOrderId,
+    byId,
+    proposeOrderMeetup,
+    confirmOrderPickup,
+    confirmDlg,
+    cancelOrderRequest,
+    sendOrderMessage,
+    orderRateable,
+    reviewOf,
+    submitReview,
+    openModal,
+  } = useTindahan()
+
+  const [openBox, setOpenBox] = useState<'' | 'msg' | 'edit' | 'cancel'>('')
+  const [msgText, setMsgText] = useState('')
+  const presetPlaces = PLACES.filter((pl) => pl !== 'Others')
+  const [editPlace, setEditPlace] = useState(PLACES[0])
+  const [editOthersMode, setEditOthersMode] = useState(false)
+  const [editTime, setEditTime] = useState(TIMES[0])
+
+  if (!currentAccount) return null
+  const orders = currentAccount.orders || []
+  const tabs: ('Requesting' | 'For Pickup' | 'Completed' | 'Cancelled')[] = ['Requesting', 'For Pickup', 'Completed', 'Cancelled']
+
+  // Determine whether an Active order belongs in 'Requesting' or 'For Pickup'.
+  // Student seller orders: status 'Awaiting seller'/'Pending' or stage <= 1 => Requesting;
+  // status 'Meetup set'/'Confirmed'/'Ready' or stage >= 2 => For Pickup.
+  // Official RTU Store (BAO) orders: status 'Request Received' => Requesting;
+  // status 'Confirmed'/'Ready for Pickup' => For Pickup.
+  const isRequestingOrder = (o: OrderRecord): boolean => {
+    if (o.tab !== 'Active') return false
+    const t = baoTxnFor(o, db.txn ?? [])
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Request Received'
+    }
+    return o.status === 'Awaiting seller' || o.stage <= 1
+  }
+
+  const isForPickupOrder = (o: OrderRecord): boolean => {
+    if (o.tab !== 'Active') return false
+    const t = baoTxnFor(o, db.txn ?? [])
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Confirmed' || st === 'Ready for Pickup'
+    }
+    return o.status === 'Meetup set' || o.stage >= 2
+  }
+
+  // Split Active orders into Requesting vs For Pickup; Completed/Cancelled stay as-is.
+  const list = orders.filter((o) => {
+    if (orderTab === 'Requesting') return isRequestingOrder(o)
+    if (orderTab === 'For Pickup') return isForPickupOrder(o)
+    return o.tab === orderTab
+  })
+
+  // Auto-select the first order in the current tab (or null if empty)
+  useEffect(() => {
+    const first = list.length ? list[0].id : null
+    setSelectedOrderId(first)
+    setOpenBox('')
+  }, [orderTab, list])
+
+  const sel = list.find((o) => o.id === selectedOrderId) || list[0]
+
+  const steps = [
+    { label: 'Requested', stageThreshold: 1 },
+    { label: 'Meetup set', stageThreshold: 2 },
+    { label: 'Completed', stageThreshold: 4 },
+  ]
+
+  const renderOrderPill = (o: OrderRecord) => {
+    const t = baoTxnFor(o, db.txn ?? [])
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return <span className={`pill ${BAO_PILL[st] || ''}`.trim()}>{st}</span>
+    }
+    return (
+      <span
+        className={`pill ${
+          o.tab === 'Completed' ? 'green' : o.tab === 'Cancelled' ? 'red' : 'yellow'
+        }`}
+      >
+        {o.status}
+      </span>
+    )
+  }
+
+  const renderOrderThumb = (o: OrderRecord, size: number) => {
+    const pid = o.lines && o.lines[0] && o.lines[0].pid
+    const prod = pid ? byId(pid) : undefined
+    const imgs = prod ? imgsOf(prod) : []
+    const src = imgs.length ? imgSrc(imgs[0]) : ''
+    return (
+      <div
+        className={`photo ${o.tone || 't-study'} ${src ? 'has-img' : 'nophoto-tile'}`.trim()}
+        style={{ width: size, height: size, aspectRatio: '1', flex: 'none' }}
+      >
+        {src ? <img className="pimg" src={src} alt={o.title} /> : null}
+        <Icon name={(o.icon || 'bag') as IconName} />
+      </div>
+    )
+  }
+
+  const selTxn = sel ? baoTxnFor(sel, db.txn ?? []) : null
+  const selIsOfficial = Boolean(sel && baoIsOfficialOrder(sel, db.txn ?? []) && selTxn)
+  const sellerAccepted = sel ? sel.status === 'Meetup set' : false
+
+  // Strict cancel check: only while still pending (Requesting).
+  // Allowed: Active + status Awaiting seller / Pending / stage <= 1 (student seller),
+  //          or BAO status Request Received (Official RTU Store).
+  // Blocked: Meetup set, Confirmed, Ready, Completed, Cancelled.
+  const canCancelOrder = (o?: OrderRecord): boolean => {
+    if (!o || o.tab !== 'Active') return false
+    if (o.status === 'Completed' || o.status === 'Cancelled') return false
+    const t = baoTxnFor(o, db.txn ?? [])
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Request Received'
+    }
+    return o.status === 'Awaiting seller' || o.stage <= 1
+  }
+
+  const selCanCancel = canCancelOrder(sel)
+  const selFirstProd = sel && sel.lines && sel.lines[0] ? byId(sel.lines[0].pid) : undefined
+  const selTimeOptions = selFirstProd ? getSellerTimeWindows(selFirstProd) : TIMES
+
+  return (
+    <>
+      <div>
+        <span className="eyebrow">MY ORDERS</span>
+        <h1>Your requests and campus pickups</h1>
+        <p className="muted small">
+          Follow each meetup from request to in-person pickup.
+        </p>
+      </div>
+
+      <div className="tabs orders-tabs" role="tablist">
+        {tabs.map((t) => {
+          const count = t === 'Requesting'
+            ? orders.filter(isRequestingOrder).length
+            : t === 'For Pickup'
+              ? orders.filter(isForPickupOrder).length
+              : orders.filter((o) => o.tab === t).length
+          return (
+            <button
+              key={t}
+              type="button"
+              className={`tab ${orderTab === t ? 'on' : ''}`.trim()}
+              role="tab"
+              aria-selected={orderTab === t}
+              onClick={() => {
+                setOrderTab(t)
+                setOpenBox('')
+              }}
+            >
+              {t} <span className="tnum">({count})</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {!list.length ? (
+        <div
+          className="card stack"
+          style={{ alignItems: 'center', textAlign: 'center', padding: 40 }}
+        >
+          <span style={{ color: 'var(--blue)' }}>
+            <Icon name="bag" />
+          </span>
+          {orderTab === 'Requesting' ? (
+            <>
+              <b>No pending requests right now.</b>
+              <p className="small muted">
+                Your active requests awaiting seller confirmation will show here.
+              </p>
+            </>
+          ) : orderTab === 'For Pickup' ? (
+            <>
+              <b>No items ready for pickup yet.</b>
+              <p className="small muted">
+                Accepted requests scheduled for meetup will show here.
+              </p>
+            </>
+          ) : orderTab === 'Completed' ? (
+            <>
+              <b>No completed pickups.</b>
+              <p className="small muted">
+                Completed campus pickups will show here.
+              </p>
+            </>
+          ) : (
+            <>
+              <b>No cancelled requests.</b>
+              <p className="small muted">
+                Cancelled requests will show here.
+              </p>
+            </>
+          )}
+          <button type="button" className="btn" onClick={() => navigate('browse')}>
+            Browse listings
+          </button>
+        </div>
+      ) : (
+        <div className="orders-two two">
+          {/* Left list of orders */}
+          <div className="stack">
+            {list.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                className="card row between"
+                style={{
+                  textAlign: 'left',
+                  borderColor: sel && sel.id === o.id ? 'var(--blue)' : undefined,
+                }}
+                onClick={() => {
+                  setSelectedOrderId(o.id)
+                  setOpenBox('')
+                }}
+              >
+                <div className="row" style={{ minWidth: 0 }}>
+                  {renderOrderThumb(o, 54)}
+                  <div style={{ minWidth: 0 }}>
+                    <b style={{ overflowWrap: 'anywhere' }}>{o.title}</b>
+                    <div className="tiny muted">
+                      {o.id} Â· {o.seller}
+                    </div>
+                    <div className="row wrap" style={{ gap: 4, marginTop: 2 }}>
+                      <span className={`pill ${o.fulfillment === 'delivery' ? 'blue' : 'green'}`}>
+                        {o.fulfillment === 'delivery' ? 'Delivery' : 'Pickup'}
+                      </span>
+                    </div>
+                    <div className="tiny">{o.when}</div>
+                  </div>
+                </div>
+                <div className="stack" style={{ alignItems: 'flex-end', gap: 4 }}>
+                  {renderOrderPill(o)}
+                  <span className="price tnum" style={{ fontSize: 14 }}>
+                    {peso(o.total)}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Right selected order detail */}
+          {sel && (
+            <div className="card stack">
+              <div className="row between wrap">
+                <div>
+                  <span className="tiny muted">ORDER {sel.id}</span>
+                  <h3 style={{ overflowWrap: 'anywhere' }}>{sel.title}</h3>
+                </div>
+                {renderOrderPill(sel)}
+              </div>
+
+              {/* Official Store BAO Ticket Card (v1.6 baoTicketHtml) */}
+              {selIsOfficial && selTxn && (
+                <div className="ticket stack" data-ticket={selTxn.id}>
+                  <div className="row between wrap">
+                    <div>
+                      <span className="tiny muted">TICKET REFERENCE</span>
+                      <div className="tk-id tnum">{selTxn.id}</div>
+                    </div>
+                    {selTxn.queue && (
+                      <div style={{ textAlign: 'right' }}>
+                        <span className="tiny muted">QUEUE NUMBER</span>
+                        <div className="tk-id tnum">{selTxn.queue}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  <BaoProgressBar txn={selTxn} />
+
+                  {baoStatusOf(selTxn) === 'On Hold' && (
+                    <div className="note" role="status">
+                      <Icon name="clock" />
+                      <span>
+                        <b>On hold.</b>{' '}
+                        {selTxn.note || 'The BAO will update this request.'}
+                      </span>
+                    </div>
+                  )}
+
+                  {baoStatusOf(selTxn) === 'Cancelled' && (
+                    <div className="note" role="status">
+                      <Icon name="info" />
+                      <span>
+                        <b>Cancelled.</b> {selTxn.note || ''}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="grid2 small">
+                    <div>
+                      <span className="tiny muted">REQUESTED</span>
+                      <br />
+                      <b>{stamp(selTxn.created)}</b>
+                    </div>
+                    <div>
+                      <span className="tiny muted">PICKUP DATE</span>
+                      <br />
+                      <b>
+                        {selTxn.pickup
+                          ? baoDate(selTxn.pickup)
+                          : 'Not set yet. The BAO will update it.'}
+                      </b>
+                    </div>
+                  </div>
+
+                  <div className="stack" style={{ gap: 4 }}>
+                    <span className="tiny muted">ITEMS</span>
+                    {selTxn.lines.map((l, idx) => (
+                      <div
+                        key={idx}
+                        className="small"
+                        style={{ overflowWrap: 'anywhere' }}
+                      >
+                        {l.name} Ã— {l.qty}
+                      </div>
+                    ))}
+                  </div>
+
+                  {(() => {
+                    const notes = baoClaimNotes(db.bao, db.official, selTxn)
+                    return notes.length ? (
+                      <div className="note blue">
+                        <Icon name="info" />
+                        <span>
+                          <b>Claim notes.</b> {notes.join(' ')}
+                        </span>
+                      </div>
+                    ) : null
+                  })()}
+
+                  <div>
+                    <b className="small">Updates</b>
+                    <div className="tl" style={{ marginTop: 6 }}>
+                      {(selTxn.bhist || [])
+                        .slice()
+                        .reverse()
+                        .map((h, idx) => (
+                          <div key={idx}>
+                            <b className="small">{h.to}</b>{' '}
+                            <span className="tiny muted">{stamp(h.ts)}</span>
+                            {h.note && <div className="tiny muted">{h.note}</div>}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!selIsOfficial && (sel.lines || []).some((l) => l.vlabel) && (
+                <div className="stack" style={{ gap: 4 }}>
+                  {(sel.lines || []).map((l, idx) => {
+                    const prod = byId(l.pid)
+                    return (
+                      <div key={idx} className="small muted">
+                        {l.qty} Ã— {prod ? prod.name : sel.title}
+                        {l.vlabel ? ` (${l.vlabel})` : ''}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {!selIsOfficial &&
+                (sel.tab !== 'Cancelled' ? (
+                  <div className="stack" style={{ gap: 10 }}>
+                    {steps.map((step, i) => {
+                      const done = sel.stage >= step.stageThreshold
+                      return (
+                        <div key={step.label} className="stack" style={{ gap: 6 }}>
+                          <div className="row">
+                            <span
+                              style={{
+                                width: 22,
+                                height: 22,
+                                borderRadius: '50%',
+                                background: done ? 'var(--green)' : 'var(--soft)',
+                                color: done ? '#fff' : 'var(--muted)',
+                                display: 'grid',
+                                placeItems: 'center',
+                                fontSize: 11,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {done ? 'âœ“' : i + 1}
+                            </span>
+                            <span
+                              className="small"
+                              style={{ fontWeight: done ? 600 : 400 }}
+                            >
+                              {step.label}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {sel.tab === 'Active' && sel.proofPhoto && imgSrc(sel.proofPhoto) && (
+                      <div
+                        className="card flat stack"
+                        style={{ background: 'var(--bg)', padding: 12, gap: 6 }}
+                      >
+                        <div className="row between wrap">
+                          <b className="small">
+                            Meetup / Pickup Photo Proof
+                          </b>
+                          <span className="pill green">Proof uploaded</span>
+                        </div>
+                        <img
+                          src={imgSrc(sel.proofPhoto)}
+                          alt="Meetup proof"
+                          style={{
+                            width: '100%',
+                            maxWidth: 260,
+                            maxHeight: 200,
+                            objectFit: 'cover',
+                            borderRadius: 10,
+                            border: '1px solid var(--line)',
+                          }}
+                        />
+                        <span className="tiny muted">
+                          Uploaded by {sel.proofBy || 'Seller'}
+                          {sel.proofAt ? ` Â· ${stamp(sel.proofAt)}` : ''}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    className="note"
+                    style={{ background: 'var(--red-bg)', borderColor: 'transparent' }}
+                  >
+                    This request was cancelled. No payment was made.
+                  </div>
+                ))}
+
+              <div className="card flat stack" style={{ background: 'var(--bg)', gap: 6 }}>
+                <div className="row between small">
+                  <span className="muted">Seller</span>
+                  <b>{sel.seller}</b>
+                </div>
+                <div className="row between small">
+                  <span className="muted">Fulfillment method</span>
+                  <span className={`pill ${sel.fulfillment === 'delivery' ? 'blue' : 'green'}`}>
+                    {sel.fulfillment === 'delivery' ? 'Delivery' : 'Pickup'}
+                  </span>
+                </div>
+                <div className="row between small">
+                  <span className="muted">{sel.fulfillment === 'delivery' ? 'Delivery schedule' : 'Meetup'}</span>
+                  <b>{sel.when}</b>
+                </div>
+                <div className="row between small">
+                  <span className="muted">Pay on meetup</span>
+                  <b className="tnum">{peso(sel.total)}</b>
+                </div>
+              </div>
+
+              {sel.tab === 'Active' && (
+                <>
+                  <div className="order-actions">
+                    {!selIsOfficial && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn sm"
+                          disabled={!sellerAccepted}
+                          aria-disabled={!sellerAccepted}
+                          onClick={() => {
+                            confirmDlg({
+                              title:
+                                'Confirm ' +
+                                (sel.fulfillment === 'delivery' ? 'delivery' : 'pickup') + '?',
+                              msg: `Only confirm once you have received "${sel.title}" from ${sel.seller} and paid in person. This marks the order as completed and lets the seller know.`,
+                              yes: 'Yes, I received it',
+                              no: 'Not yet',
+                              danger: false,
+                              run: () => {
+                                confirmOrderPickup(sel.id, sel.proofPhoto || null)
+                              },
+                            })
+                          }}
+                        >
+                          <Icon name="check" size="sm" />
+                          Confirm {sel.fulfillment === 'delivery' ? 'delivery' : 'pickup'}
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      className="btn ghost sm"
+                      onClick={() =>
+                        setOpenBox((cur) => (cur === 'msg' ? '' : 'msg'))
+                      }
+                    >
+                      <Icon name="msg" size="sm" />
+                      Message seller
+                    </button>
+                    {!selIsOfficial && (
+                      <button
+                        type="button"
+                        className="btn ghost sm"
+                        onClick={() => {
+                          const rawPlace = (sel.when || '').split(',')[0] || ''
+                          const cleanPl = rawPlace.replace(/^(Pickup|Delivery)\s*Â·\s*/i, '').trim()
+                          if (cleanPl) {
+                            setEditPlace(cleanPl)
+                            setEditOthersMode(!presetPlaces.includes(cleanPl))
+                          }
+                          setEditTime(selTimeOptions[0] || TIMES[0])
+                          setOpenBox((cur) => (cur === 'edit' ? '' : 'edit'))
+                        }}
+                      >
+                        Reschedule
+                      </button>
+                    )}
+                    {!selIsOfficial && (
+                      <button
+                        type="button"
+                        className="btn ghost sm"
+                        onClick={() =>
+                          openModal({
+                            kind: 'order-report',
+                            orderId: sel.id,
+                            role: 'buyer',
+                            targetEmail: sel.sellerEmail,
+                            targetName: sel.seller,
+                            itemTitle: sel.title,
+                          })
+                        }
+                      >
+                        <Icon name="flag" size="sm" />
+                        Report issue
+                      </button>
+                    )}
+                    {sel && selCanCancel ? (
+                      <button
+                        type="button"
+                        className="btn danger sm"
+                        onClick={() =>
+                          setOpenBox((cur) => (cur === 'cancel' ? '' : 'cancel'))
+                        }
+                      >
+                        Cancel request
+                      </button>
+                    ) : sel && !selCanCancel ? (
+                      <button
+                        type="button"
+                        className="btn danger sm disabled"
+                        disabled
+                        title="Cannot cancel once meetup is set. Message the seller or request a reschedule instead."
+                      >
+                        Cancel request
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {!sellerAccepted && !selIsOfficial && (
+                    <div className="note blue">
+                      <Icon name="info" size="sm" />
+                      <span>
+                        Confirm {sel.fulfillment === 'delivery' ? 'delivery' : 'pickup'} unlocks once the seller accepts your request.
+                      </span>
+                    </div>
+                  )}
+
+                  {openBox === 'msg' && (
+                    <form
+                      className="card flat stack"
+                      style={{ background: 'var(--bg)' }}
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        if (sendOrderMessage(sel.id, msgText, true)) {
+                          setMsgText('')
+                          setOpenBox('')
+                        }
+                      }}
+                    >
+                      <b className="small">Message {sel.seller}</b>
+                      <textarea
+                        className="input"
+                        id="omsg-t"
+                        placeholder="Write a message about this meetup..."
+                        value={msgText}
+                        onChange={(e) => setMsgText(e.target.value)}
+                      />
+                      <div className="row" style={{ justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="btn ghost sm"
+                          onClick={() => setOpenBox('')}
+                        >
+                          Close
+                        </button>
+                        <button type="submit" className="btn sm">
+                          Send
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {!selIsOfficial && openBox === 'edit' && (
+                    <form
+                      className="card flat stack"
+                      style={{ background: 'var(--bg)' }}
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        proposeOrderMeetup(sel.id, editPlace, editTime)
+                        setOpenBox('')
+                      }}
+                    >
+                      <b className="small">Propose a new meetup</b>
+                      <div className="grid2">
+                        <div className="field">
+                          <label htmlFor="oep">Location</label>
+                          <select
+                            className="input"
+                            id="oep"
+                            value={
+                              editOthersMode || !presetPlaces.includes(editPlace)
+                                ? 'Others'
+                                : editPlace
+                            }
+                            onChange={(e) => {
+                              const val = e.target.value
+                              if (val === 'Others') {
+                                setEditOthersMode(true)
+                                if (presetPlaces.includes(editPlace)) setEditPlace('')
+                              } else {
+                                setEditOthersMode(false)
+                                setEditPlace(val)
+                              }
+                            }}
+                          >
+                            {PLACES.map((pl) => (
+                              <option key={pl} value={pl}>
+                                {pl}
+                              </option>
+                            ))}
+                          </select>
+                          {(editOthersMode || !presetPlaces.includes(editPlace)) && (
+                            <input
+                              className="input"
+                              style={{ marginTop: 8 }}
+                              placeholder="Write your specific campus spot..."
+                              value={presetPlaces.includes(editPlace) ? '' : editPlace}
+                              onChange={(e) => setEditPlace(e.target.value)}
+                            />
+                          )}
+                        </div>
+                        <div className="field">
+                          <label htmlFor="oet">Time window</label>
+                          <select
+                            className="input"
+                            id="oet"
+                            value={selTimeOptions.includes(editTime) ? editTime : selTimeOptions[0] || editTime}
+                            onChange={(e) => setEditTime(e.target.value)}
+                          >
+                            {selTimeOptions.map((tm) => (
+                              <option key={tm} value={tm}>
+                                {tm}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="row" style={{ justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="btn ghost sm"
+                          onClick={() => setOpenBox('')}
+                        >
+                          Cancel
+                        </button>
+                        <button type="submit" className="btn sm">
+                          Save new time
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {openBox === 'cancel' && (
+                    <div
+                      className="card flat stack"
+                      style={{ background: 'var(--red-bg)' }}
+                    >
+                      <b className="small">Cancel request {sel.id}?</b>
+                      <p className="tiny">
+                        The seller will be notified and the reserved stock will be returned.
+                      </p>
+                      <div className="row" style={{ justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="btn ghost sm"
+                          onClick={() => setOpenBox('')}
+                        >
+                          Keep request
+                        </button>
+                        <button
+                          type="button"
+                          className="btn danger sm"
+                          onClick={() => {
+                            cancelOrderRequest(sel.id)
+                            setOpenBox('')
+                          }}
+                        >
+                          Yes, cancel it
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {!selIsOfficial && sel.tab !== 'Active' && (
+                <div className="row wrap" style={{ justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={() =>
+                      openModal({
+                        kind: 'order-report',
+                        orderId: sel.id,
+                        role: 'buyer',
+                        targetEmail: sel.sellerEmail,
+                        targetName: sel.seller,
+                        itemTitle: sel.title,
+                      })
+                    }
+                  >
+                    <Icon name="flag" size="sm" />
+                    Report issue with seller
+                  </button>
+                </div>
+              )}
+
+              {/* Order review section for completed pickups (orderReviewHtml in js/9e-reviews-ranking.js) */}
+              {orderRateable(sel) && (
+                <OrderReviewSection
+                  order={sel}
+                  reviewOf={reviewOf}
+                  submitReview={submitReview}
+                  byId={byId}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
+function OrderReviewSection({
+  order,
+  reviewOf,
+  submitReview,
+  byId,
+}: {
+  order: OrderRecord
+  reviewOf: ReturnType<typeof useTindahan>['reviewOf']
+  submitReview: ReturnType<typeof useTindahan>['submitReview']
+  byId: ReturnType<typeof useTindahan>['byId']
+}) {
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [stars, setStars] = useState<number>(0)
+  const [text, setText] = useState<string>('')
+
+  const seenPids = new Set<string>()
+  const lines = (order.lines || []).filter(
+    (l) => l.pid && byId(l.pid) && !seenPids.has(l.pid) && seenPids.add(l.pid),
+  )
+
+  const renderBox = (
+    kind: 'seller' | 'item',
+    pid: string,
+    title: string,
+    sub: string,
+  ) => {
+    const k = kind === 'seller' ? `seller:${order.id}` : `item:${order.id}:${pid}`
+    const ex = reviewOf(kind, order.id, pid)
+    const isEditing = editingKey === k
+
+    if (ex && !isEditing) {
+      return (
+        <div
+          key={k}
+          className="card flat stack"
+          style={{ gap: 6, background: 'var(--bg)' }}
+        >
+          <div className="row between wrap">
+            <div>
+              <b className="small">{title}</b>
+              <div className="tiny muted">{sub}</div>
+            </div>
+            <div className="row" style={{ gap: 8 }}>
+              <StarsDisplay avg={ex.stars} />
+              <b className="small tnum">{ex.stars}.0</b>
+              <button
+                type="button"
+                className="btn ghost sm"
+                onClick={() => {
+                  setEditingKey(k)
+                  setStars(ex.stars)
+                  setText(ex.text || '')
+                }}
+              >
+                Edit
+              </button>
+            </div>
+          </div>
+          {ex.text ? (
+            <p className="small" style={{ overflowWrap: 'anywhere' }}>
+              {ex.text}
+            </p>
+          ) : (
+            <p className="tiny muted">No written review.</p>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <form
+        key={k}
+        className="card flat stack"
+        style={{ gap: 8, background: 'var(--bg)' }}
+        onSubmit={(e) => {
+          e.preventDefault()
+          const curStars = isEditing ? stars : stars
+          if (submitReview(kind, order.id, pid, curStars, text)) {
+            setEditingKey(null)
+            setStars(0)
+            setText('')
+          }
+        }}
+      >
+        <div>
+          <b className="small">{title}</b>
+          <div className="tiny muted">{sub}</div>
+        </div>
+        <StarPicker
+          value={editingKey === k ? stars : 0}
+          label={title}
+          onChange={(val) => {
+            if (editingKey !== k) {
+              setEditingKey(k)
+              setText(ex?.text || '')
+            }
+            setStars(val)
+          }}
+        />
+        <label className="field">
+          <span className="tiny muted">Short review (optional, up to 500 characters)</span>
+          <textarea
+            className="input"
+            maxLength={500}
+            rows={2}
+            placeholder="Was the item as described? How was the campus meetup?"
+            value={editingKey === k ? text : ''}
+            onChange={(e) => {
+              if (editingKey !== k) {
+                setEditingKey(k)
+              }
+              setText(e.target.value)
+            }}
+          />
+        </label>
+        <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+          {ex && (
+            <button
+              type="button"
+              className="btn ghost sm"
+              onClick={() => {
+                setEditingKey(null)
+                setStars(0)
+                setText('')
+              }}
+            >
+              Cancel
+            </button>
+          )}
+          <button type="submit" className="btn sm">
+            {ex ? 'Update rating' : 'Submit rating'}
+          </button>
+        </div>
+      </form>
+    )
+  }
+
+  return (
+    <div
+      className="stack"
+      style={{ gap: 10, borderTop: '1px solid var(--line)', paddingTop: 12 }}
+    >
+      <div>
+        <b>Rate this completed pickup</b>
+        <p className="tiny muted">
+          Your rating helps other RTU students know who and what to trust.
+        </p>
+      </div>
+      {renderBox(
+        'seller',
+        '',
+        `Rate seller: ${order.seller}`,
+        'How was the communication and campus meetup?',
+      )}
+      {lines.map((l) => {
+        const p = byId(l.pid)
+        if (!p) return null
+        return renderBox(
+          'item',
+          p.id,
+          `Rate item: ${p.name}`,
+          'Was it in the condition described?',
+        )
+      })}
+    </div>
+  )
+}
+

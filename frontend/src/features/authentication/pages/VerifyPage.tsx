@@ -3,6 +3,7 @@ import { navigate } from '@/common/router/router'
 import { Icon } from '@/common/components/Icon'
 import { VerifyForm } from '../components/VerifyForm'
 import logoImg from '@/assets/logo-removebg-preview.png'
+import { Banderitas } from '@/common/components/Banderitas'
 import './VerifyPage.css'
 
 const STEPS = [
@@ -66,14 +67,15 @@ export function VerifyPage() {
 
   return (
     <div className="split rev">
-      <div className="l">
-        <button className="logo" type="button" onClick={goBack}>
+      <div className="l" style={{ position: 'relative' }}>
+        <Banderitas variant="canopy" opacity={0.88} />
+        <button className="logo" type="button" onClick={goBack} style={{ position: 'relative', zIndex: 2 }}>
           <img className="logo-img" src={logoImg} alt="RTU Tindahan Campus Marketplace" />
         </button>
-        <span className="eyebrow">JOIN YOUR CAMPUS</span>
-        <h1>Sign up with a code sent to your RTU email.</h1>
-        <div className="stack" style={{ gap: 8 }}>{side}</div>
-        <div className="note blue">
+        <span className="eyebrow" style={{ position: 'relative', zIndex: 2 }}>JOIN YOUR CAMPUS</span>
+        <h1 style={{ position: 'relative', zIndex: 2 }}>Sign up with a code sent to your RTU email.</h1>
+        <div className="stack" style={{ gap: 8, position: 'relative', zIndex: 2 }}>{side}</div>
+        <div className="note blue" style={{ position: 'relative', zIndex: 2 }}>
           <Icon name="lock" />
           <span>
             Only students with an RTU student-number email can join. The code is sent to your RTU
@@ -88,7 +90,7 @@ export function VerifyPage() {
             <Icon name="lock" size="sm" /> Secure sign up
           </span>
         </div>
-        <VerifyForm onStep3Complete={handleStep3Complete} />
+        <VerifyForm onStep3Complete={handleStep3Complete} onStepChange={setStep} />
       </div>
     </div>
   )

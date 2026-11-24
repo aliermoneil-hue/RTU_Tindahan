@@ -1,8 +1,9 @@
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -10,8 +11,11 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .emails import send_verification_code_email, send_verification_email
+from .lockout import FailureResult, current_lock, record_failure, reset
 from .models import User
 from .serializers import (
+    ChangePasswordSerializer,
+    DeleteAccountSerializer,
     LoginSerializer,
     ProfileUpdateSerializer,
     RegisterSerializer,
@@ -229,16 +233,68 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data["email"].lower()
+        email = serializer.validated_data["email"].strip().lower()
         password = serializer.validated_data["password"]
+
+        # 1. Check if the email is currently locked (cooldown or restricted).
+        #    Return 429 without touching the password, so a locked account does
+        #    not reveal whether the password would have been right.
+        lock = current_lock(email)
+        if lock is not None:
+            return Response(
+                {
+                    "detail": (
+                        "Too many failed attempts. Try again in a moment, or reset your password."
+                        if lock.kind == "cooldown"
+                        else "Your login access is temporarily restricted for security reasons. "
+                        "Try again later, or reset your password."
+                    ),
+                    "code": "login_cooldown" if lock.kind == "cooldown" else "login_restricted",
+                    "retry_after": lock.retry_after,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+                headers={"Retry-After": str(lock.retry_after)},
+            )
+
+        # 2. Look up the user and check the password.
         user = User.objects.filter(email=email).first()
 
         # AV-06: do not say which half of the pair was wrong.
         if user is None or not user.check_password(password):
+            result = record_failure(email)
+
+            # If recording this failure created a lock, return 429 immediately
+
+            # If recording this failure created a lock, return 429 immediately
+            # (so attempt 5 and attempt 7 show the timer right away).
+            if result.locked:
+                return Response(
+                    {
+                        "detail": (
+                            "Too many failed attempts. Try again in a moment, or reset your password."
+                            if result.kind == "cooldown"
+                            else "Your login access is temporarily restricted for security reasons. "
+                            "Try again later, or reset your password."
+                        ),
+                        "code": "login_cooldown" if result.kind == "cooldown" else "login_restricted",
+                        "retry_after": result.retry_after,
+                    },
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                    headers={"Retry-After": str(result.retry_after)},
+                )
+
+            # Not yet locked: return 400 with attempts_left and next_penalty.
             return Response(
-                {"detail": "Email or password is incorrect."},
+                {
+                    "detail": "Email or password is incorrect.",
+                    "attempts_left": result.attempts_left,
+                    "next_penalty": result.next_penalty,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # 3. Password correct: reset the failed-attempt counter.
+        reset(email)
 
         if user.status == User.Status.BANNED:
             return Response(
@@ -263,6 +319,124 @@ class LoginView(APIView):
             )
 
         return Response(auth_payload(user))
+
+
+class LoginStatusView(APIView):
+    """Return the current lock state for an email (AllowAny, throttled).
+
+    Used by the frontend after a page refresh to show the remaining cooldown /
+    restriction timer without revealing whether the email exists.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login-status"
+
+    def post(self, request):
+        email = (request.data.get("email") or "").strip().lower()
+        lock = current_lock(email)
+
+        if lock is None:
+            return Response({"locked": False, "code": None, "retry_after": 0})
+
+        return Response(
+            {
+                "locked": True,
+                "code": "login_cooldown" if lock.kind == "cooldown" else "login_restricted",
+                "retry_after": lock.retry_after,
+            }
+        )
+
+
+class PasswordResetSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetView(APIView):
+    """Send a 6-digit password-reset code to the email (AllowAny, throttled).
+
+    Does not reveal whether the address is registered.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "verify"
+
+    def post(self, request):
+        serializer = PasswordResetSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"].strip().lower()
+
+        user = User.objects.filter(email=email).first()
+        if user and user.is_verified and user.can_sign_in:
+            code = issue_code(user)
+            send_verification_code_email(user, code)
+
+        # Same answer either way, so the endpoint cannot be used to test emails.
+        return Response(
+            {
+                "detail": (
+                    "If that RTU email is registered and verified, a 6-digit "
+                    "code has been sent to your inbox."
+                )
+            }
+        )
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.RegexField(
+        r"^\d{6}$",
+        error_messages={"invalid": "Enter the 6 digits from the email."},
+    )
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    password_confirm = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError(
+                {"password_confirm": "The two passwords do not match."}
+            )
+        return attrs
+
+
+class PasswordResetConfirmView(APIView):
+    """Confirm a password reset using a 6-digit code, then clear the lockout."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "verify"
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"].strip().lower()
+        code = serializer.validated_data["code"]
+
+        user = User.objects.filter(email=email).first()
+        if user is None or not user.is_verified:
+            # Do not reveal whether the address exists.
+            return Response(
+                {"detail": "Invalid code or reset failed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            check_code(user, code)
+        except CodeError as exc:
+            return Response(
+                {"detail": exc.message},
+                status=exc.status,
+            )
+
+        with transaction.atomic():
+            user.set_password(serializer.validated_data["password"])
+            user.save(update_fields=["password"])
+            # Clear the lockout so the user can sign in at once.
+            reset(email)
+
+        return Response({"detail": "Password reset complete. You can sign in with your new password."})
 
 
 class LogoutView(APIView):
@@ -291,3 +465,55 @@ class MeView(APIView):
                 {"detail": exc.messages}, status=status.HTTP_400_BAD_REQUEST
             )
         return Response(UserSerializer(request.user).data)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        user.set_password(serializer.validated_data["new_password"])
+        user.save(update_fields=["password"])
+        return Response({"detail": "Password changed."})
+
+
+class DeleteAccountView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = DeleteAccountSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+
+        # Check whether deleting this user would break listings or tickets.
+        from apps.catalog.models import Listing
+        from apps.store.models import OfficialTicket
+
+        has_listings = Listing.objects.filter(seller=user).exists()
+        has_tickets = OfficialTicket.objects.filter(buyer=user).exists() or (
+            hasattr(OfficialTicket, "processed_by")
+            and OfficialTicket.objects.filter(processed_by=user).exists()
+        )
+
+        if has_listings or has_tickets:
+            # Cannot hard-delete: deactivate and scrub personal data instead.
+            user.is_active = False
+            user.display_name = "Deleted account"
+            user.email = f"deleted_{user.pk}@rtu.edu.ph"
+            user.contact_number = ""
+            user.profile_photo = None
+            user.save()
+            user_pk = user.pk
+        else:
+            user_pk = user.pk
+            user.delete()
+
+        # Remove auth tokens so all sessions are invalidated.
+        Token.objects.filter(user_id=user_pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

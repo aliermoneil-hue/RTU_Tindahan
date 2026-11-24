@@ -232,6 +232,7 @@ export function GuestSectionPage({ section, kind }: { section?: 'books' | 'merch
                         kind: 'gate',
                         route: 'product',
                         why: 'open a listing and reserve it',
+                        after: `product?id=${p.id}`,
                       })
                   : undefined
               }

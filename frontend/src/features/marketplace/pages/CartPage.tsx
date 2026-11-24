@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@/common/components/Icon'
 import type { IconName } from '@/common/components/icons'
 import { playRemove, playSuccess } from '@/common/sounds'
@@ -7,8 +7,26 @@ import { PLACES, findVar, getSellerTimeWindows, isSvc, peso, unitPrice, varLabel
 import { getPickupDates } from '../dateHelper'
 import { useTindahan } from '../context/TindahanContext'
 import { imgSrc, imgsOf } from '../imageStore'
-import type { ChosenFulfillment, FulfillmentMethod } from '../types'
+import type { ChosenFulfillment, FulfillmentMethod, OrderRecord, PrototypeProduct, CartLine } from '../types'
+import { RequestSentView } from './RequestSentView'
 import './CartPage.css'
+
+const getFulfillment = (
+  p: PrototypeProduct | undefined,
+  c: CartLine,
+): { avail: FulfillmentMethod | 'none'; chosen: ChosenFulfillment } => {
+  const avail: FulfillmentMethod | 'none' =
+    p?.cat === 'Official' && !p?.fulfillment
+      ? 'pickup'
+      : p?.fulfillment === 'pickup' ||
+          p?.fulfillment === 'delivery' ||
+          p?.fulfillment === 'both'
+        ? (p.fulfillment as FulfillmentMethod)
+        : 'none'
+  const chosen: ChosenFulfillment =
+    c.fulfillment || (avail === 'delivery' ? 'delivery' : 'pickup')
+  return { avail, chosen }
+}
 
 export function CartPage() {
   const {
@@ -32,14 +50,40 @@ export function CartPage() {
     sendMeetupRequest,
     selectedCartItems,
     toast,
+    lastOrderId,
+    lastOrderIds,
+    myConversations,
+    setSelectedConvId,
   } = useTindahan()
+
+  const cartStepRef = useRef(cartStep)
+  cartStepRef.current = cartStep
+
+  const cart = currentAccount?.cart || []
+  const selectedCount = selectedCartItems.size
+
+  useEffect(() => {
+    if (cartStep === 2 && cart.length > 0 && selectedCount === 0) {
+      setCartStep(1)
+    }
+  }, [cartStep, cart.length, selectedCount, setCartStep])
+
+  useEffect(() => {
+    return () => {
+      if (cartStepRef.current === 3) {
+        setCartStep(1)
+      }
+    }
+  }, [])
 
   const [othersCartIdx, setOthersCartIdx] = useState<Record<number, boolean>>({})
   const presetPlaces = PLACES.filter((pl) => pl !== 'Others')
 
   if (!currentAccount) return null
-  const cart = currentAccount.cart || []
-  const selectedCount = selectedCartItems.size
+
+  const orderIdSet = new Set<string>(lastOrderIds)
+  if (lastOrderId) orderIdSet.add(lastOrderId)
+  const batchOrders: OrderRecord[] = currentAccount.orders.filter((o) => orderIdSet.has(o.id))
 
   const selectedSellers = new Set(
     cart
@@ -52,24 +96,15 @@ export function CartPage() {
     if (!selectedCartItems.has(i)) return false
     const p = byId(c.id)
     if (!p) return true
-    const avail: FulfillmentMethod | 'none' =
-      p.cat === 'Official' && !p.fulfillment
-        ? 'pickup'
-        : p.fulfillment === 'pickup' ||
-            p.fulfillment === 'delivery' ||
-            p.fulfillment === 'both'
-          ? p.fulfillment
-          : 'none'
+    const { avail, chosen } = getFulfillment(p, c)
     if (avail === 'none') return true
-    const chosen: ChosenFulfillment =
-      c.fulfillment || (avail === 'delivery' ? 'delivery' : 'pickup')
     if (avail === 'pickup' && chosen !== 'pickup') return true
     if (avail === 'delivery' && chosen !== 'delivery') return true
     return false
   })
 
   const selectedCartCount = cart.reduce(
-    (acc, _, i) => (selectedCartItems.has(i) ? acc + 1 : acc),
+    (acc, c, i) => (selectedCartItems.has(i) ? acc + c.qty : acc),
     0,
   )
   const selectedCartTotal = cart.reduce(
@@ -91,15 +126,37 @@ export function CartPage() {
     sendMeetupRequest()
   }
 
+  const handleMessageSeller = (order: OrderRecord) => {
+    const conv = myConversations.find((c) =>
+      order.sellerEmail ? c.seller === order.sellerEmail : !c.seller,
+    )
+    if (conv) setSelectedConvId(conv.id)
+    setCartStep(1)
+    navigate('messages')
+  }
+
   return (
     <>
       <div>
-        <span className="eyebrow">PICKUP & DELIVERY REQUEST</span>
-        <h1>Review and schedule your order</h1>
-        <p className="muted small">
-          No online checkout. You are sending a pickup or delivery request to the seller and paying
-          in person on campus.
-        </p>
+        {cartStep === 3 ? (
+          <>
+            <span className="eyebrow">REQUEST SENT</span>
+            <h1>Order request sent</h1>
+            <p className="muted small">
+              Your seller has been notified. Coordinate your campus pickup or delivery in Messages
+              or track updates in My Orders.
+            </p>
+          </>
+        ) : (
+          <>
+            <span className="eyebrow">PICKUP & DELIVERY REQUEST</span>
+            <h1>Review and schedule your order</h1>
+            <p className="muted small">
+              No online checkout. You are sending a pickup or delivery request to the seller and paying
+              in person on campus.
+            </p>
+          </>
+        )}
       </div>
 
       <div className="steps" role="list">
@@ -118,7 +175,20 @@ export function CartPage() {
         ))}
       </div>
 
-      {!cart.length ? (
+      {cartStep === 3 && batchOrders.length > 0 ? (
+        <RequestSentView
+          batchOrders={batchOrders}
+          remainingCartCount={cart.length}
+          byId={byId}
+          onMessageSeller={handleMessageSeller}
+          onTrackOrders={() => {
+            setCartStep(1)
+            navigate('orders')
+          }}
+          onBackToMarketplace={() => navigate('marketplace')}
+          onBackToCart={() => setCartStep(1)}
+        />
+      ) : !cart.length ? (
         <div
           className="card stack"
           style={{ alignItems: 'center', textAlign: 'center', padding: 40 }}
@@ -143,48 +213,38 @@ export function CartPage() {
       ) : (
         <div className="cart-two two">
           <div className="stack">
-            <div className="selection-bar">
-              <label className="check row between wrap">
-                <input
-                  type="checkbox"
-                  checked={selectedCount > 0 && selectedCount === cart.length}
-                  onChange={() => toggleCartSelectAll()}
-                />
-                <span>
-                  <b>Select all</b> ({selectedCount} of {cart.length} selected)
-                </span>
-              </label>
-              {selectedCount > 0 && (
-                <span className="tiny muted">
-                  {selectedCartTotal > 0 ? peso(selectedCartTotal) : ''} ·{' '}
-                  {selectedCartCount} item{selectedCartCount === 1 ? '' : 's'}
-                </span>
-              )}
-            </div>
+            {cartStep === 2 ? null : (
+              <div className="selection-bar">
+                <label className="cart-check row between wrap">
+                  <input
+                    type="checkbox"
+                    checked={selectedCount > 0 && selectedCount === cart.length}
+                    onChange={() => toggleCartSelectAll()}
+                  />
+                  <span>
+                    <b>Select all</b> ({selectedCount} of {cart.length} selected)
+                  </span>
+                </label>
+                {selectedCount > 0 && (
+                  <span className="tiny muted">
+                    {selectedCartTotal > 0 ? peso(selectedCartTotal) : ''} ·{' '}
+                    {selectedCartCount} item{selectedCartCount === 1 ? '' : 's'}
+                  </span>
+                )}
+              </div>
+            )}
 
             {cart.map((c, idx) => {
               const p = byId(c.id)
               if (!p) return null
+              if (cartStep === 2 && !selectedCartItems.has(idx)) return null
               const vr = c.vid && findVar(p, c.vid)
               const pr = unitPrice(p, c.vid)
               const imgs = imgsOf(p)
               const src = imgs.length ? imgSrc(imgs[0]) : ''
               const svc = isSvc(p)
 
-              const availMethod: FulfillmentMethod | 'none' =
-                p.cat === 'Official' && !p.fulfillment
-                  ? 'pickup'
-                  : p.fulfillment === 'pickup' ||
-                      p.fulfillment === 'delivery' ||
-                      p.fulfillment === 'both'
-                    ? p.fulfillment
-                    : 'none'
-              const chosenMethod: ChosenFulfillment =
-                availMethod === 'delivery'
-                  ? 'delivery'
-                  : availMethod === 'pickup'
-                    ? 'pickup'
-                    : c.fulfillment || 'pickup'
+              const { avail: availMethod, chosen: chosenMethod } = getFulfillment(p, c)
 
               const isOfficial = p.cat === 'Official' || sellerKind(p) === 'school'
               const sellerTimeSlots = getSellerTimeWindows(p)
@@ -255,20 +315,27 @@ export function CartPage() {
                         className="iconbtn"
                         aria-label={`Remove ${p.name}`}
                         onClick={() => {
-                          playRemove()
-                          removeCartLine(idx)
+                          if (cartStep === 2) {
+                            toggleCartSelect(idx)
+                            toast('Moved back to your cart.')
+                          } else {
+                            playRemove()
+                            removeCartLine(idx)
+                          }
                         }}
                       >
-                        <Icon name="trash" />
+                        {cartStep === 2 ? <Icon name="x" /> : <Icon name="trash" />}
                       </button>
-                      <label className="check">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleCartSelect(idx)}
-                          aria-label={`Select ${p.name}`}
-                        />
-                      </label>
+                      {cartStep === 2 ? null : (
+                        <label className="cart-check">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleCartSelect(idx)}
+                            aria-label={`Select ${p.name}`}
+                          />
+                        </label>
+                      )}
                     </div>
                   </div>
 
@@ -355,7 +422,7 @@ export function CartPage() {
                       </button>
                     </div>
 
-                    {(c.edit || c.editing || chosenMethod === 'delivery' || cartStep === 2) ? (
+                    {(c.edit || c.editing || chosenMethod === 'delivery') ? (
                       <div className="stack" style={{ gap: 10, marginTop: 4 }}>
                         {chosenMethod === 'delivery' && (
                           <div className="field">
@@ -374,7 +441,7 @@ export function CartPage() {
                           </div>
                         )}
 
-                        {(c.edit || c.editing || cartStep === 2) && (
+                        {(c.edit || c.editing) && (
                           <>
                             {isOfficial ? (
                               <div className="stack" style={{ gap: 8 }}>
@@ -538,42 +605,9 @@ export function CartPage() {
               )
             })}
 
-            {cartStep === 2 && (
-              <div className="card stack">
-                <div className="field">
-                  <label htmlFor="cmsg">Note to seller (optional)</label>
-                  <textarea
-                    className="input"
-                    id="cmsg"
-                    value={cartMsg}
-                    onChange={(e) => setCartMsg(e.target.value)}
-                  />
-                </div>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    id="cagree"
-                    checked={cartAgree}
-                    onChange={(e) => {
-                      setCartAgree(e.target.checked)
-                      setCartErr('')
-                    }}
-                  />
-                  <span>
-                    I understand that RTU Tindahan only coordinates the campus pickup or delivery.
-                    Payment is settled directly with the seller in person after inspecting the item.
-                  </span>
-                </label>
-                {cartErr && (
-                  <span className="err" role="alert">
-                    {cartErr}
-                  </span>
-                )}
-              </div>
-            )}
           </div>
 
-          <div className="card stack">
+          <div className="card stack cart-summary">
             <b>Request summary</b>
             <div className="row between small">
               <span className="muted">Items ({selectedCartCount})</span>
@@ -592,16 +626,7 @@ export function CartPage() {
                 .map((c, sidx) => {
                   const p = byId(c.id)
                   if (!p) return null
-                  const avail: FulfillmentMethod =
-                    p.fulfillment === 'delivery' || p.fulfillment === 'both'
-                      ? p.fulfillment
-                      : 'pickup'
-                  const chosen: ChosenFulfillment =
-                    avail === 'delivery'
-                      ? 'delivery'
-                      : avail === 'pickup'
-                        ? 'pickup'
-                        : c.fulfillment || 'pickup'
+                  const { chosen } = getFulfillment(p, c)
                   return (
                     <div key={sidx} className="row between tiny">
                       <span
@@ -661,25 +686,56 @@ export function CartPage() {
                 Continue to confirmation
               </button>
             ) : (
-              <div className="stack" style={{ gap: 8 }}>
-                <button
-                  type="button"
-                  className="btn yellow block lg"
-                  disabled={hasInvalidFulfillment}
-                  onClick={handleSend}
-                >
-                  Send order request
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost block sm"
-                  onClick={() => {
-                    setCartStep(1)
-                  }}
-                >
-                  Back to items
-                </button>
-              </div>
+              <>
+                <div className="field">
+                  <label htmlFor="cmsg">Note to seller (optional)</label>
+                  <textarea
+                    className="input"
+                    id="cmsg"
+                    value={cartMsg}
+                    onChange={(e) => setCartMsg(e.target.value)}
+                  />
+                </div>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    id="cagree"
+                    checked={cartAgree}
+                    onChange={(e) => {
+                      setCartAgree(e.target.checked)
+                      setCartErr('')
+                    }}
+                  />
+                  <span>
+                    I understand that RTU Tindahan only coordinates the campus pickup or delivery.
+                    Payment is settled directly with the seller in person after inspecting the item.
+                  </span>
+                </label>
+                {cartErr && (
+                  <span className="err" role="alert">
+                    {cartErr}
+                  </span>
+                )}
+                <div className="stack" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn yellow block lg"
+                    disabled={hasInvalidFulfillment}
+                    onClick={handleSend}
+                  >
+                    Send order request
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost block sm"
+                    onClick={() => {
+                      setCartStep(1)
+                    }}
+                  >
+                    Back to items
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

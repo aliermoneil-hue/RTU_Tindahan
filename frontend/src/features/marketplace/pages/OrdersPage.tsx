@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Icon } from '@/common/components/Icon'
 import type { IconName } from '@/common/components/icons'
 import { navigate } from '@/common/router/router'
@@ -11,7 +11,6 @@ import {
   baoIsOfficialTxn,
   baoProgress,
   baoStatusOf,
-  baoStudentCanCancel,
   baoTxnFor,
 } from '../baoHelpers'
 import { PLACES, TIMES, getSellerTimeWindows, peso, stamp } from '../constants'
@@ -66,30 +65,75 @@ export function OrdersPage() {
     byId,
     proposeOrderMeetup,
     confirmOrderPickup,
+    confirmDlg,
     cancelOrderRequest,
-    sendOrderMessage,
+    cancelMultipleOrders,
+    myConversations,
+    setSelectedConvId,
     orderRateable,
     reviewOf,
     submitReview,
     openModal,
   } = useTindahan()
 
-  const [openBox, setOpenBox] = useState<'' | 'msg' | 'edit' | 'cancel'>('')
-  const [msgText, setMsgText] = useState('')
+  const [openBox, setOpenBox] = useState<'' | 'edit'>('')
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set())
   const presetPlaces = PLACES.filter((pl) => pl !== 'Others')
   const [editPlace, setEditPlace] = useState(PLACES[0])
   const [editOthersMode, setEditOthersMode] = useState(false)
   const [editTime, setEditTime] = useState(TIMES[0])
 
+  const orders = currentAccount?.orders || []
+  const tabs: ('Requesting' | 'For Pickup' | 'Completed' | 'Cancelled')[] = ['Requesting', 'For Pickup', 'Completed', 'Cancelled']
+
   if (!currentAccount) return null
-  const orders = currentAccount.orders || []
-  const tabs: ('Active' | 'Completed' | 'Cancelled')[] = ['Active', 'Completed', 'Cancelled']
-  const list = orders.filter((o) => o.tab === orderTab)
+
+  const isRequestingOrder = (o: OrderRecord): boolean => {
+    if (o.tab !== 'Active') return false
+    const t = baoTxnFor(o, db.txn ?? [])
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Request Received'
+    }
+    return o.status === 'Awaiting seller' || o.stage <= 1
+  }
+
+  const isForPickupOrder = (o: OrderRecord): boolean => {
+    if (o.tab !== 'Active') return false
+    const t = baoTxnFor(o, db.txn ?? [])
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Confirmed' || st === 'Ready for Pickup'
+    }
+    return o.status === 'Meetup set' || o.stage >= 2
+  }
+
+  const list = orders.filter((o) => {
+    if (orderTab === 'Requesting') return isRequestingOrder(o)
+    if (orderTab === 'For Pickup') return isForPickupOrder(o)
+    return o.tab === orderTab
+  })
+
+  const listIdsKey = list.map((o) => o.id).join(',')
+
+  useEffect(() => {
+    if (!list.length) {
+      if (selectedOrderId !== null) setSelectedOrderId(null)
+      return
+    }
+    if (!list.some((o) => o.id === selectedOrderId)) {
+      setSelectedOrderId(list[0].id)
+    }
+  }, [orderTab, listIdsKey, selectedOrderId, setSelectedOrderId])
+
+  useEffect(() => {
+    setOpenBox('')
+  }, [orderTab, selectedOrderId])
+
   const sel = list.find((o) => o.id === selectedOrderId) || list[0]
-  const steps = ['Requested', 'Meetup set', 'Meet on campus', 'Completed']
 
   const renderOrderPill = (o: OrderRecord) => {
-    const t = baoTxnFor(o, db.txn)
+    const t = baoTxnFor(o, db.txn ?? [])
     if (baoIsOfficialTxn(t) && t) {
       const st = baoStatusOf(t)
       return <span className={`pill ${BAO_PILL[st] || ''}`.trim()}>{st}</span>
@@ -121,9 +165,52 @@ export function OrdersPage() {
     )
   }
 
-  const selTxn = sel ? baoTxnFor(sel, db.txn) : null
-  const selIsOfficial = Boolean(sel && baoIsOfficialOrder(sel, db.txn) && selTxn)
-  const selCanCancel = sel ? baoStudentCanCancel(sel, db.txn, db.bao) : false
+  const selTxn = sel ? baoTxnFor(sel, db.txn ?? []) : null
+  const selIsOfficial = Boolean(sel && baoIsOfficialOrder(sel, db.txn ?? []) && selTxn)
+  const sellerAccepted = sel ? sel.status === 'Meetup set' : false
+
+  // Strict cancel check: only while still pending (Requesting).
+  // Allowed: Active + status Awaiting seller / Pending / stage <= 1 (student seller),
+  //          or BAO status Request Received (Official RTU Store).
+  // Blocked: Meetup set, Confirmed, Ready, Completed, Cancelled.
+  const canCancelOrder = (o?: OrderRecord): boolean => {
+    if (!o || o.tab !== 'Active') return false
+    if (o.status === 'Completed' || o.status === 'Cancelled') return false
+    const t = baoTxnFor(o, db.txn ?? [])
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Request Received'
+    }
+    return o.status === 'Awaiting seller' || o.stage <= 1
+  }
+
+  const selCanCancel = canCancelOrder(sel)
+
+  const cancellableList = orderTab === 'Requesting' ? list.filter(canCancelOrder) : []
+
+  const allSelected =
+    cancellableList.length > 0 &&
+    cancellableList.every((o) => selectedOrderIds.has(o.id))
+
+  const toggleSelectOrder = (id: string) => {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedOrderIds(new Set())
+    } else {
+      setSelectedOrderIds(new Set(cancellableList.map((o) => o.id)))
+    }
+  }
+
+  const cleanWhen = (when?: string) => (when || '').replace(/^(Pickup|Delivery)\s*·\s*/i, '').trim()
+
   const selFirstProd = sel && sel.lines && sel.lines[0] ? byId(sel.lines[0].pid) : undefined
   const selTimeOptions = selFirstProd ? getSellerTimeWindows(selFirstProd) : TIMES
 
@@ -137,9 +224,13 @@ export function OrdersPage() {
         </p>
       </div>
 
-      <div className="tabs" role="tablist">
+      <div className="tabs orders-tabs" role="tablist">
         {tabs.map((t) => {
-          const count = orders.filter((o) => o.tab === t).length
+          const count = t === 'Requesting'
+            ? orders.filter(isRequestingOrder).length
+            : t === 'For Pickup'
+              ? orders.filter(isForPickupOrder).length
+              : orders.filter((o) => o.tab === t).length
           return (
             <button
               key={t}
@@ -166,10 +257,35 @@ export function OrdersPage() {
           <span style={{ color: 'var(--blue)' }}>
             <Icon name="bag" />
           </span>
-          <b>No {orderTab.toLowerCase()} orders</b>
-          <p className="small muted">
-            Items you reserve will show up here with their meetup schedule.
-          </p>
+          {orderTab === 'Requesting' ? (
+            <>
+              <b>No pending requests right now.</b>
+              <p className="small muted">
+                Your active requests awaiting seller confirmation will show here.
+              </p>
+            </>
+          ) : orderTab === 'For Pickup' ? (
+            <>
+              <b>No items ready for pickup yet.</b>
+              <p className="small muted">
+                Accepted requests scheduled for meetup will show here.
+              </p>
+            </>
+          ) : orderTab === 'Completed' ? (
+            <>
+              <b>No completed pickups.</b>
+              <p className="small muted">
+                Completed campus pickups will show here.
+              </p>
+            </>
+          ) : (
+            <>
+              <b>No cancelled requests.</b>
+              <p className="small muted">
+                Cancelled requests will show here.
+              </p>
+            </>
+          )}
           <button type="button" className="btn" onClick={() => navigate('browse')}>
             Browse listings
           </button>
@@ -178,48 +294,90 @@ export function OrdersPage() {
         <div className="orders-two two">
           {/* Left list of orders */}
           <div className="stack">
-            {list.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                className="card row between"
-                style={{
-                  textAlign: 'left',
-                  borderColor: sel && sel.id === o.id ? 'var(--blue)' : undefined,
-                }}
-                onClick={() => {
-                  setSelectedOrderId(o.id)
-                  setOpenBox('')
-                }}
-              >
-                <div className="row" style={{ minWidth: 0 }}>
-                  {renderOrderThumb(o, 54)}
-                  <div style={{ minWidth: 0 }}>
-                    <b style={{ overflowWrap: 'anywhere' }}>{o.title}</b>
-                    <div className="tiny muted">
-                      {o.id} · {o.seller}
+            {orderTab === 'Requesting' && cancellableList.length > 0 && (
+              <div className="orders-select-bar">
+                <label className="orders-check">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                  />
+                  <b>
+                    Select all ({selectedOrderIds.size} of {cancellableList.length})
+                  </b>
+                </label>
+                {selectedOrderIds.size > 0 && (
+                  <button
+                    type="button"
+                    className="btn danger sm"
+                    onClick={() =>
+                      cancelMultipleOrders(Array.from(selectedOrderIds))
+                    }
+                  >
+                    Cancel selected ({selectedOrderIds.size})
+                  </button>
+                )}
+              </div>
+            )}
+            {list.map((o) => {
+              const isCancellable = orderTab === 'Requesting' && canCancelOrder(o)
+              const isSelected = sel && sel.id === o.id
+              return (
+                <div
+                  key={o.id}
+                  role="button"
+                  tabIndex={0}
+                  className={`card row between order-list-card ${isSelected ? 'selected' : ''}`}
+                  onClick={() => {
+                    setSelectedOrderId(o.id)
+                    setOpenBox('')
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setSelectedOrderId(o.id)
+                      setOpenBox('')
+                    }
+                  }}
+                >
+                  {isCancellable && (
+                    <label className="orders-check" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedOrderIds.has(o.id)}
+                        onChange={() => toggleSelectOrder(o.id)}
+                      />
+                    </label>
+                  )}
+                  <div className="row" style={{ minWidth: 0 }}>
+                    {renderOrderThumb(o, 54)}
+                    <div className="order-list-meta" style={{ minWidth: 0 }}>
+                      <b style={{ overflowWrap: 'anywhere' }}>{o.title}</b>
+                      <div className="tiny muted">
+                        {o.id} · {o.seller}
+                      </div>
+                      <div className="row wrap" style={{ gap: 4, marginTop: 2 }}>
+                        <span className={`pill ${o.fulfillment === 'delivery' ? 'blue' : 'green'}`}>
+                          {o.fulfillment === 'delivery' ? 'Delivery' : 'Pickup'}
+                        </span>
+                      </div>
+                      <div className="tiny">{cleanWhen(o.when)}</div>
                     </div>
-                    <div className="row wrap" style={{ gap: 4, marginTop: 2 }}>
-                      <span className={`pill ${o.fulfillment === 'delivery' ? 'blue' : 'green'}`}>
-                        {o.fulfillment === 'delivery' ? 'Delivery' : 'Pickup'}
-                      </span>
-                    </div>
-                    <div className="tiny">{o.when}</div>
+                  </div>
+                  <div className="order-list-right">
+                    {renderOrderPill(o)}
+                    <span className="price tnum" style={{ fontSize: 14 }}>
+                      {peso(o.total)}
+                    </span>
                   </div>
                 </div>
-                <div className="stack" style={{ alignItems: 'flex-end', gap: 4 }}>
-                  {renderOrderPill(o)}
-                  <span className="price tnum" style={{ fontSize: 14 }}>
-                    {peso(o.total)}
-                  </span>
-                </div>
-              </button>
-            ))}
+              )
+            })}
           </div>
 
           {/* Right selected order detail */}
           {sel && (
-            <div className="card stack">
+            <div className="card stack orders-detail">
               <div className="row between wrap">
                 <div>
                   <span className="tiny muted">ORDER {sel.id}</span>
@@ -342,98 +500,51 @@ export function OrdersPage() {
               {!selIsOfficial &&
                 (sel.tab !== 'Cancelled' ? (
                   <div className="stack" style={{ gap: 10 }}>
-                    {steps.map((s, i) => {
-                      const done = i < sel.stage
-                      const isMeetStep = i === 2
-                      return (
-                        <div key={s} className="stack" style={{ gap: 6 }}>
-                          <div className="row">
-                            <span
-                              style={{
-                                width: 22,
-                                height: 22,
-                                borderRadius: '50%',
-                                background: done ? 'var(--green)' : 'var(--soft)',
-                                color: done ? '#fff' : 'var(--muted)',
-                                display: 'grid',
-                                placeItems: 'center',
-                                fontSize: 11,
-                                fontWeight: 700,
-                              }}
-                            >
-                              {done ? '✓' : i + 1}
-                            </span>
-                            <span
-                              className="small"
-                              style={{ fontWeight: done ? 600 : 400 }}
-                            >
-                              {s}
-                            </span>
-                          </div>
+                    <ol className="bstep bstep-3" aria-label="Order progress">
+                      {[
+                        { label: 'Requested', stageThreshold: 1 },
+                        { label: 'Meetup set', stageThreshold: 2 },
+                        { label: 'Completed', stageThreshold: 4 },
+                      ].map((step, i) => {
+                        const done = sel.stage >= step.stageThreshold
+                        return (
+                          <li key={step.label} className={done ? 'done' : i === sel.stage - 1 ? 'cur' : 'todo'}>
+                            <span className="dot">{done ? <Icon name="check" size="sm" /> : String(i + 1)}</span>
+                            <span className="lbl">{step.label}</span>
+                          </li>
+                        )
+                      })}
+                    </ol>
 
-                          {isMeetStep && sel.tab === 'Active' && (
-                            <>
-                              {sel.proofPhoto && imgSrc(sel.proofPhoto) && (
-                                <div
-                                  className="card flat stack"
-                                  style={{
-                                    marginLeft: 30,
-                                    background: 'var(--bg)',
-                                    padding: 12,
-                                    gap: 6,
-                                  }}
-                                >
-                                  <div className="row between wrap">
-                                    <b className="small">
-                                      Meetup / Pickup Photo Proof
-                                    </b>
-                                    <span className="pill green">Proof uploaded</span>
-                                  </div>
-                                  <img
-                                    src={imgSrc(sel.proofPhoto)}
-                                    alt="Meetup proof"
-                                    style={{
-                                      width: '100%',
-                                      maxWidth: 260,
-                                      maxHeight: 200,
-                                      objectFit: 'cover',
-                                      borderRadius: 10,
-                                      border: '1px solid var(--line)',
-                                    }}
-                                  />
-                                  <span className="tiny muted">
-                                    Uploaded by {sel.proofBy || 'Seller'}
-                                    {sel.proofAt ? ` · ${stamp(sel.proofAt)}` : ''}
-                                  </span>
-                                </div>
-                              )}
-                              {!sel.proofPhoto && (
-                                <div
-                                  className="card flat stack"
-                                  style={{
-                                    marginLeft: 30,
-                                    background: 'var(--bg)',
-                                    padding: 12,
-                                    gap: 6,
-                                    border: '1px dashed var(--line)',
-                                  }}
-                                >
-                                  <div className="row between wrap">
-                                    <b className="small">
-                                      Meetup / Pickup Photo Proof
-                                    </b>
-                                  </div>
-                                  <span className="tiny muted">
-                                    Seller will upload a meetup handover photo when marking this
-                                    order as picked up.
-                                  </span>
-                                </div>
-                              )}
-                            </>
-                          )}
+                    {sel.tab === 'Active' && sel.proofPhoto && imgSrc(sel.proofPhoto) && (
+                      <div
+                        className="card flat stack"
+                        style={{ background: 'var(--bg)', padding: 12, gap: 6 }}
+                      >
+                        <div className="row between wrap">
+                          <b className="small">
+                            Meetup / Pickup Photo Proof
+                          </b>
+                          <span className="pill green">Proof uploaded</span>
                         </div>
-                      )
-                    })}
+                        <img
+                          src={imgSrc(sel.proofPhoto)}
+                          alt="Meetup proof"
+                          style={{
+                            width: '100%',
+                            maxWidth: 260,
+                            maxHeight: 200,
+                            objectFit: 'cover',
+                            borderRadius: 10,
+                            border: '1px solid var(--line)',
+                          }}
+                        />
+                        <span className="tiny muted">
+                          Uploaded by {sel.proofBy || 'Seller'}
+                          {sel.proofAt ? ` · ${stamp(sel.proofAt)}` : ''}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div
@@ -444,7 +555,10 @@ export function OrdersPage() {
                   </div>
                 ))}
 
-              <div className="card flat stack" style={{ background: 'var(--bg)', gap: 6 }}>
+              <div
+                className="card flat stack orders-detail-meta"
+                style={{ background: 'var(--bg)', gap: 6 }}
+              >
                 <div className="row between small">
                   <span className="muted">Seller</span>
                   <b>{sel.seller}</b>
@@ -457,7 +571,7 @@ export function OrdersPage() {
                 </div>
                 <div className="row between small">
                   <span className="muted">{sel.fulfillment === 'delivery' ? 'Delivery schedule' : 'Meetup'}</span>
-                  <b>{sel.when}</b>
+                  <b>{cleanWhen(sel.when)}</b>
                 </div>
                 <div className="row between small">
                   <span className="muted">Pay on meetup</span>
@@ -467,23 +581,44 @@ export function OrdersPage() {
 
               {sel.tab === 'Active' && (
                 <>
-                  <div className="row wrap">
+                  <div className="order-actions">
                     {!selIsOfficial && (
-                      <button
-                        type="button"
-                        className="btn sm"
-                        onClick={() => confirmOrderPickup(sel.id, sel.proofPhoto || null)}
-                      >
-                        <Icon name="check" size="sm" />
-                        Confirm {sel.fulfillment === 'delivery' ? 'delivery' : 'pickup'}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="btn sm"
+                          disabled={!sellerAccepted}
+                          aria-disabled={!sellerAccepted}
+                          onClick={() => {
+                            confirmDlg({
+                              title:
+                                'Confirm ' +
+                                (sel.fulfillment === 'delivery' ? 'delivery' : 'pickup') + '?',
+                              msg: `Only confirm once you have received "${sel.title}" from ${sel.seller} and paid in person. This marks the order as completed and lets the seller know.`,
+                              yes: 'Yes, I received it',
+                              no: 'Not yet',
+                              danger: false,
+                              run: () => {
+                                confirmOrderPickup(sel.id, sel.proofPhoto || null)
+                              },
+                            })
+                          }}
+                        >
+                          <Icon name="check" size="sm" />
+                          Confirm {sel.fulfillment === 'delivery' ? 'delivery' : 'pickup'}
+                        </button>
+                      </>
                     )}
                     <button
                       type="button"
                       className="btn ghost sm"
-                      onClick={() =>
-                        setOpenBox((cur) => (cur === 'msg' ? '' : 'msg'))
-                      }
+                      onClick={() => {
+                        const conv = myConversations.find((c) =>
+                          sel.sellerEmail ? c.seller === sel.sellerEmail : !c.seller,
+                        )
+                        if (conv) setSelectedConvId(conv.id)
+                        navigate('messages')
+                      }}
                     >
                       <Icon name="msg" size="sm" />
                       Message seller
@@ -525,52 +660,24 @@ export function OrdersPage() {
                         Report issue
                       </button>
                     )}
-                    {selCanCancel && (
+                    {selCanCancel ? (
                       <button
                         type="button"
                         className="btn danger sm"
-                        onClick={() =>
-                          setOpenBox((cur) => (cur === 'cancel' ? '' : 'cancel'))
-                        }
+                        onClick={() => cancelOrderRequest(sel.id)}
                       >
                         Cancel request
                       </button>
-                    )}
+                    ) : null}
                   </div>
 
-                  {openBox === 'msg' && (
-                    <form
-                      className="card flat stack"
-                      style={{ background: 'var(--bg)' }}
-                      onSubmit={(e) => {
-                        e.preventDefault()
-                        if (sendOrderMessage(sel.id, msgText, true)) {
-                          setMsgText('')
-                          setOpenBox('')
-                        }
-                      }}
-                    >
-                      <b className="small">Message {sel.seller}</b>
-                      <textarea
-                        className="input"
-                        id="omsg-t"
-                        placeholder="Write a message about this meetup..."
-                        value={msgText}
-                        onChange={(e) => setMsgText(e.target.value)}
-                      />
-                      <div className="row" style={{ justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          className="btn ghost sm"
-                          onClick={() => setOpenBox('')}
-                        >
-                          Close
-                        </button>
-                        <button type="submit" className="btn sm">
-                          Send
-                        </button>
-                      </div>
-                    </form>
+                  {!sellerAccepted && !selIsOfficial && (
+                    <div className="note blue">
+                      <Icon name="info" size="sm" />
+                      <span>
+                        Confirm {sel.fulfillment === 'delivery' ? 'delivery' : 'pickup'} unlocks once the seller accepts your request.
+                      </span>
+                    </div>
                   )}
 
                   {!selIsOfficial && openBox === 'edit' && (
@@ -653,36 +760,6 @@ export function OrdersPage() {
                     </form>
                   )}
 
-                  {openBox === 'cancel' && (
-                    <div
-                      className="card flat stack"
-                      style={{ background: 'var(--red-bg)' }}
-                    >
-                      <b className="small">Cancel request {sel.id}?</b>
-                      <p className="tiny">
-                        The seller will be notified and the reserved stock will be returned.
-                      </p>
-                      <div className="row" style={{ justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          className="btn ghost sm"
-                          onClick={() => setOpenBox('')}
-                        >
-                          Keep request
-                        </button>
-                        <button
-                          type="button"
-                          className="btn danger sm"
-                          onClick={() => {
-                            cancelOrderRequest(sel.id)
-                            setOpenBox('')
-                          }}
-                        >
-                          Yes, cancel it
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </>
               )}
 
@@ -711,6 +788,7 @@ export function OrdersPage() {
               {/* Order review section for completed pickups (orderReviewHtml in js/9e-reviews-ranking.js) */}
               {orderRateable(sel) && (
                 <OrderReviewSection
+                  key={sel.id}
                   order={sel}
                   reviewOf={reviewOf}
                   submitReview={submitReview}
@@ -736,9 +814,21 @@ function OrderReviewSection({
   submitReview: ReturnType<typeof useTindahan>['submitReview']
   byId: ReturnType<typeof useTindahan>['byId']
 }) {
-  const [editingKey, setEditingKey] = useState<string | null>(null)
-  const [stars, setStars] = useState<number>(0)
-  const [text, setText] = useState<string>('')
+  type ReviewDraft = { stars: number; text: string }
+  const [drafts, setDrafts] = useState<Record<string, ReviewDraft>>({})
+
+  const patchDraft = (k: string, patch: Partial<ReviewDraft>) =>
+    setDrafts((prev) => ({
+      ...prev,
+      [k]: { stars: prev[k]?.stars ?? 0, text: prev[k]?.text ?? '', ...patch },
+    }))
+
+  const clearDraft = (k: string) =>
+    setDrafts((prev) => {
+      const next = { ...prev }
+      delete next[k]
+      return next
+    })
 
   const seenPids = new Set<string>()
   const lines = (order.lines || []).filter(
@@ -753,7 +843,8 @@ function OrderReviewSection({
   ) => {
     const k = kind === 'seller' ? `seller:${order.id}` : `item:${order.id}:${pid}`
     const ex = reviewOf(kind, order.id, pid)
-    const isEditing = editingKey === k
+    const draft = drafts[k]
+    const isEditing = Boolean(ex) && Boolean(draft)
 
     if (ex && !isEditing) {
       return (
@@ -774,9 +865,10 @@ function OrderReviewSection({
                 type="button"
                 className="btn ghost sm"
                 onClick={() => {
-                  setEditingKey(k)
-                  setStars(ex.stars)
-                  setText(ex.text || '')
+                  setDrafts((prev) => ({
+                    ...prev,
+                    [k]: { stars: ex.stars, text: ex.text || '' },
+                  }))
                 }}
               >
                 Edit
@@ -801,11 +893,8 @@ function OrderReviewSection({
         style={{ gap: 8, background: 'var(--bg)' }}
         onSubmit={(e) => {
           e.preventDefault()
-          const curStars = isEditing ? stars : stars
-          if (submitReview(kind, order.id, pid, curStars, text)) {
-            setEditingKey(null)
-            setStars(0)
-            setText('')
+          if (submitReview(kind, order.id, pid, draft?.stars ?? 0, draft?.text ?? '')) {
+            clearDraft(k)
           }
         }}
       >
@@ -814,15 +903,9 @@ function OrderReviewSection({
           <div className="tiny muted">{sub}</div>
         </div>
         <StarPicker
-          value={editingKey === k ? stars : 0}
+          value={draft?.stars ?? 0}
           label={title}
-          onChange={(val) => {
-            if (editingKey !== k) {
-              setEditingKey(k)
-              setText(ex?.text || '')
-            }
-            setStars(val)
-          }}
+          onChange={(val) => patchDraft(k, { stars: val })}
         />
         <label className="field">
           <span className="tiny muted">Short review (optional, up to 500 characters)</span>
@@ -831,13 +914,8 @@ function OrderReviewSection({
             maxLength={500}
             rows={2}
             placeholder="Was the item as described? How was the campus meetup?"
-            value={editingKey === k ? text : ''}
-            onChange={(e) => {
-              if (editingKey !== k) {
-                setEditingKey(k)
-              }
-              setText(e.target.value)
-            }}
+            value={draft?.text ?? ''}
+            onChange={(e) => patchDraft(k, { text: e.target.value })}
           />
         </label>
         <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
@@ -845,11 +923,7 @@ function OrderReviewSection({
             <button
               type="button"
               className="btn ghost sm"
-              onClick={() => {
-                setEditingKey(null)
-                setStars(0)
-                setText('')
-              }}
+              onClick={() => clearDraft(k)}
             >
               Cancel
             </button>

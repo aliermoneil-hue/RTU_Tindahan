@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Icon } from '@/common/components/Icon'
 import type { IconName } from '@/common/components/icons'
 import { navigate } from '@/common/router/router'
+import { setAfterLogin } from '@/common/utils/afterLogin'
 import { HeroCarousel } from '../components/HeroCarousel'
+import { Banderitas } from '@/common/components/Banderitas'
 import './LandingPage.css'
 
 const ABOUT_CARDS: { title: string; text: string; icon: IconName }[] = [
@@ -20,15 +22,15 @@ const STEPS: { title: string; text: string; icon: IconName }[] = [
   { title: 'Meet and pay at pickup', text: 'Meet in a visible campus area, check the item, then pay the seller in person.', icon: 'pin' },
 ]
 
-const LOCKED: { title: string; text: string; icon: IconName }[] = [
-  { title: 'Full marketplace', text: 'Every listing, every seller', icon: 'store' },
-  { title: 'Search and filters', text: 'Find items by name, price or category', icon: 'search' },
-  { title: 'Request cart', text: 'Reserve items for a campus meetup', icon: 'cart' },
-  { title: 'Sell an item', text: 'Post your own listing', icon: 'plus' },
-  { title: 'My orders', text: 'Track requests and pickups', icon: 'bag' },
-  { title: 'Pasig Campus Store', text: 'Official uniforms and books', icon: 'shirt' },
-  { title: 'My shop', text: 'Sell items and answer requests', icon: 'eye' },
-  { title: 'Profile and alerts', text: 'Notifications and your account', icon: 'user' },
+const LOCKED: { title: string; text: string; icon: IconName; route: string }[] = [
+  { title: 'Full marketplace', text: 'Every listing, every seller', icon: 'store', route: 'marketplace' },
+  { title: 'Search and filters', text: 'Find items by name, price or category', icon: 'search', route: 'browse' },
+  { title: 'Request cart', text: 'Reserve items for a campus meetup', icon: 'cart', route: 'cart' },
+  { title: 'Sell an item', text: 'Post your own listing', icon: 'plus', route: 'create' },
+  { title: 'My orders', text: 'Track requests and pickups', icon: 'bag', route: 'orders' },
+  { title: 'Pasig Campus Store', text: 'Official uniforms and books', icon: 'shirt', route: 'store' },
+  { title: 'My shop', text: 'Sell items and answer requests', icon: 'eye', route: 'shop' },
+  { title: 'Profile and alerts', text: 'Notifications and your account', icon: 'user', route: 'profile' },
 ]
 
 const TIPS: { title: string; text: string; icon: IconName }[] = [
@@ -52,12 +54,22 @@ const FAQ: { q: string; a: string }[] = [
 
 export function LandingPage() {
   const [popup, setPopup] = useState<'guidelines' | 'policy' | null>(null)
-  const [lockedPopup, setLockedPopup] = useState<{ route: string; why: string } | null>(null)
+  const [lockedPopup, setLockedPopup] = useState<{ route: string; title: string } | null>(null)
+
+  // Close the locked-tile pop-up on Escape
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLockedPopup(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [lockedPopup])
 
   return (
     <>
       {/* ---------- HERO ---------- */}
       <section className="ld-hero">
+        <Banderitas variant="canopy" opacity={0.92} />
         <div className="g-wrap ld-hero-grid">
           <div className="ld-copy">
             <span className="eyebrow">Rizal Technological University · Pasig Campus</span>
@@ -134,8 +146,8 @@ export function LandingPage() {
           </div>
           <div className="g-4">
             {LOCKED.map((t) => (
-              <button key={t.title} type="button" className="lock-tile" onClick={() => {
-                setLockedPopup({ route: t.title.toLowerCase().replace(/\s+/g, '-'), why: t.text })
+              <button key={t.title} type="button" className="lock-tile" aria-haspopup="dialog" onClick={() => {
+                setLockedPopup({ route: t.route, title: t.title })
               }}>
                 <span className="lt-ic"><Icon name={t.icon} /></span>
                 <span className="lt-t">
@@ -332,28 +344,53 @@ export function LandingPage() {
       {/* ---------- POPUP: SIGN IN TO CONTINUE (locked tiles) ---------- */}
       {lockedPopup && (
         <div className="popup-overlay" onClick={() => setLockedPopup(null)}>
-          <div className="popup-box" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="popup-box"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Sign in to continue"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="popup-close"
+              aria-label="Close"
+              onClick={() => setLockedPopup(null)}
+            >
+              <Icon name="x" size="sm" />
+            </button>
             <div className="row" style={{ gap: 8, marginBottom: 16 }}>
               <Icon name="lock" size="sm" />
               <span style={{ fontWeight: 600, color: 'var(--ink)' }}>Sign in to continue</span>
             </div>
             <p className="small muted" style={{ lineHeight: 1.55, marginBottom: 20 }}>
-              You need a verified RTU account to {lockedPopup.why}. Sign in with your RTU email, or create an account if you are new. You can keep browsing the Books and Merchandise pages as a guest.
+              You need a verified RTU account to {lockedPopup.title}. After you sign in, we will take
+              you there.
             </p>
             <div style={{ display: 'flex', flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
               <button type="button" className="btn ghost" onClick={() => setLockedPopup(null)}>
                 Not now
               </button>
-              <button type="button" className="btn ghost" onClick={() => {
-                setLockedPopup(null)
-                navigate('register')
-              }}>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  setAfterLogin(lockedPopup.route)
+                  setLockedPopup(null)
+                  navigate('register')
+                }}
+              >
                 Create account
               </button>
-              <button type="button" className="btn" onClick={() => {
-                setLockedPopup(null)
-                navigate('login')
-              }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setAfterLogin(lockedPopup.route)
+                  setLockedPopup(null)
+                  navigate('login')
+                }}
+              >
                 <Icon name="lock" size="sm" /> Sign in
               </button>
             </div>

@@ -1,0 +1,275 @@
+/* ==========================================================================
+   ACCOUNT SETTINGS (ProfileSettings)
+   ========================================================================== */
+
+.pset-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+.pset-row:hover {
+  border-color: var(--navy);
+  background: var(--soft);
+}
+.pset-row.danger {
+  color: var(--red);
+}
+.pset-row.danger:hover {
+  background: var(--red-bg);
+}
+.pset-row:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.pset-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.pset-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.pset-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 2px 0;
+}
+
+.pset-hint {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+:root[data-theme='dark'] .pset-row:hover {
+  border-color: var(--yellow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pset-row {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   SETTINGS DIALOGS
+   ========================================================================== */
+
+.pset-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pset-box {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+  width: min(520px, 92vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  color: var(--ink);
+  animation: psetIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+@keyframes psetIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pset-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: 0;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0;
+}
+
+.pset-close:hover {
+  color: var(--ink);
+}
+
+.pset-box h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+}
+
+.pset-box p.small {
+  margin: 0 0 16px 0;
+}
+
+.pset-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pset-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pset-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.pset-password-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pset-password-input input {
+  width: 100%;
+  padding-right: 34px;
+}
+
+.pset-password-toggle {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 2px;
+}
+
+.pset-password-toggle:hover {
+  color: var(--ink);
+}
+
+.pset-err {
+  color: var(--red);
+  font-size: 12px;
+  margin: 0;
+}
+
+.pset-actions {
+  display: flex;
+  gap: 8;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.pset-warn {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.pset-tabs {
+  display: flex;
+  gap: 8;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.pset-tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.pset-tab:hover {
+  color: var(--ink);
+}
+
+.pset-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pset-section-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--ink);
+}
+
+.pset-friend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.pset-friend-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.pset-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pset-request-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pset-request-subtitle {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.pset-choice-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pset-box {
+    animation: none;
+  }
+}

@@ -3,7 +3,8 @@ import { navigate } from '@/common/router/router'
 import { baoItemType } from '../baoHelpers'
 import { useTindahan } from '../context/TindahanContext'
 import { ProductCard } from '../components/ProductCard'
-import './GuestSectionPage.css'
+import { Banderitas } from '@/common/components/Banderitas'
+import './GuestMarketplacePages.css'
 
 /** Guest-facing page: official RTU store items (uniforms, books, merchandise).
  * Guests see only the first 4 listings with seller names masked.
@@ -44,65 +45,60 @@ export function GuestOfficialStorePage() {
       }),
   ]
 
-  const total = officialItems.length
-  const shown = guest ? officialItems.slice(0, 4) : officialItems
-  const hiddenCount = guest ? Math.max(0, total - shown.length) : 0
+  const totalCount = officialItems.length
+  const shown = guest ? officialItems.slice(0, 50) : officialItems
+  const shownCount = shown.length
 
   return (
-    <main className="page" style={{ margin: '0 auto', padding: '22px clamp(16px, 4.45vw, 64px)' }}>
-      <div className="row between wrap">
-        <div style={{ maxWidth: '62ch' }}>
+    <div className="guest-page">
+      <div className="guest-hero" style={{ position: 'relative', overflow: 'hidden' }}>
+        <Banderitas variant="corner-right" opacity={0.85} />
+        <div className="guest-hero-copy" style={{ position: 'relative', zIndex: 2 }}>
           <span className="eyebrow">OFFICIAL RTU STORE</span>
-          <h1>Uniforms, books and merchandise</h1>
+          <h1>Uniforms, books and campus merch</h1>
           <p className="muted small">
-            Official uniforms, books and merchandise published by RTU staff.
-            Published by the Pasig Campus Store.
+            Official items published by the RTU Pasig Campus Store. Sign in to reserve and track
+            your pickup ticket.
           </p>
+        </div>
+        <div className="guest-hero-actions" style={{ position: 'relative', zIndex: 2 }}>
+          <button type="button" className="btn yellow" onClick={() => navigate('login')}>
+            Sign in to reserve
+          </button>
+          <span className="guest-count-pill">
+            <Icon name="lock" size="sm" /> Guest preview · {shownCount} of {totalCount} shown
+          </span>
         </div>
       </div>
 
-      {guest && (
-        <div className="note blue" role="status">
-          <Icon name="lock" />
-          <span className="grow">
-            <b>You are browsing as a guest.</b> You can see {Math.min(4, total)} of {total}{' '}
-            listings with seller names hidden. Sign in to see everything, open details, reserve and
-            message sellers.
-          </span>
-          <span className="row">
-            <button type="button" className="btn sm" onClick={() => navigate('login')}>
-              Sign in
+      {/* Category filter pills */}
+      <div className="guest-pills" role="tablist" aria-label="Official store categories">
+        {dynamicTabs.map(([id, label, count]) => {
+          const isActive = id === 'All'
+          return (
+            <button
+              key={id}
+              type="button"
+              className={`guest-pill ${isActive ? 'on' : ''}`}
+              role="tab"
+              aria-pressed={isActive}
+              onClick={() => {
+                if (guest) {
+                  openModal({ kind: 'gate', route: 'store', why: 'browse the store tabs' })
+                  return
+                }
+                navigate('store')
+              }}
+            >
+              {label}
+              <span className="guest-pill-count tnum">({count})</span>
             </button>
-            <button type="button" className="btn ghost sm" onClick={() => navigate('register')}>
-              Create account
-            </button>
-          </span>
-        </div>
-      )}
-
-      {/* Tab bar */}
-      <div className="row wrap" style={{ marginBottom: 18 }}>
-        {dynamicTabs.map(([id, label, count]) => (
-          <button
-            key={id}
-            type="button"
-            className="btn sm"
-            onClick={() => {
-              if (guest) {
-                openModal({ kind: 'gate', route: 'store', why: 'browse the store tabs' })
-                return
-              }
-              navigate('store')
-            }}
-          >
-            {label}
-            <span className="small muted">({count})</span>
-          </button>
-        ))}
+          )
+        })}
       </div>
 
       {shown.length ? (
-        <div className="pgrid">
+        <div className="guest-pgrid">
           {shown.map((p) => (
             <ProductCard
               key={p.id}
@@ -115,6 +111,7 @@ export function GuestOfficialStorePage() {
                         kind: 'gate',
                         route: 'product',
                         why: 'open a listing and reserve it',
+                        after: `product?id=${p.id}`,
                       })
                   : undefined
               }
@@ -129,22 +126,20 @@ export function GuestOfficialStorePage() {
         </div>
       )}
 
-      {hiddenCount > 0 && (
-        <div className="card row wrap" style={{ justifyContent: 'space-between', background: 'var(--soft)' }}>
-          <span className="row">
-            <Icon name="lock" />
+      {totalCount > shownCount && (
+        <div className="guest-unlock-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Icon name="lock" size="sm" />
             <span>
-              <b>More listings</b>
-              <span className="small muted" style={{ display: 'block' }}>
-                Available to signed-in RTU members.
-              </span>
+              <b>{totalCount - shownCount} more listing{totalCount - shownCount === 1 ? '' : 's'}</b>{' '}
+              available to verified RTU members
             </span>
-          </span>
+          </div>
           <button type="button" className="btn" onClick={() => navigate('login')}>
-            Sign in to see everything
+            Sign in to view all
           </button>
         </div>
       )}
-    </main>
+    </div>
   )
 }

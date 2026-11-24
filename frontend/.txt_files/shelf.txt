@@ -1,0 +1,376 @@
+﻿/* ==========================================================================
+   MARKETPLACE PRODUCT SHELF â€” 5-on-2 horizontally scrollable showcase grid
+   Used by Latest Items, Best-Selling Items, Student Services.
+   ========================================================================== */
+
+.shelf-section {
+  container-type: inline-size;
+}
+
+.shelf-viewport {
+  overflow-x: auto;
+  overflow-y: visible;
+  width: 100%;
+  /* Subtle vertical padding so card borders/shadows are never clipped */
+  padding: 12px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.shelf-viewport::-webkit-scrollbar {
+  height: 8px;
+}
+.shelf-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+.shelf-viewport::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+.shelf-viewport::-webkit-scrollbar-thumb:hover {
+  background: #9aa3b2;
+}
+
+.shelf-track {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.shelf-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 16px;
+  min-width: max-content;
+}
+
+/* Card slot sizing: exactly 5 cards across on desktop using container query units */
+.shelf-row .pcard {
+  width: calc((100cqi - (4 * 16px)) / 5);
+  flex-shrink: 0;
+}
+
+/* Compact typography so seller names/prices don't wrap at 5-across width */
+.shelf-row .pcard h4 {
+  font-size: 13px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+.shelf-row .pcard .srcpill,
+.shelf-row .pcard .pill {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+.shelf-row .pcard .row {
+  flex-wrap: nowrap;
+}
+.shelf-row .pcard .price {
+  white-space: nowrap;
+}
+
+/* Chevron scroll buttons â€” appear only when section overflows */
+.shelf-chev {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: #1a2f57;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  z-index: 20;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+  min-width: 44px;
+  min-height: 44px;
+}
+.shelf-chev:hover {
+  background: #1a2f57;
+  color: #fff;
+  border-color: #1a2f57;
+}
+
+/* Dark theme shelf chevrons */
+:root[data-theme='dark'] .shelf-chev {
+  background: var(--card);
+  color: var(--ink);
+  border-color: var(--line);
+}
+:root[data-theme='dark'] .shelf-chev:hover {
+  background: var(--yellow);
+  color: var(--yellow-ink);
+  border-color: var(--yellow);
+}
+.shelf-chev:focus-visible {
+  outline: 2px solid #f4b63a;
+  outline-offset: 2px;
+}
+.shelf-chev:active {
+  transform: translateY(-50%) scale(0.95);
+}
+.shelf-chev-left {
+  left: -56px;
+}
+.shelf-chev-left .ico {
+  transform: rotate(90deg);
+}
+.shelf-chev-right {
+  right: -56px;
+}
+.shelf-chev-right .ico {
+  transform: rotate(-90deg);
+}
+.shelf-chev .ico {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+/* Mobile shelf wrapper: never push wider than the viewport */
+@media (max-width: 767px) {
+  .shelf-section {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .shelf-track {
+    display: grid;
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(2, auto);
+    grid-auto-columns: calc(44vw - 8px);
+    gap: 10px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 2px 16px 6px 2px;
+  }
+  .shelf-track::-webkit-scrollbar {
+    display: none;
+  }
+  .shelf-track .pcard {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    scroll-snap-align: start;
+  }
+
+  /* Desktop carousel arrows stay hidden on mobile */
+  .shelf-chev {
+    display: none;
+  }
+}
+
+/* Desktop responsive breakpoints - maintain 5-on-5 layout */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .shelf-row .pcard {
+    width: calc((100cqi - (2 * 16px)) / 3);
+  }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .shelf-row .pcard {
+    width: calc((100cqi - (3 * 16px)) / 4);
+  }
+}
+@media (min-width: 1280px) {
+  .shelf-row .pcard {
+    width: calc((100cqi - (4 * 16px)) / 5);
+  }
+}
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Icon } from '@/common/components/Icon'
+import { ProductCard } from './ProductCard'
+import type { PrototypeProduct } from '../types'
+import './MarketplaceProductShelf.css'
+
+interface MarketplaceProductShelfProps {
+  title: string
+  subtitle: string
+  items: PrototypeProduct[]
+  viewMoreLabel?: string
+  onViewMore?: () => void
+  onEmptyAction?: () => void
+  emptyActionLabel?: string
+  emptyTitle?: string
+  emptySubtitle?: string
+}
+
+/**
+ * MARKETPLACE PRODUCT SHELF
+ * Reusable 5-on-2 (10 visible) horizontally scrollable showcase grid.
+ * Used by Latest Items, Best-Selling Items, and Student Services.
+ */
+export function MarketplaceProductShelf({
+  title,
+  subtitle,
+  items,
+  viewMoreLabel = 'View more',
+  onViewMore,
+  onEmptyAction,
+  emptyActionLabel,
+  emptyTitle,
+  emptySubtitle,
+}: MarketplaceProductShelfProps) {
+  const shelfRef = useRef<HTMLDivElement | null>(null)
+  const viewportRef = useRef<HTMLDivElement | null>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  // Distribute items into two rows for the marquee-style shelf.
+  // Row 1 (top): items[0..4], then items[10], items[12], items[14], ...
+  // Row 2 (bottom): items[5..9], then items[11], items[13], items[15], ...
+  const buildRows = useCallback((list: PrototypeProduct[]) => {
+    if (list.length <= 5) {
+      return { rows: [list] as PrototypeProduct[][] }
+    }
+    const top: PrototypeProduct[] = list.slice(0, 5)
+    const bottom: PrototypeProduct[] = list.slice(5, 10)
+    for (let i = 10; i < list.length; i++) {
+      if (i % 2 === 0) top.push(list[i])
+      else bottom.push(list[i])
+    }
+    return { rows: [top, bottom] as PrototypeProduct[][] }
+  }, [])
+
+  const { rows } = buildRows(items)
+
+  const scrollStep = useCallback((el: HTMLElement) => Math.round(el.clientWidth * 0.6), [])
+
+  const updateScrollStates = useCallback(() => {
+    const el = viewportRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 2)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2)
+  }, [])
+
+  const scrollShelf = useCallback((dir: -1 | 1) => {
+    const el = viewportRef.current
+    if (!el) return
+    el.scrollBy({ left: dir * scrollStep(el), behavior: 'smooth' })
+  }, [scrollStep])
+
+  // Recalculate on mount, items changes, scroll, and resize (sidebar toggle, etc.)
+  useEffect(() => {
+    const el = viewportRef.current
+    if (!el) return
+    const onScroll = () => updateScrollStates()
+    const onResize = () => updateScrollStates()
+
+    updateScrollStates()
+    el.addEventListener('scroll', onScroll)
+    window.addEventListener('resize', onResize)
+
+    const ro = new ResizeObserver(() => updateScrollStates())
+    ro.observe(el)
+    if (shelfRef.current) ro.observe(shelfRef.current)
+
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onResize)
+      ro.disconnect()
+    }
+  }, [items.length, updateScrollStates])
+
+  const hasItems = items.length > 0
+
+  return (
+    <div className="shelf-section" style={{ gap: 10, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'visible' }}>
+      {/* Header */}
+      <div className="row between wrap">
+        <div>
+          <h2 style={{ fontSize: 18, margin: 0 }}>{title}</h2>
+          <span className="small muted">{subtitle}</span>
+        </div>
+        {hasItems && onViewMore && (
+          <button
+            type="button"
+            className="link"
+            onClick={onViewMore}
+          >
+            {viewMoreLabel}
+          </button>
+        )}
+      </div>
+
+      {hasItems ? (
+        <>
+          <div
+            className="shelf-viewport"
+            ref={viewportRef}
+            style={{ overflowX: 'auto', overflowY: 'visible' }}
+            aria-label={`${title}. Swipe left or right to browse more items.`}
+          >
+            <div
+              className="shelf-track"
+              ref={shelfRef}
+            >
+              {rows.map((row, rowIdx) => (
+                <div
+                  key={`shelf-row-${rowIdx}`}
+                  className="shelf-row"
+              >
+                  {row.map((p) => (
+                    <ProductCard key={p.id} product={p} />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Chevrons live OUTSIDE the scrollable track as direct children of shelf-section */}
+          {canScrollLeft && (
+            <button
+              type="button"
+              className="shelf-chev shelf-chev-left"
+              aria-label={`Scroll ${title} left`}
+              onClick={() => scrollShelf(-1)}
+            >
+              <Icon name="chev" size="sm" />
+            </button>
+          )}
+          {canScrollRight && (
+            <button
+              type="button"
+              className="shelf-chev shelf-chev-right"
+              aria-label={`Scroll ${title} right`}
+              onClick={() => scrollShelf(1)}
+            >
+              <Icon name="chev" size="sm" />
+            </button>
+          )}
+        </>
+      ) : (
+        <div
+          className="card stack"
+          style={{ alignItems: 'center', textAlign: 'center', padding: 30 }}
+        >
+          <b>{emptyTitle || 'No items yet'}</b>
+          <p className="small muted">{emptySubtitle}</p>
+          {onEmptyAction && emptyActionLabel && (
+            <button
+              type="button"
+              className="btn yellow"
+              onClick={onEmptyAction}
+            >
+              {emptyActionLabel}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+

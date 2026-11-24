@@ -1,0 +1,14 @@
+.public-main {
+  flex: 1;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding-bottom: 64px;
+  background-color: var(--bg, #f4f6fa);
+}
+
+/* The landing page ends with its own navy call-to-action strip, so the
+   footer should sit directly under it. */
+.public-main.is-landing {
+  min-height: 0;
+  padding-bottom: 0;
+}

@@ -14,8 +14,13 @@
 .fimgs.full .fimg img {
   aspect-ratio: auto;
   height: auto;
-  max-height: 560px;
+  max-height: 600px;
   object-fit: contain;
+}
+.fimgs.n1.full .fimg img {
+  width: auto;
+  max-width: 100%;
+  margin: 0;
 }
 .cthread {
   margin-top: 8px;

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import logoImg from '@/assets/logo-removebg-preview.png'
 import { navigate, useRoute } from '@/common/router/router'
+import { ThemeToggle } from '@/common/components/ThemeToggle'
 import './PubTop.css'
 
 export type PubTopSection = 'about' | 'insights' | 'help'
@@ -248,6 +249,7 @@ return (
     <span className="pub-top-spacer" />
 
     <div className="pub-top-actions">
+        <ThemeToggle />
         {isMobile && (
         <button
             type="button"

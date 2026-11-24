@@ -1,0 +1,1352 @@
+﻿/** After-login redirect helper. Stores the target page in sessionStorage so the
+ * sign-in flow can take the user back to the tile/page they tried to open. */
+
+export type AfterLoginTarget =
+  | 'marketplace'
+  | 'browse'
+  | 'cart'
+  | 'create'
+  | 'orders'
+  | 'store'
+  | 'shop'
+  | 'profile'
+  | 'product'
+  | 'student-sellers'
+  | 'books'
+  | 'merch'
+
+const KEY = 'rtu:after-login'
+const MAX_AGE_MS = 30 * 60 * 1000 // 30 minutes
+
+const WHITELIST: ReadonlySet<string> = new Set([
+  'marketplace',
+  'browse',
+  'cart',
+  'create',
+  'orders',
+  'store',
+  'shop',
+  'profile',
+  'product',
+  'student-sellers',
+  'books',
+  'merch',
+])
+
+function pathOf(target: string): string {
+  return target.split('?')[0]
+}
+
+/** Save the page to return to after signing in. */
+export function setAfterLogin(target: string): void {
+  try {
+    sessionStorage.setItem(KEY, JSON.stringify({ to: target, at: Date.now() }))
+  } catch {
+    /* sessionStorage unavailable or quota-exceeded; ignore */
+  }
+}
+
+/** Return the saved target if it is fresh and on the whitelist. */
+export function peekAfterLogin(): string | null {
+  try {
+    const raw = sessionStorage.getItem(KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { to?: string; at?: number }
+    if (!parsed.to || typeof parsed.at !== 'number') return null
+    if (Date.now() - parsed.at > MAX_AGE_MS) return null
+    if (!WHITELIST.has(pathOf(parsed.to))) return null
+    return parsed.to
+  } catch {
+    return null
+  }
+}
+
+/** Remove the saved target. */
+export function clearAfterLogin(): void {
+  try {
+    sessionStorage.removeItem(KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+import { useEffect, useState, type AnchorHTMLAttributes } from 'react'
+
+/**
+ * TINY HASH ROUTER
+ * ---------------------------------------------------------------
+ * Pages live after the # in the address bar:
+ *   http://localhost:5173/#/login          -> path "login"
+ *   http://localhost:5173/#/browse?q=pen   -> path "browse", q = "pen"
+ *   http://localhost:5173/                 -> path ""  (home)
+ * No extra library is needed and refreshing the page always works.
+ */
+
+export interface Route {
+  path: string
+  params: URLSearchParams
+}
+
+function readRoute(): Route {
+  const raw = window.location.hash.replace(/^#\/?/, '')
+  const [path, query = ''] = raw.split('?')
+  return { path: path.replace(/\/+$/, ''), params: new URLSearchParams(query) }
+}
+
+/** Go to another page. navigate('login'), navigate('browse?q=pen'). */
+export function navigate(to: string, options: { replace?: boolean } = {}) {
+  const target = `#/${to.replace(/^\/+/, '')}`
+  if (options.replace) window.location.replace(target)
+  else window.location.hash = target
+  window.scrollTo({ top: 0 })
+}
+
+/** Returns the current route and re-renders when the address changes. */
+export function useRoute(): Route {
+  const [route, setRoute] = useState<Route>(readRoute)
+  useEffect(() => {
+    const onChange = () => setRoute(readRoute())
+    window.addEventListener('hashchange', onChange)
+    return () => window.removeEventListener('hashchange', onChange)
+  }, [])
+  return route
+}
+
+interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> {
+  to: string
+}
+
+/** Like <a>, but for pages inside this app: <Link to="login">Sign in</Link> */
+export function Link({ to, children, ...props }: LinkProps) {
+  return (
+    <a href={`#/${to.replace(/^\/+/, '')}`} {...props}>
+      {children}
+    </a>
+  )
+}
+
+import { useEffect } from 'react'
+import { navigate, useRoute } from '@/common/router/router'
+import { clearAfterLogin, peekAfterLogin, setAfterLogin } from '@/common/utils/afterLogin'
+import { LoginPage, VerifyPage, ForgotPasswordPage, useAuth } from '@/features/authentication'
+import { useTindahan } from '../marketplace/context/TindahanContext'
+import { BrowsePage } from '@/features/marketplace/pages/BrowsePage'
+import { CartPage } from '@/features/marketplace/pages/CartPage'
+import { ConfirmPage } from '@/features/marketplace/pages/ConfirmPage'
+import { CreateListingPage } from '@/features/marketplace/pages/CreateListingPage'
+import { FavoritesPage } from '@/features/marketplace/pages/FavoritesPage'
+import { ForumPage } from '@/features/marketplace/pages/ForumPage'
+import { ForumPostPage } from '@/features/marketplace/pages/ForumPostPage'
+import { GuestSectionPage } from '@/features/marketplace/pages/GuestSectionPage'
+import { GuestStudentSellersPage } from '@/features/marketplace/pages/GuestStudentSellersPage'
+import { GuestOfficialStorePage } from '@/features/marketplace/pages/GuestOfficialStorePage'
+import { HelpCenterPage } from '@/features/marketplace/pages/HelpCenterPage'
+import { MarketplacePage } from '@/features/marketplace/pages/MarketplacePage'
+import { MessagesPage } from '@/features/marketplace/pages/MessagesPage'
+import { MyShopPage } from '@/features/marketplace/pages/MyShopPage'
+import { OfficialStorePage } from '@/features/marketplace/pages/OfficialStorePage'
+import { OrdersPage } from '@/features/marketplace/pages/OrdersPage'
+import { ProductPage } from '@/features/marketplace/pages/ProductPage'
+import { ProfilePage } from '@/features/marketplace/pages/ProfilePage'
+import { StudentSellersPage } from '@/features/marketplace/pages/StudentSellersPage'
+import { ForumReportsPage } from '@/features/marketplace/pages/admin/ForumReportsPage'
+import { ModerationPage } from '@/features/marketplace/pages/admin/ModerationPage'
+import { StaffToolsPage } from '@/features/marketplace/pages/admin/StaffToolsPage'
+import { StoreInventoryPage } from '@/features/marketplace/pages/admin/StoreInventoryPage'
+import { StoreOrdersPage } from '@/features/marketplace/pages/admin/StoreOrdersPage'
+import { TransactionsPage } from '@/features/marketplace/pages/admin/TransactionsPage'
+import { UsersAuditPage } from '@/features/marketplace/pages/admin/UsersAuditPage'
+import { AppLayout } from './layouts/AppLayout'
+import { PublicLayout } from './layouts/PublicLayout'
+import { LandingPage } from './pages/LandingPage'
+import { NotFoundPage } from './pages/NotFoundPage'
+import { BrandLoader } from '@/common/components/BrandLoader/BrandLoader'
+import { useAppReady } from '@/common/components/BrandLoader/useAppReady'
+
+/**
+ * ROUTES: decides which page to show.
+ *  - Visitors (not signed in): landing page, login, register/verify, books, merch.
+ *  - Signed-in users: all student, seller, community, and admin pages inside AppLayout.
+ *  - Wrong combination: redirect (visitor opens a member page -> login).
+ */
+
+/** Import page icons from src/assets/icons/ so they are version-controlled and processed by Vite. */
+import buyMarketplaceIco from '@/assets/icons/buy-marketplace.ico'
+import buyBrowseIco from '@/assets/icons/buy-browse.ico'
+import buyProductIco from '@/assets/icons/buy-product.ico'
+import buyOrdersIco from '@/assets/icons/buy-orders.ico'
+import buyStudentSellersIco from '@/assets/icons/buy-student-sellers.ico'
+import buyStoreIco from '@/assets/icons/buy-store.ico'
+import sellCreateIco from '@/assets/icons/sell-create.ico'
+import sellShopIco from '@/assets/icons/sell-shop.ico'
+import communityForumIco from '@/assets/icons/community-forum.ico'
+import communityHelpIco from '@/assets/icons/community-help.ico'
+import adminModerationIco from '@/assets/icons/admin-moderation.ico'
+import adminUsersIco from '@/assets/icons/admin-users.ico'
+import adminBaoOrdersIco from '@/assets/icons/admin-baoorders.ico'
+import adminBaoStockIco from '@/assets/icons/admin-baostock.ico'
+import adminTransactionsIco from '@/assets/icons/admin-transactions.ico'
+import adminForumReportsIco from '@/assets/icons/admin-forum-reports.ico'
+import adminStaffIco from '@/assets/icons/admin-staff.ico'
+import topbarMessagesIco from '@/assets/icons/topbar-messages.ico'
+import topbarCartIco from '@/assets/icons/topbar-cart.ico'
+import topbarFavoritesIco from '@/assets/icons/topbar-favorites.ico'
+import topbarProfileIco from '@/assets/icons/topbar-profile.ico'
+import signInIco from '@/assets/icons/sign-in.ico'
+import signUpIco from '@/assets/icons/sign-up.ico'
+
+/** Maps each signed-in route path to its .ico favicon. */
+const PAGE_FAVICONS: Record<string, string> = {
+  marketplace: buyMarketplaceIco,
+  browse: buyBrowseIco,
+  product: buyProductIco,
+  orders: buyOrdersIco,
+  'student-sellers': buyStudentSellersIco,
+  store: buyStoreIco,
+  create: sellCreateIco,
+  shop: sellShopIco,
+  forum: communityForumIco,
+  help: communityHelpIco,
+  moderation: adminModerationIco,
+  users: adminUsersIco,
+  baoorders: adminBaoOrdersIco,
+  baostock: adminBaoStockIco,
+  transactions: adminTransactionsIco,
+  'forum-reports': adminForumReportsIco,
+  staff: adminStaffIco,
+  messages: topbarMessagesIco,
+  cart: topbarCartIco,
+  favorites: topbarFavoritesIco,
+  profile: topbarProfileIco,
+  login: signInIco,
+  register: signUpIco,
+  'forgot-password': signInIco,
+}
+
+function renderActiveRoute(path: string, user: { email: string; role: string } | null) {
+  const active = path === '' || path === 'landing' ? 'marketplace' : path
+
+  // ----- signed-in -----
+  if (user) {
+    switch (active) {
+      case 'marketplace':
+      case 'market':
+        return <MarketplacePage />
+      case 'browse':
+        return <BrowsePage />
+      case 'product':
+        return <ProductPage />
+      case 'store':
+      case 'official':
+        return <OfficialStorePage />
+      case 'student-sellers':
+      case 'sellers':
+        return <StudentSellersPage />
+      case 'cart':
+        return <CartPage />
+      case 'confirm':
+        return <ConfirmPage />
+      case 'orders':
+        return <OrdersPage />
+      case 'create':
+      case 'list':
+        return <CreateListingPage />
+      case 'shop':
+      case 'seller':
+        return <MyShopPage />
+      case 'forum':
+        return <ForumPage />
+      case 'help':
+      case 'help-center':
+        return <HelpCenterPage />
+      case 'post':
+        return <ForumPostPage />
+      case 'messages':
+        return <MessagesPage />
+      case 'favorites':
+        return <FavoritesPage />
+      case 'profile':
+        return <ProfilePage />
+      case 'books':
+        return <GuestSectionPage kind="books" />
+      case 'merch':
+        return <GuestSectionPage kind="merch" />
+      case 'moderation':
+        return <ModerationPage />
+      case 'users':
+        return <UsersAuditPage />
+      case 'baoorders':
+      case 'store-orders':
+        return <StoreOrdersPage />
+      case 'baostock':
+      case 'store-inventory':
+        return <StoreInventoryPage />
+      case 'transactions':
+        return <TransactionsPage />
+      case 'forum-reports':
+      case 'forumreports':
+        return <ForumReportsPage />
+      case 'staff':
+        return <StaffToolsPage />
+      default:
+        return <NotFoundPage />
+    }
+  }
+
+  // ----- visitor -----
+  if (path === 'login') {
+    return <LoginPage />
+  }
+  if (path === 'register' || path === 'verify') {
+    return <VerifyPage />
+  }
+  if (path === 'forgot-password') {
+    return <ForgotPasswordPage />
+  }
+  if (path === 'books') {
+    return <GuestSectionPage kind="books" />
+  }
+  if (path === 'merch') {
+    return <GuestSectionPage kind="merch" />
+  }
+  if (path === 'student-sellers') {
+    return <GuestStudentSellersPage />
+  }
+  if (path === 'store') {
+    return <GuestOfficialStorePage />
+  }
+  if (path === 'help' || path === 'help-center') {
+    return (
+      <div className="g-wrap" style={{ padding: '24px 16px' }}>
+        <HelpCenterPage />
+      </div>
+    )
+  }
+  return <LandingPage />
+}
+
+export function AppRoutes() {
+  const { path, params } = useRoute()
+  const { user, isLoading: authLoading, isSigningIn } = useAuth()
+  const { hasSettledInitialFetch } = useTindahan()
+
+  /** Canonical page key used for both rendering and favicon selection. */
+  const activePage = path === '' || path === 'landing' ? 'marketplace' : path
+
+  const isPublicPath =
+    path === '' ||
+    path === 'landing' ||
+    path === 'login' ||
+    path === 'register' ||
+    path === 'verify' ||
+    path === 'forgot-password' ||
+    path === 'books' ||
+    path === 'merch' ||
+    path === 'student-sellers' ||
+    path === 'store' ||
+    path === 'help' ||
+    path === 'help-center'
+
+  const redirectTo =
+    !authLoading &&
+    (user
+      ? path === 'login' || path === 'register' || path === 'verify' || path === 'forgot-password'
+        ? peekAfterLogin() ?? 'marketplace'
+        : null
+      : !isPublicPath
+        ? 'login'
+        : null)
+
+  const appReady = useAppReady({
+    authLoading,
+    isAuthenticated: !!user,
+    listingsSettled: hasSettledInitialFetch,
+  })
+
+  const showOverlay = !appReady || Boolean(redirectTo) || Boolean(isSigningIn)
+
+  /** Swap the page favicon to match the current route. */
+  useEffect(() => {
+    const href = PAGE_FAVICONS[activePage] || '/favicon.svg'
+    const link = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null
+    if (link) link.href = href
+  }, [activePage])
+
+  useEffect(() => {
+    if (redirectTo) navigate(redirectTo, { replace: true })
+  }, [redirectTo])
+
+  // When the user lands on the page they were redirected to after login, clear the saved target.
+  useEffect(() => {
+    if (!user) return
+    const target = peekAfterLogin()
+    if (!target) return
+    const targetPath = target.split('?')[0]
+    if (path === targetPath || path === '' && targetPath === 'marketplace') {
+      clearAfterLogin()
+    }
+  }, [user, path])
+
+  // When a visitor opens a member page directly, save the current path so it can be restored after login.
+  useEffect(() => {
+    if (redirectTo === 'login' && !user) {
+      const withQuery = params.toString() ? `${path}?${params.toString()}` : path
+      setAfterLogin(withQuery)
+    }
+  }, [redirectTo, user, path, params])
+
+  /** Mobile only: after signing in / creating an account from the landing page,
+   * stay at the top for 3 seconds, then scroll down with animation. The flag is
+   * set in sessionStorage by PubTop before navigation, so it survives the page
+   * change (PubTop unmounts on login/register). */
+  useEffect(() => {
+    const isMobile = window.innerWidth <= 900
+    const shouldScroll = sessionStorage.getItem('rtu:scroll-after-login') === 'true'
+    const isAuthPage = path === 'login' || path === 'register' || path === 'forgot-password'
+
+    if (!isMobile || !shouldScroll || !isAuthPage) return
+
+    sessionStorage.removeItem('rtu:scroll-after-login')
+
+    const timer = setTimeout(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [path])
+
+  return (
+    <>
+      <BrandLoader
+        isLoading={showOverlay}
+        variant={isSigningIn ? 'full' : 'auto'}
+        immediate={isSigningIn}
+        onExited={() => {}}
+      />
+      {!authLoading && !redirectTo && (
+        <>
+          {/* Signed-in pages use AppLayout; login/verify pages have their own layout */}
+          {user ? (
+            <AppLayout user={user} activePath={activePage}>
+              {renderActiveRoute(path, user)}
+            </AppLayout>
+          ) : path === 'login' || path === 'register' || path === 'verify' || path === 'forgot-password' ? (
+            renderActiveRoute(path, user)
+          ) : (
+            <PublicLayout>{renderActiveRoute(path, user)}</PublicLayout>
+          )}
+        </>
+      )}
+    </>
+  )
+}
+
+import { baoLimitFor, baoWindowState, baoWindowText } from '../baoHelpers'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
+import { Icon } from '@/common/components/Icon'
+import { navigate, useRoute } from '@/common/router/router'
+import { MiniLoader } from '@/common/components/BrandLoader'
+import {
+  catOf,
+  hasVars,
+  isSvc,
+  peso,
+  priceLabel,
+  subOf,
+  varLabel,
+} from '../constants'
+import { useTindahan } from '../context/TindahanContext'
+import type { ChosenFulfillment, FulfillmentMethod, ProductVariationAttr, ProductVariationRow } from '../types'
+import { AvatarBadge } from '../components/AvatarBadge'
+import { ProductGallery } from '../components/PhotoUploader'
+import { RatingText, StarsDisplay } from '../components/StarRating'
+import './ProductPage.css'
+
+export function ProductPage() {
+  const { params } = useRoute()
+  const {
+    db,
+    listingsLoading,
+    currentAccount,
+    isStaffUser,
+    selectedProductId,
+    setSelectedProductId,
+    byId,
+    allOnSale,
+    sellerKind,
+    sellerKeyOf,
+    acctByEmail,
+    ratingOf,
+    browseFor,
+    toggleFav,
+    toggleSellerFav,
+    addToCart,
+    reserveNow,
+    startProductConversation,
+    confirmDeleteReview,
+    openModal,
+    toast,
+  } = useTindahan()
+  const urlId = params.get('id')
+  const pid = urlId || selectedProductId
+  const p = pid ? byId(pid) : undefined
+  const isOwner = Boolean(p && currentAccount && p.owner === currentAccount.email)
+  const canView = p ? allOnSale.some((x) => String(x.id) === String(p.id)) || isOwner || isStaffUser : false
+
+  // Keep the internal selection in sync with the URL id (e.g. after login from a guest link).
+  useEffect(() => {
+    if (urlId && selectedProductId !== urlId) {
+      setSelectedProductId(urlId)
+    }
+  }, [urlId, selectedProductId, setSelectedProductId])
+  const [selectedOpts, setSelectedOpts] = useState<Record<string, string>>({})
+  const [variationWarned, setVariationWarned] = useState(false)
+  const [qty, setQty] = useState(1)
+  const [chosenFulfillment, setChosenFulfillment] = useState<ChosenFulfillment>('pickup')
+  const [showMsgForm, setShowMsgForm] = useState(false)
+  const [msgText, setMsgText] = useState('')
+  const [revLimit, setRevLimit] = useState(5)
+  const [particles, setParticles] = useState<
+    { x: number; y: number; id: number; r: string; tx: number; ty: number }[]
+  >([])
+  const [ripple, setRipple] = useState<{ x: number; y: number; active: boolean } | null>(null)
+
+  const sellerFulfillment: FulfillmentMethod | 'none' = useMemo(() => {
+    if (!p) return 'pickup'
+    // Official RTU Store items are always campus pickup at the BAO window unless explicitly configured
+    if (p.cat === 'Official' && !p.fulfillment) return 'pickup'
+    const f = p.fulfillment || 'pickup'
+    if (f === 'pickup' || f === 'delivery' || f === 'both') return f
+    return 'none'
+  }, [p])
+
+  useEffect(() => {
+    if (sellerFulfillment === 'delivery') {
+      setChosenFulfillment('delivery')
+    } else {
+      setChosenFulfillment('pickup')
+    }
+  }, [p?.id, sellerFulfillment])
+
+  const handleHeartClick = (e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation()
+    e.preventDefault()
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    setRipple({ x, y, active: true })
+    setTimeout(() => setRipple(null), 600)
+
+    const newParticles = Array.from({ length: 8 }, (_, i) => {
+      const angle = (i / 8) * Math.PI * 2
+      return {
+        x,
+        y,
+        id: i,
+        r: `${angle}rad`,
+        tx: Math.cos(angle) * (20 + i * 3),
+        ty: Math.sin(angle) * (20 + i * 3),
+      }
+    })
+    setParticles(newParticles)
+    setTimeout(() => setParticles([]), 500)
+
+    if (p) toggleFav(p.id)
+  }
+
+  const reviewsRef = useRef<HTMLElement | null>(null)
+
+  const itemReviews = useMemo(() => {
+    if (!p) return []
+    return db.reviews
+      .filter((r) => r.kind === 'item' && r.pid === p.id)
+      .sort((a, b) => b.ts - a.ts)
+  }, [db.reviews, p])
+
+  // If listings are still loading, don't show "not available" yet â€” the
+  // product may just not have arrived from the backend.
+  if (listingsLoading) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', minHeight: 400 }}>
+        <MiniLoader variant="section" size="lg" label="Loading listingâ€¦" />
+      </div>
+    )
+  }
+
+  if (!p || !canView) {
+    return (
+      <div
+        className="card stack"
+        style={{ alignItems: 'center', textAlign: 'center', padding: 40 }}
+      >
+        <b>This listing is not available</b>
+        <p className="small muted">
+          It may have been removed or sold out. Browse the other listings instead.
+        </p>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => browseFor({ goBrowse: true })}
+        >
+          Browse listings
+        </button>
+      </div>
+    )
+  }
+
+  const svc = isSvc(p)
+  const sk = sellerKind(p)
+  const skey = sellerKeyOf(p)
+  const cat = catOf(p)
+  const sub = subOf(p)
+  const fav = Boolean(currentAccount?.favs?.includes(p.id))
+  const sfav = Boolean(currentAccount?.sfavs?.includes(skey))
+  const isOwnListing = Boolean(p.owner && currentAccount && p.owner === currentAccount.email)
+
+  const [place, win] = (p.when || '').split(',').map((s: string) => s.trim())
+  const hasVariations = hasVars(p) && p.vars
+
+  // Resolve matching variation row when all attributes are selected (selVar in js/9d-listings.js)
+  const chosenVar = useMemo(() => {
+    if (!hasVariations || !p.vars) return null
+    for (const a of p.vars.attrs) {
+      if (!selectedOpts[a.name]) return null
+    }
+    return (
+      p.vars.rows.find((r: ProductVariationRow) =>
+        p.vars!.attrs.every((a: ProductVariationAttr) => r.opts[a.name] === selectedOpts[a.name]),
+      ) || null
+    )
+  }, [hasVariations, p.vars, selectedOpts])
+
+  const unitPr =
+    chosenVar && chosenVar.price != null ? chosenVar.price : p.price
+  const availStock = hasVariations ? (chosenVar ? chosenVar.qty : p.left) : p.left
+  const inCartLine = currentAccount?.cart.find(
+    (c) => c.id === p.id && (c.vid || '') === (chosenVar ? chosenVar.id : ''),
+  )
+
+  const ensureVariationPicked = (): string | null => {
+    if (!hasVariations || !p.vars) return ''
+    if (chosenVar) return chosenVar.id
+    toast(
+      'Please choose your ' +
+        p.vars.attrs.map((a: ProductVariationAttr) => a.name.toLowerCase()).join(' and ') +
+        ' first.',
+    )
+    return null
+  }
+
+  // Option availability helper (matching varPickerHtml in js/9d-listings.js)
+  const isOptSoldOut = (attrName: string, optVal: string): boolean => {
+    if (!hasVariations || !p.vars) return false
+    const matchingRows = p.vars.rows.filter((r: ProductVariationRow) => {
+      if (r.opts[attrName] !== optVal) return false
+      return p.vars!.attrs.every(
+        (other: ProductVariationAttr) =>
+          other.name === attrName ||
+          !selectedOpts[other.name] ||
+          r.opts[other.name] === selectedOpts[other.name],
+      )
+    })
+    return matchingRows.reduce((sum: number, r: ProductVariationRow) => sum + r.qty, 0) < 1
+  }
+
+  const itemRating = ratingOf('item', p.id)
+  const starBuckets = [5, 4, 3, 2, 1].map((s) => ({
+    s,
+    c: itemReviews.filter((r) => r.stars === s).length,
+  }))
+
+  const sellerAcct = p.owner ? acctByEmail(p.owner) : undefined
+  const activeFulfillmentChoice: ChosenFulfillment =
+    sellerFulfillment === 'delivery'
+      ? 'delivery'
+      : sellerFulfillment === 'pickup'
+        ? 'pickup'
+        : chosenFulfillment
+
+  return (
+    <>
+      {listingsLoading ? (
+        <div style={{ padding: 40, textAlign: 'center', minHeight: 400 }}>
+          <MiniLoader variant="section" size="lg" label="Loading campus listingsâ€¦" />
+        </div>
+      ) : (
+        <>
+      <div className="crumbs">
+        <button type="button" onClick={() => navigate('marketplace')}>
+          Marketplace
+        </button>{' '}
+        /
+        <button type="button" onClick={() => browseFor({ cats: [cat] })}>
+          {cat}
+        </button>
+        {sub && (
+          <>
+            {' '}
+            /{' '}
+            <button
+              type="button"
+              onClick={() => browseFor({ cats: [cat], sub })}
+            >
+              {sub}
+            </button>
+          </>
+        )}{' '}
+        / <span>{p.name}</span>
+      </div>
+
+      <div className="pgrid2">
+        {/* Left column: gallery + about */}
+        <div className="stack pgrid2-left">
+          <div className="pgrid2-media">
+            <ProductGallery
+              product={p}
+              favButton={
+              <button
+                type="button"
+                className={`heart ${fav ? 'on' : ''}`.trim()}
+                aria-label="Save item"
+                aria-pressed={fav}
+                style={{ width: 38, height: 38 }}
+                onClick={handleHeartClick}
+              >
+                <Icon name="heart" />
+                {ripple && <div className="heart-ripple" style={{ left: '50%', top: '50%' }} />}
+                {particles.map((pt) => (
+                  <div
+                    key={pt.id}
+                    className="heart-particle"
+                    style={
+                      {
+                        left: '50%',
+                        top: '50%',
+                        '--r': pt.r,
+                        '--tx': `${pt.tx}px`,
+                        '--ty': `${pt.ty}px`,
+                      } as CSSProperties
+                    }
+                  />
+                ))}
+              </button>
+            }
+          />
+          </div>
+
+          <div className="card stack pgrid2-about">
+            <b>{svc ? 'About this service' : 'About this listing'}</b>
+            <p className="small muted" style={{ overflowWrap: 'anywhere' }}>
+              {p.desc}
+            </p>
+            <div className="row wrap">
+              {p.cond && <span className="pill">Condition: {p.cond}</span>}
+              {p.avail && <span className="pill">Available days: {p.avail}</span>}
+              <span className="pill">
+                {p.cat === 'Official'
+                  ? 'Sold by the Pasig Campus Store'
+                  : 'Listed by a verified RTU student'}
+              </span>
+              <span className="pill yellow">
+                {sellerFulfillment === 'both'
+                  ? 'Campus Pickup or Delivery'
+                  : sellerFulfillment === 'delivery'
+                    ? 'Campus Delivery only'
+                    : 'Campus Pickup only'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right column: buy card + seller card */}
+        <div className="stack pgrid2-right">
+          <div className={`card stack pdetail-card ${svc ? 'type-service' : sk === 'school' ? 'type-school' : 'type-student'}`}>
+            <div className="row between wrap">
+              <span className="row wrap" style={{ gap: 6 }}>
+                <span className={`srcpill ${sk}`}>
+                  {sk === 'school' ? (
+                    <>
+                      <Icon name="shield" size="sm" />
+                      Official RTU Store
+                    </>
+                  ) : (
+                    'Student seller'
+                  )}
+                </span>
+                {svc ? (
+                  <span className="srcpill svc">
+                    Service{p.svcType ? ` Â· ${p.svcType}` : ''}
+                  </span>
+                ) : sub === 'Uniform' || p.tag === 'Uniform' ? (
+                  <span className="pill blue">Uniform</span>
+                ) : sub ? (
+                  <span className="pill">{sub}</span>
+                ) : p.cat === 'Official' && p.tag ? (
+                  <span className="pill">{p.tag}</span>
+                ) : null}
+              </span>
+              <span className="pill green">
+                {svc
+                  ? `Available Â· ${p.avail || 'By arrangement'}`
+                  : hasVariations
+                    ? chosenVar
+                      ? `${chosenVar.qty} in stock (${varLabel(p, chosenVar)})`
+                      : `${p.left} in stock across options`
+                    : `${p.left} available`}
+              </span>
+            </div>
+
+            <h1 style={{ fontSize: 22, overflowWrap: 'anywhere' }}>{p.name}</h1>
+
+            <div className="row">
+              <span className="price tnum" style={{ fontSize: 26 }}>
+                {hasVariations && !chosenVar ? priceLabel(p) : peso(unitPr)}
+              </span>
+              <span className="muted small">per {p.unit}</span>
+            </div>
+
+            <div className="small">
+              <RatingText
+                kind="item"
+                targetKey={p.id}
+                onClick={() => reviewsRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              />
+            </div>
+
+            <div className="row wrap" style={{ gap: 8 }}>
+              <button
+                type="button"
+                className="link"
+                onClick={() => openModal({ kind: 'seller-profile', sellerName: p.seller })}
+              >
+                {p.seller}
+              </button>
+              <span className="small muted">
+                Â·{' '}
+                {sk === 'school'
+                  ? 'Pasig Campus Store (RTU)'
+                  : `Verified RTU student${svc ? '' : ' seller'}`}
+              </span>
+              <span className="small">
+                Â· <RatingText kind="seller" targetKey={skey} />
+              </span>
+            </div>
+
+            <div className="card flat grid2" style={{ background: 'var(--bg)' }}>
+              <div className="row" style={{ alignItems: 'flex-start' }}>
+                <Icon name="pin" />
+                <div>
+                  <span className="tiny muted">
+                    {activeFulfillmentChoice === 'delivery' ? 'DELIVERY HUB' : 'MEETUP POINT'}
+                  </span>
+                  <br />
+                  <b className="small">{place || p.when}</b>
+                </div>
+              </div>
+              <div className="row" style={{ alignItems: 'flex-start' }}>
+                <Icon name="clock" />
+                <div>
+                  <span className="tiny muted">
+                    {activeFulfillmentChoice === 'delivery' ? 'DELIVERY WINDOW' : 'PICKUP WINDOW'}
+                  </span>
+                  <br />
+                  <b className="small">{win || '12:00 to 1:00 PM'}</b>
+                </div>
+              </div>
+            </div>
+
+            {/* Requirement #1: Buyer Fulfillment Method Selection based on Seller Configuration */}
+            <div className="card flat stack" style={{ background: 'var(--bg)', gap: 8 }}>
+              <div className="row between wrap">
+                <b className="small">Fulfillment method</b>
+                <span className="tiny muted">
+                  {sellerFulfillment === 'both'
+                    ? 'Seller offers both Pickup & Delivery'
+                    : sellerFulfillment === 'delivery'
+                      ? 'Seller offers Delivery only'
+                      : sellerFulfillment === 'pickup'
+                        ? 'Seller offers Pickup only'
+                        : 'Fulfillment not configured'}
+                </span>
+              </div>
+
+              {sellerFulfillment === 'none' ? (
+                <div className="note" style={{ background: 'var(--red-bg)', borderColor: 'transparent' }}>
+                  <Icon name="info" size="sm" />
+                  <span className="small">
+                    Neither pickup nor delivery is currently configured for this listing. You cannot
+                    place an order until the seller configures a fulfillment method.
+                  </span>
+                </div>
+              ) : (
+                <div
+                  className="row wrap"
+                  role="radiogroup"
+                  aria-label="Choose fulfillment method"
+                  style={{ gap: 8 }}
+                >
+                  {(sellerFulfillment === 'pickup' || sellerFulfillment === 'both') && (
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={activeFulfillmentChoice === 'pickup'}
+                      className={`btn sm ${activeFulfillmentChoice === 'pickup' ? '' : 'ghost'}`.trim()}
+                      onClick={() => setChosenFulfillment('pickup')}
+                    >
+                      <Icon name="pin" size="sm" />
+                      Pickup
+                      {sellerFulfillment === 'pickup' ? ' (Only option)' : ''}
+                    </button>
+                  )}
+                  {(sellerFulfillment === 'delivery' || sellerFulfillment === 'both') && (
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={activeFulfillmentChoice === 'delivery'}
+                      className={`btn sm ${activeFulfillmentChoice === 'delivery' ? '' : 'ghost'}`.trim()}
+                      onClick={() => setChosenFulfillment('delivery')}
+                    >
+                      <Icon name="bag" size="sm" />
+                      Delivery
+                      {sellerFulfillment === 'delivery' ? ' (Only option)' : ''}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* BAO v1.6 Official Store ordering window, student limit & claim notes */}
+            {db.official.some((x) => x.id === p.id) &&
+              (() => {
+                const lines: string[] = []
+                baoWindowText(db.bao, p).forEach((x) => lines.push(x))
+                const lim = baoLimitFor(db.bao, p)
+                if (lim) lines.push(`Limit: ${lim} per student.`)
+                if (p.inv?.claimNote) lines.push(`Claim notes: ${p.inv.claimNote}`)
+                if (db.bao.settings.claimNote) lines.push(`Claim notes: ${db.bao.settings.claimNote}`)
+                if (!lines.length) return null
+                const w = baoWindowState(db.bao, p)
+                return (
+                  <div
+                    className={`note ${w.open ? 'blue' : ''}`.trim()}
+                    role="status"
+                    data-bao-notes
+                  >
+                    <Icon name={w.open ? 'info' : 'clock'} size="sm" />
+                    <span className="small">
+                      {lines.map((ln, idx) => (
+                        <span key={idx} style={{ display: 'block' }}>
+                          {ln}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                )
+              })()}
+
+            {/* Per-attribute variation picker (varPickerHtml in js/9d-listings.js) */}
+            {hasVariations && p.vars && (
+              <div className="stack" style={{ gap: 10 }}>
+                {p.vars.attrs.map((a: ProductVariationAttr) => (
+                  <div key={a.name} className="stack" style={{ gap: 6 }}>
+                    <div className="row between">
+                      <b className="small">{a.name}</b>
+                      <span className="tiny muted">
+                        {selectedOpts[a.name] ? `Selected: ${selectedOpts[a.name]}` : 'Choose one'}
+                      </span>
+                    </div>
+                    <div
+                      className="row wrap"
+                      role="group"
+                      aria-label={a.name}
+                      style={{ gap: 6 }}
+                    >
+                      {a.opts.map((v: string) => {
+                        const on = selectedOpts[a.name] === v
+                        const out = isOptSoldOut(a.name, v)
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            className={`btn sm ${on ? '' : 'ghost'} vopt`.trim()}
+                            aria-pressed={on}
+                            disabled={out}
+                            onClick={() => {
+                              setSelectedOpts((prev) => ({
+                                ...prev,
+                                [a.name]: prev[a.name] === v ? '' : v,
+                              }))
+                              setQty(1)
+                              setVariationWarned(false)
+                            }}
+                          >
+                            {v}
+                            {out ? ' (out)' : ''}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+                <div className="tiny muted" role="status">
+                  {chosenVar
+                    ? `${chosenVar.qty} in stock for ${varLabel(p, chosenVar)}`
+                    : 'Choose an option in each row to see stock and reserve.'}
+                </div>
+              </div>
+            )}
+
+            <div className="row wrap">
+              <div className="qty" role="group" aria-label="Quantity">
+                <button
+                  type="button"
+                  aria-label="Decrease quantity"
+                  onClick={() => setQty((q) => Math.max(1, q - 1))}
+                >
+                  âˆ’
+                </button>
+                <span className="tnum" aria-live="polite">
+                  {qty}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Increase quantity"
+                  onClick={() => {
+                    const max = Math.max(1, availStock)
+                    if (qty + 1 > max) {
+                      toast(`Only ${max} left.`)
+                      return
+                    }
+                    setQty((q) => q + 1)
+                  }}
+                >
+                  +
+                </button>
+              </div>
+              <button
+                type="button"
+                className="btn yellow grow"
+                disabled={availStock < 1 || sellerFulfillment === 'none'}
+                onClick={() => {
+                  if (sellerFulfillment === 'none') {
+                    toast('This listing does not have an active fulfillment method.')
+                    return
+                  }
+                  if (hasVariations && !chosenVar) {
+                    setVariationWarned(true)
+                    return
+                  }
+                  const vid = ensureVariationPicked()
+                  if (vid === null) return
+                  reserveNow(p.id, qty, vid, activeFulfillmentChoice)
+                }}
+              >
+                {svc
+                  ? `Request service (${activeFulfillmentChoice === 'delivery' ? 'Delivery' : 'Pickup'})`
+                  : `Reserve for ${activeFulfillmentChoice === 'delivery' ? 'delivery' : 'pickup'}`}{' '}
+                Â· {peso(unitPr * qty)}
+              </button>
+            </div>
+
+            {hasVariations && !chosenVar && variationWarned && (
+              <div
+                className="note"
+                style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'flex-start', color: 'var(--red)' }}
+              >
+                <Icon name="info" size="sm" style={{ marginTop: 2 }} />
+                <span className="small">
+                  Please choose{' '}
+                  {p.vars?.attrs.map((a) => a.name.toLowerCase()).join(' and ')}
+                  {' '}
+                  to enable Reserve and Add to Cart.
+                </span>
+              </div>
+            )}
+
+            <div className="row">
+              <button
+                type="button"
+                className="btn ghost grow"
+                disabled={availStock < 1 || sellerFulfillment === 'none'}
+                onClick={() => {
+                  if (sellerFulfillment === 'none') {
+                    toast('This listing does not have an active fulfillment method.')
+                    return
+                  }
+                  if (hasVariations && !chosenVar) {
+                    setVariationWarned(true)
+                    return
+                  }
+                  const vid = ensureVariationPicked()
+                  if (vid === null) return
+                  if (addToCart(p.id, qty, vid, activeFulfillmentChoice)) {
+                    toast(
+                      `${qty} added to your request cart (${
+                        activeFulfillmentChoice === 'delivery' ? 'Delivery' : 'Pickup'
+                      }).`,
+                    )
+                    setQty(1)
+                  }
+                }}
+              >
+                <Icon name="cart" size="sm" />
+                {inCartLine ? `In cart (${inCartLine.qty})` : 'Add to request cart'}
+              </button>
+              <button
+                type="button"
+                className="btn ghost grow"
+                onClick={() => {
+                  if (isOwnListing) {
+                    toast('That is your own listing.')
+                    return
+                  }
+                  setShowMsgForm((prev) => !prev)
+                }}
+              >
+                <Icon name="msg" size="sm" />
+                {svc ? 'Contact provider' : 'Message seller'}
+              </button>
+            </div>
+
+            {showMsgForm && (
+              <form
+                className="stack"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (startProductConversation(p.id, msgText)) {
+                    setMsgText('')
+                    setShowMsgForm(false)
+                  }
+                }}
+              >
+                <textarea
+                  className="input"
+                  id="smsg"
+                  placeholder="Ask about condition, size or another pickup window..."
+                  aria-label="Message to the seller"
+                  value={msgText}
+                  onChange={(e) => setMsgText(e.target.value)}
+                />
+                <div className="row" style={{ justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={() => setShowMsgForm(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn sm">
+                    Send message
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <p className="tiny muted">
+              No online payment. You pay the seller in person when you meet on campus.
+            </p>
+
+            {isStaffUser && sk === 'student' && (
+              <div
+                className="card flat row between wrap"
+                style={{ background: 'var(--bg)', padding: '10px 12px', gap: 8 }}
+              >
+                <span className="tiny muted">
+                  <b>Admin moderation:</b> Pause or delete this student listing
+                </span>
+                <button
+                  type="button"
+                  className="btn danger sm"
+                  onClick={() => openModal({ kind: 'admin-remove-listing', lid: p.id })}
+                >
+                  Pause / Delete listing
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Seller card */}
+          <div className="card row wrap">
+            {p.cat === 'Official' ? (
+              <span className="avw av-lg">
+                <span className="avatar staff">RTU</span>
+              </span>
+            ) : (
+              <AvatarBadge
+                account={sellerAcct}
+                name={p.seller}
+                size="lg"
+              />
+            )}
+            <div className="grow">
+              <b>{p.seller}</b>
+              <div className="small muted">
+                {p.cat === 'Official'
+                  ? 'Official Pasig Campus Store'
+                  : 'Verified RTU student seller'}
+              </div>
+              <div className="small">
+                <RatingText kind="seller" targetKey={skey} />
+              </div>
+            </div>
+            <div className="row wrap" style={{ gap: 8 }}>
+              {!isOwnListing && (
+                <button
+                  type="button"
+                  className={`btn ghost sm sfav ${sfav ? 'on' : ''}`.trim()}
+                  aria-pressed={sfav}
+                  onClick={() => toggleSellerFav(skey)}
+                >
+                  <Icon name="heart" size="sm" />
+                  {sfav ? 'Favorite seller' : 'Add seller to favorites'}
+                </button>
+              )}
+              <button
+                type="button"
+                className="link"
+                onClick={() => openModal({ kind: 'seller-profile', sellerName: p.seller })}
+              >
+                View seller profile
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Item ratings and reviews panel (reviewsPanel in js/9e-reviews-ranking.js) */}
+      <section
+        ref={reviewsRef}
+        className="card stack"
+        id="item-reviews"
+        aria-label="Item ratings and reviews"
+      >
+        <div className="row between wrap">
+          <div>
+            <b>Item ratings and reviews</b>
+            <p className="small muted">
+              Only buyers who completed a campus pickup for this item can leave a rating.
+            </p>
+          </div>
+          <div>
+            <RatingText kind="item" targetKey={p.id} />
+          </div>
+        </div>
+
+        {itemReviews.length ? (
+          <>
+            <div className="grid2" style={{ alignItems: 'center' }}>
+              <div className="stack" style={{ gap: 4 }}>
+                <div className="row" style={{ gap: 8 }}>
+                  <b className="tnum" style={{ fontSize: 28 }}>
+                    {itemRating.avg.toFixed(1)}
+                  </b>
+                  <div>
+                    <StarsDisplay avg={itemRating.avg} />
+                    <div className="tiny muted tnum">
+                      {itemRating.n} verified {itemRating.n === 1 ? 'review' : 'reviews'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="stack" style={{ gap: 4 }}>
+                {starBuckets.map((b) => (
+                  <div key={b.s} className="row tiny" style={{ gap: 6 }}>
+                    <span className="tnum" style={{ width: 28 }}>
+                      {b.s} â˜…
+                    </span>
+                    <div className="bar">
+                      <div
+                        style={{
+                          width: `${Math.round((b.c / itemRating.n) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <span
+                      className="tnum muted"
+                      style={{ width: 24, textAlign: 'right' }}
+                    >
+                      {b.c}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="stack" style={{ gap: 10 }}>
+              {itemReviews.slice(0, revLimit).map((r) => {
+                const canDelete =
+                  currentAccount && (r.buyerEmail === currentAccount.email || isStaffUser)
+                const reviewerAcct = acctByEmail(r.buyerEmail)
+                return (
+                  <div
+                    key={r.id}
+                    className="card flat stack"
+                    style={{ gap: 6, background: 'var(--bg)' }}
+                  >
+                    <div className="row between wrap">
+                      <span className="row" style={{ gap: 8 }}>
+                        <AvatarBadge
+                          account={reviewerAcct}
+                          name={r.buyerName}
+                          size="sm"
+                        />
+                        <b>{r.buyerName}</b>
+                        <span className="pill green">Verified pickup</span>
+                        <StarsDisplay avg={r.stars} />
+                      </span>
+                      <span className="row" style={{ gap: 8 }}>
+                        <span className="tiny muted">
+                          {new Date(r.ts).toLocaleDateString('en-PH', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                          {r.edited ? ' Â· edited' : ''}
+                        </span>
+                        {canDelete && (
+                          <button
+                            type="button"
+                            className="link"
+                            style={{ color: 'var(--red)' }}
+                            onClick={() => confirmDeleteReview(r.id)}
+                          >
+                            {r.buyerEmail === currentAccount?.email ? 'Delete' : 'Remove'}
+                          </button>
+                        )}
+                      </span>
+                    </div>
+                    {r.text ? (
+                      <p className="small" style={{ overflowWrap: 'anywhere' }}>
+                        {r.text}
+                      </p>
+                    ) : (
+                      <p className="tiny muted">Rated with stars only.</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {itemReviews.length > revLimit && (
+              <button
+                type="button"
+                className="btn ghost sm"
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() => setRevLimit((n) => n + 5)}
+              >
+                Show more reviews ({itemReviews.length - revLimit} more)
+              </button>
+            )}
+          </>
+        ) : (
+          <p className="small muted">
+            No ratings yet. After a buyer picks this up on campus, their rating appears here.
+          </p>
+        )}
+      </section>
+        </>
+      )}
+    </>
+  )
+}

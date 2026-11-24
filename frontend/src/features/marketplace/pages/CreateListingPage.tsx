@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Icon } from '@/common/components/Icon'
+import { navigate } from '@/common/router/router'
 import type { IconName } from '@/common/components/icons'
 import {
   CATEGORIES,
@@ -77,6 +78,19 @@ export function CreateListingPage() {
   const [othersPlaceMode, setOthersPlaceMode] = useState(
     () => Boolean(draft.place && !presetPlaces.includes(draft.place)),
   )
+
+  // Track whether default selling windows have been applied to this draft.
+  const appliedDefaultDaysRef = useRef(false)
+
+  // Apply default selling windows from Profile when the form opens on a fresh draft.
+  useEffect(() => {
+    if (appliedDefaultDaysRef.current) return
+    const untouched = !draft.editLid && !draft.title.trim() && !draft.desc.trim() && draft.images.length === 0
+    if (untouched && currentAccount?.windows.length) {
+      setDraft((prev) => ({ ...prev, days: cleanDays(currentAccount.windows) }))
+    }
+    appliedDefaultDaysRef.current = true
+  }, [draft, currentAccount, setDraft])
 
   if (!currentAccount) return null
 
@@ -981,6 +995,14 @@ export function CreateListingPage() {
                     )
                   })}
                 </div>
+                {currentAccount?.windows.length > 0 && (
+                  <p className="tiny muted">
+                    Pre-filled from your default selling windows.{' '}
+                    <button type="button" className="link" onClick={() => navigate('profile')}>
+                      Change in Profile
+                    </button>
+                  </p>
+                )}
                 {draftErrs.days && (
                   <span className="err" role="alert">
                     {draftErrs.days}

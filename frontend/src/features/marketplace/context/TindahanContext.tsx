@@ -49,6 +49,7 @@ import { apiFetch, getToken } from '@/common/api/client'
 import { fetchListings, mergeApiCatalogue } from '../api/listings'
 import { navigate } from '@/common/router/router'
 import { useAuth } from '@/features/authentication'
+import { useProfileSettings } from '../profileSettingsStore'
 import type { User } from '@/common/types'
 import {
   CATEGORIES,
@@ -508,7 +509,7 @@ export type ActiveModal =
   | { kind: 'policy' }
   | { kind: 'rules' }
   | { kind: 'modguide' }
-  | { kind: 'gate'; route: string; why?: string }
+  | { kind: 'gate'; route: string; why?: string; after?: string }
   | { kind: 'seller-profile'; sellerName: string }
   | { kind: 'edit-profile' }
   | { kind: 'verif-status' }
@@ -590,8 +591,8 @@ interface TindahanContextValue {
   // Cart & Orders
   cartCount: number
   cartTotal: number
-  cartStep: 1 | 2
-  setCartStep: (s: 1 | 2) => void
+  cartStep: 1 | 2 | 3
+  setCartStep: (s: 1 | 2 | 3) => void
   cartMsg: string
   setCartMsg: (s: string) => void
   cartAgree: boolean
@@ -610,13 +611,15 @@ interface TindahanContextValue {
   sendMeetupRequest: () => void
 
   lastOrderId: string | null
+  lastOrderIds: string[]
   selectedOrderId: string | null
   setSelectedOrderId: (id: string | null) => void
-  orderTab: 'Active' | 'Completed' | 'Cancelled'
-  setOrderTab: (t: 'Active' | 'Completed' | 'Cancelled') => void
+  orderTab: 'Requesting' | 'For Pickup' | 'Completed' | 'Cancelled'
+  setOrderTab: (t: 'Requesting' | 'For Pickup' | 'Completed' | 'Cancelled') => void
   proposeOrderMeetup: (orderId: string, place: string, time: string) => void
   confirmOrderPickup: (orderId: string, proofImgId?: string | null) => void
   cancelOrderRequest: (orderId: string) => void
+  cancelMultipleOrders: (orderIds: string[]) => void
 
   // Seller / My Shop & Create Listing
   shopTab: 'overview' | 'orders' | 'listings' | 'reviews'
@@ -781,6 +784,7 @@ const TindahanContext = createContext<TindahanContextValue | null>(null)
 
 export function TindahanProvider({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth()
+  const { blocked: storeBlocked } = useProfileSettings(user?.email || '')
   const [db, setDb] = useState<DatabaseSnapshot>(() => {
     loadImgs()
     try {
@@ -842,6 +846,13 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
+
+  // Clear gate modal when user signs in so it never lingers after authentication.
+  useEffect(() => {
+    if (user && activeModal?.kind === 'gate') {
+      setActiveModal(null)
+    }
+  }, [user, activeModal])
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogConfig | null>(null)
 
   const openModal = useCallback((m: ActiveModal) => setActiveModal(m), [])
@@ -870,7 +881,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null)
 
   // Cart UI state
-  const [cartStep, setCartStep] = useState<1 | 2>(1)
+  const [cartStep, setCartStep] = useState<1 | 2 | 3>(1)
   const [cartMsg, setCartMsg] = useState(
     'Hi! I will be at the pickup spot a few minutes early. Please confirm your preferred payment method after accepting.',
   )
@@ -878,8 +889,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   const [cartErr, setCartErr] = useState('')
   const [selectedCartItems, setSelectedCartItems] = useState<Set<number>>(new Set())
   const [lastOrderId, setLastOrderId] = useState<string | null>(null)
+  const [lastOrderIds, setLastOrderIds] = useState<string[]>([])
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
-  const [orderTab, setOrderTab] = useState<'Active' | 'Completed' | 'Cancelled'>('Active')
+  const [orderTab, setOrderTab] = useState<'Requesting' | 'For Pickup' | 'Completed' | 'Cancelled'>('Requesting')
 
   // Seller / Create Listing UI state
   const [shopTab, setShopTab] = useState<'overview' | 'orders' | 'listings' | 'reviews'>('overview')
@@ -1064,12 +1076,12 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     const email = user ? user.email.trim().toLowerCase() : null
     if (email === prevEmailRef.current) return
     prevEmailRef.current = email
+    const acct = email ? db.accounts.find((a) => a.email === email) : undefined
     if (!email) {
-      setDraft(blankDraft(isStaffUser))
+      setDraft(blankDraft(isStaffUser, acct?.windows))
       setListStep(1)
       return
     }
-    const acct = db.accounts.find((a) => a.email === email)
     if (acct?.draft) {
       try {
         const parsed = JSON.parse(acct.draft) as Partial<ListingDraft>
@@ -1081,10 +1093,10 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           editLid: null,
         })
       } catch {
-        setDraft(blankDraft(isStaffUser))
+        setDraft(blankDraft(isStaffUser, acct?.windows))
       }
     } else {
-      setDraft(blankDraft(isStaffUser))
+      setDraft(blankDraft(isStaffUser, acct?.windows))
     }
     setListStep(1)
   }, [user, db.accounts])
@@ -1120,6 +1132,47 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     const email = user.email.trim().toLowerCase()
     return db.accounts.find((a) => a.email === email) || null
   }, [user, db.accounts])
+
+  const defaultTabSetRef = useRef<boolean>(false)
+
+  // Determine whether an Active order belongs in 'Requesting' or 'For Pickup'.
+  // Student seller orders: status 'Awaiting seller'/'Pending' or stage <= 1 => Requesting;
+  // status 'Meetup set' or stage >= 2 => For Pickup.
+  // Official RTU Store (BAO) orders: status 'Request Received' => Requesting;
+  // status 'Confirmed'/'Ready for Pickup' => For Pickup.
+  function isRequestingOrder(o: OrderRecord): boolean {
+    if (o.tab !== 'Active') return false
+    const t = baoTxnFor(o, db.txn)
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Request Received'
+    }
+    return o.status === 'Awaiting seller' || o.stage <= 1
+  }
+
+  function isForPickupOrder(o: OrderRecord): boolean {
+    if (o.tab !== 'Active') return false
+    const t = baoTxnFor(o, db.txn)
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Confirmed' || st === 'Ready for Pickup'
+    }
+    return o.status === 'Meetup set' || o.stage >= 2
+  }
+
+  // Default the initial active tab: 'For Pickup' if there are pickup-ready
+  // active orders and none requesting, otherwise 'Requesting'.
+  useEffect(() => {
+    if (!currentAccount || defaultTabSetRef.current) return
+    const requesting = currentAccount.orders.filter(o => isRequestingOrder(o)).length
+    const forPickup = currentAccount.orders.filter(o => isForPickupOrder(o)).length
+    if (forPickup > 0 && requesting === 0) {
+      setOrderTab('For Pickup')
+    } else {
+      setOrderTab('Requesting')
+    }
+    defaultTabSetRef.current = true
+  }, [currentAccount])
 
   // Kick blocked user if status changed in another tab or action
   useEffect(() => {
@@ -1164,14 +1217,19 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
 
   const allOnSale = useMemo(() => {
     const blocked = new Set(
-      db.accounts.filter((a) => a.status && a.status !== 'active').map((a) => a.email),
+      [
+        ...db.accounts
+          .filter((a) => a.status && a.status !== 'active')
+          .map((a) => a.email),
+        ...storeBlocked,
+      ],
     )
     const officialLive = db.official.filter((p) => !p.hidden)
     const studentLive = db.userListings
       .filter((l) => l.state === 'live' && !l.paused && !l.modHold && !blocked.has(l.ownerEmail))
       .map((l) => l.product)
     return [...officialLive, ...studentLive]
-  }, [db.accounts, db.official, db.userListings])
+  }, [db.accounts, db.official, db.userListings, storeBlocked])
 
   const allProducts = useMemo(() => allOnSale.filter((p) => !isSvc(p)), [allOnSale])
   const allServices = useMemo(() => allOnSale.filter((p) => isSvc(p)), [allOnSale])
@@ -1327,7 +1385,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   const openProduct = useCallback(
     (id: string) => {
       if (!currentAccount) {
-        setActiveModal({ kind: 'gate', route: 'product', why: 'open a listing and reserve it' })
+        setActiveModal({ kind: 'gate', route: 'product', why: 'open a listing and reserve it', after: `product?id=${id}` })
         return
       }
       setSelectedProductId(id)
@@ -1365,7 +1423,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   const toggleFav = useCallback(
     (productId: string) => {
       if (!currentAccount) {
-        setActiveModal({ kind: 'gate', route: 'browse', why: 'save items to your favorites' })
+        setActiveModal({ kind: 'gate', route: 'browse', why: 'save items to your favorites', after: 'browse' })
         return
       }
       const had = currentAccount.favs.includes(productId)
@@ -1457,7 +1515,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   const addToCart = useCallback(
     (id: string, qty: number, vid = '', fulfillment?: ChosenFulfillment): boolean => {
       if (!currentAccount) {
-        setActiveModal({ kind: 'gate', route: 'cart', why: 'use your request cart' })
+        setActiveModal({ kind: 'gate', route: 'cart', why: 'use your request cart', after: 'cart' })
         return false
       }
       const p = byId(id)
@@ -1517,38 +1575,68 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       } else {
         cleanVid = ''
       }
-      const ex = currentAccount.cart.find((c) => c.id === id && (c.vid || '') === cleanVid)
+      const exIdx = currentAccount.cart.findIndex((c) => c.id === id && (c.vid || '') === cleanVid)
+      const ex = exIdx >= 0 ? currentAccount.cart[exIdx] : undefined
       const have = ex ? ex.qty : 0
       const stock = stockOf(p, cleanVid)
       if (have + cleanQty > stock) {
         toast(stock ? `Only ${stock} left.` : 'Sold out.')
         return false
       }
+
+      // Build the new cart array with the latest reserved item on top (index 0)
+      let newCart: typeof currentAccount.cart
+      if (exIdx >= 0) {
+        // Existing line: increment qty, optionally update fulfillment, move to index 0
+        newCart = currentAccount.cart.map((c, i) => {
+          if (i === exIdx) {
+            return {
+              ...c,
+              qty: c.qty + cleanQty,
+              ...(fulfillment ? { fulfillment: chosenFulfillment } : {}),
+            }
+          }
+          return c
+        })
+        const [movedLine] = newCart.splice(exIdx, 1)
+        newCart.unshift(movedLine!)
+      } else {
+        // New line: prepend at index 0
+        const dateOpts = getPickupDates(p).options
+        const defaultDate = dateOpts[0]?.label || 'Today'
+        const sellerWins = getSellerTimeWindows(p)
+        const newLine = {
+          id,
+          qty: cleanQty,
+          vid: cleanVid,
+          place: (p.when.split(',')[0] || (p.cat === 'Official' ? 'BAU Office' : PLACES[1])).trim(),
+          time: sellerWins[0] || (p.when.split(',')[1] || TIMES[1]).trim(),
+          date: defaultDate,
+          fulfillment: p.cat === 'Official' ? 'pickup' : chosenFulfillment,
+          deliverySpot: '',
+        }
+        newCart = [newLine, ...currentAccount.cart]
+      }
+
+      // Remap selectedCartItems: newly reserved item auto-checked at index 0,
+      // previous selections shifted to account for the reorder
+      setSelectedCartItems(prev => {
+        const next = new Set<number>()
+        next.add(0) // the newly reserved / moved item is always checked
+        prev.forEach(oldIdx => {
+          if (exIdx >= 0 && oldIdx === exIdx) return // already at index 0
+          if (exIdx >= 0 && oldIdx < exIdx) next.add(oldIdx + 1)
+          else if (exIdx >= 0 && oldIdx > exIdx) next.add(oldIdx)
+          else next.add(oldIdx + 1)
+        })
+        return next
+      })
+
       setDb((prev) => ({
         ...prev,
         accounts: prev.accounts.map((a) => {
           if (a.email !== currentAccount.email) return a
-          const nextCart = a.cart.map((c) => ({ ...c }))
-          const found = nextCart.find((c) => c.id === id && (c.vid || '') === cleanVid)
-          if (found) {
-            found.qty += cleanQty
-            if (fulfillment) found.fulfillment = chosenFulfillment
-          } else {
-            const dateOpts = getPickupDates(p).options
-            const defaultDate = dateOpts[0]?.label || 'Today'
-            const sellerWins = getSellerTimeWindows(p)
-            nextCart.push({
-              id,
-              qty: cleanQty,
-              vid: cleanVid,
-              place: (p.when.split(',')[0] || (p.cat === 'Official' ? 'BAU Office' : PLACES[1])).trim(),
-              time: sellerWins[0] || (p.when.split(',')[1] || TIMES[1]).trim(),
-              date: defaultDate,
-              fulfillment: p.cat === 'Official' ? 'pickup' : chosenFulfillment,
-              deliverySpot: '',
-            })
-          }
-          return { ...a, cart: nextCart }
+          return { ...a, cart: newCart }
         }),
       }))
       playSuccess()
@@ -1605,6 +1693,14 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           return { ...a, cart: nextCart }
         }),
       }))
+      setSelectedCartItems(prev => {
+        const next = new Set<number>()
+        prev.forEach(i => {
+          if (i === idx) return
+          next.add(i > idx ? i - 1 : i)
+        })
+        return next
+      })
       playRemove()
       toast('Removed from your cart.')
     },
@@ -1779,6 +1875,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
 
     let firstOrder: OrderRecord | null = null
     let orderCount = 0
+    let createdIds: string[] = []
 
     setDb((prev) => {
       const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
@@ -2156,6 +2253,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       // Remove only selected items from cart; unselected items stay
       const selectedSet = new Set(selectedIdx)
       buyer.cart = buyer.cart.filter((_, i) => !selectedSet.has(i))
+      createdIds = madeOrders.map((o) => o.id)
       firstOrder = madeOrders[0] || null
       orderCount = madeOrders.length
       return next
@@ -2164,13 +2262,15 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     setTimeout(() => {
       if (firstOrder) {
         const fo = firstOrder as OrderRecord
-        setLastOrderId(fo.id)
+        setLastOrderIds(createdIds)
+        setLastOrderId(createdIds[0] || '')
         setSelectedOrderId(fo.id)
-        setOrderTab('Active')
-        setCartStep(1)
+        setOrderTab('Requesting')
         setCartAgree(false)
         setCartErr('')
-        navigate('confirm')
+        setSelectedCartItems(new Set())
+        // Stay on CartPage at Step 3 so the confirmation renders in-place
+        setCartStep(3)
         toast(
           `Request sent to ${fo.seller}` +
             (orderCount > 1 ? ` and ${orderCount - 1} more.` : '.'),
@@ -2236,12 +2336,17 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         toast('Only the BAO can mark an Official RTU Store request as claimed.')
         return
       }
+      if (curOrd && curOrd.status !== 'Meetup set') {
+        toast('You can confirm pickup after the seller accepts your request.')
+        return
+      }
       const nowIso = new Date().toISOString()
       setDb((prev) => {
         const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
         const buyer = next.accounts.find((a) => a.email === currentAccount.email)
         const o = buyer?.orders.find((x) => x.id === orderId)
         if (!buyer || !o) return prev
+        if (o.status !== 'Meetup set') return prev
         o.stage = 4
         o.status = 'Completed'
         o.tab = 'Completed'
@@ -2690,6 +2795,23 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     (orderId: string) => {
       if (!currentAccount) return
       const curOrd = currentAccount.orders.find((x) => x.id === orderId)
+      if (!curOrd) return
+
+      // Block cancellation once meetup is set (For Pickup / Completed / Cancelled)
+      const t = baoTxnFor(curOrd, db.txn ?? [])
+      if (baoIsOfficialTxn(t) && t) {
+        const st = baoStatusOf(t)
+        if (st !== 'Request Received') {
+          toast('This order is already set for meetup and can no longer be cancelled.')
+          return
+        }
+      } else {
+        if (curOrd.status !== 'Awaiting seller' && curOrd.stage > 1) {
+          toast('This order is already set for meetup and can no longer be cancelled.')
+          return
+        }
+      }
+
       const offTxn = baoTxnFor(curOrd, db.txn)
       if (offTxn && baoIsOfficialTxn(offTxn)) {
         confirmDlg({
@@ -2778,6 +2900,175 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       })
     },
     [currentAccount, db.txn, baoTransitionTicket, confirmDlg, toast],
+  )
+
+  const cancelMultipleOrders = useCallback(
+    (orderIds: string[]) => {
+      if (!currentAccount) return
+
+      // Filter to strictly cancellable orders
+      const cancellable = orderIds
+        .map((id) => currentAccount.orders.find((o) => o.id === id))
+        .filter((o): o is OrderRecord => Boolean(o))
+        .filter((o) => {
+          const t = baoTxnFor(o, db.txn ?? [])
+          if (baoIsOfficialTxn(t) && t) {
+            return baoStatusOf(t) === 'Request Received'
+          }
+          return o.tab === 'Active' && (o.status === 'Awaiting seller' || o.stage <= 1)
+        })
+
+      if (!cancellable.length) {
+        toast('No selected orders can be cancelled.')
+        return
+      }
+
+      confirmDlg({
+        title: `Cancel ${cancellable.length} requests?`,
+        msg:
+          cancellable.length === 1
+            ? 'This will release reserved stock and notify the seller.'
+            : 'This will release reserved stock for all selected orders and notify the sellers.',
+        yes: 'Yes, cancel requests',
+        no: 'Keep requests',
+        danger: true,
+        run: () => {
+          setDb((prev) => {
+            const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
+            const buyer = next.accounts.find((a) => a.email === currentAccount.email)
+            const now = new Date().toISOString()
+            const TX = TX_NOTE.Cancelled
+
+            for (const o of cancellable) {
+              const ord = buyer?.orders.find((x) => x.id === o.id)
+              if (!ord) continue
+
+              const t = baoTxnFor(ord, next.txn ?? [])
+              if (baoIsOfficialTxn(t) && t) {
+                // Official BAO order: release reserved stock via ledger
+                const alreadyReleased = next.bao.ledger.some(
+                  (e) => e.ticket === t.id && e.type === 'Released',
+                )
+                if (!alreadyReleased) {
+                  const lines = t.lines
+                    .filter((l) => l.pid && next.official.some((op) => op.id === l.pid))
+                    .map((l) => ({
+                      pid: l.pid!,
+                      vid: l.vid || '',
+                      type: 'Released' as const,
+                      qty: l.qty,
+                      ticket: t.id,
+                      reason: `Ticket cancelled (batch)`,
+                    }))
+                  if (lines.length) {
+                    applyLedgerOnSnapshot(next, lines, {
+                      by: currentAccount.name,
+                      byEmail: currentAccount.email,
+                      sys: true,
+                    })
+                  }
+                }
+
+                t.bst = 'Cancelled'
+                t.status = 'Cancelled'
+                t.updated = now
+                if (!Array.isArray(t.bhist)) t.bhist = []
+                t.bhist.push({
+                  from: baoStatusOf(t) === 'Cancelled' ? 'Cancelled' : 'Request Received',
+                  to: 'Cancelled',
+                  by: currentAccount.name,
+                  byEmail: currentAccount.email,
+                  ts: now,
+                  note: 'Cancelled by the student (batch)',
+                })
+                if (t.status !== 'Cancelled') {
+                  t.status = 'Cancelled'
+                  t.history.push({
+                    status: 'Cancelled',
+                    ts: now,
+                    by: currentAccount.name,
+                    note: TX,
+                  })
+                }
+
+                ord.status = 'Cancelled'
+                ord.tab = 'Cancelled'
+
+                // Notify moderators
+                next.accounts
+                  .filter((a) => a.role === 'moderator')
+                  .forEach((m) => {
+                    m.notifs.unshift({
+                      t: `BAO order #${t.id} cancelled by student (batch).`,
+                      read: false,
+                      ts: now,
+                      at: now,
+                      link: { k: 'order', id: t.id },
+                    })
+                  })
+              } else {
+                // Student order: cancel and restock
+                ord.status = 'Cancelled'
+                ord.tab = 'Cancelled'
+
+                // Restock product/variant
+                ;(ord.lines || []).forEach((l) => {
+                  const prod =
+                    next.official.find((x) => x.id === l.pid) ||
+                    next.userListings.map((x) => x.product).find((x) => x && x.id === l.pid)
+                  if (!prod) return
+                  if (l.vid && hasVars(prod)) {
+                    const vr = findVar(prod, l.vid)
+                    if (vr) {
+                      vr.qty = Math.max(0, vr.qty + l.qty)
+                      syncLeft(prod)
+                    }
+                  } else {
+                    prod.left = Math.max(0, prod.left + l.qty)
+                  }
+                })
+
+                // Set matching sellerReq.state = 'cancelled' and notify seller
+                const ow = ord.sellerEmail
+                  ? next.accounts.find((a) => a.email === ord.sellerEmail)
+                  : undefined
+                const r = ow?.sellerReq.find((x) => x.orderId === ord.id)
+                if (ow && r) {
+                  r.state = 'cancelled'
+                  ow.notifs.unshift({
+                    t: `${buyer?.name || currentAccount.name} cancelled request ${ord.id}.`,
+                    read: false,
+                    ts: nowT(),
+                    at: now,
+                    link: { k: 'request', id: ord.id },
+                  })
+                }
+
+                // Update matching txn to 'Cancelled'
+                const tx = next.txn.find((x) => x.orderId === ord.id)
+                if (tx && tx.status !== 'Cancelled') {
+                  tx.status = 'Cancelled'
+                  tx.updated = now
+                  tx.history.push({
+                    status: 'Cancelled',
+                    ts: now,
+                    by: buyer?.name || currentAccount.name,
+                    note: TX,
+                  })
+                }
+              }
+            }
+
+            return next
+          })
+          setOrderTab('Cancelled')
+          toast(
+            `Cancelled ${cancellable.length} request${cancellable.length === 1 ? '' : 's'}.`,
+          )
+        },
+      })
+    },
+    [currentAccount, db.txn, baoTxnFor, baoIsOfficialTxn, baoStatusOf, applyLedgerOnSnapshot, hasVars, findVar, syncLeft, confirmDlg, setOrderTab, toast, nowT],
   )
 
   // Seller Request Actions
@@ -3048,7 +3339,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   )
 
   const cancelEditListing = useCallback(() => {
-    setDraft(blankDraft(isStaffUser))
+    setDraft(blankDraft(isStaffUser, currentAccount?.windows))
     setListStep(1)
     setDraftErrs({})
     setShopTab('listings')
@@ -3573,7 +3864,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       return next
     })
 
-    setDraft(blankDraft(isStaffUser))
+    setDraft(blankDraft(isStaffUser, currentAccount?.windows))
     setListStep(1)
     setDraftErrs({})
     setShopTab('listings')
@@ -3761,7 +4052,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         case 'order': {
           const o = currentAccount.orders.find((x) => x.id === L.id)
           if (!o) return toast('That order is no longer available.')
-          setOrderTab(o.tab)
+          setOrderTab(isRequestingOrder(o) ? 'Requesting' : isForPickupOrder(o) ? 'For Pickup' : o.tab === 'Active' ? 'Requesting' : o.tab)
           setSelectedOrderId(o.id)
           navigate('orders')
           return
@@ -4340,7 +4631,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       }
       const o = currentAccount.orders.find((x) => x.id === orderId)
       if (o) {
-        setOrderTab(o.tab)
+        setOrderTab(isRequestingOrder(o) ? 'Requesting' : isForPickupOrder(o) ? 'For Pickup' : o.tab === 'Active' ? 'Requesting' : o.tab)
         setSelectedOrderId(o.id)
         navigate('orders')
         return
@@ -5066,6 +5357,24 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
               link: { k: 'freports' },
             })
           })
+        const normTarget = targetEmail ? targetEmail.trim().toLowerCase() : ''
+        const reportedAcct = normTarget
+          ? next.accounts.find(
+              (a) =>
+                a.email === normTarget && a.email !== currentAccount.email && a.role !== 'moderator',
+            )
+          : undefined
+
+        if (reportedAcct) {
+          const reporterLabel = role === 'seller' ? 'The seller' : 'The buyer'
+          reportedAcct.notifs.unshift({
+            t: `${reporterLabel} reported an issue on Order ${orderId} (${itemTitle}): ${cleanReason}. RTU staff will review this report.`,
+            read: false,
+            ts: nowT(),
+            at: now,
+            link: role === 'seller' ? { k: 'order', id: orderId } : { k: 'request', id: orderId },
+          })
+        }
         next.audit.push({
           id: 'au' + uid(),
           ts: now,
@@ -7444,6 +7753,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       updateCartMeetup,
       sendMeetupRequest,
       lastOrderId,
+      lastOrderIds,
       selectedOrderId,
       setSelectedOrderId,
       orderTab,
@@ -7451,6 +7761,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       proposeOrderMeetup,
       confirmOrderPickup,
       cancelOrderRequest,
+      cancelMultipleOrders,
       shopTab,
       setShopTab,
       draft,
@@ -7601,11 +7912,13 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       updateCartMeetup,
       sendMeetupRequest,
       lastOrderId,
+      lastOrderIds,
       selectedOrderId,
       orderTab,
       proposeOrderMeetup,
       confirmOrderPickup,
       cancelOrderRequest,
+      cancelMultipleOrders,
       shopTab,
       draft,
       listStep,

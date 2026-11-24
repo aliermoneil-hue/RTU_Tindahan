@@ -33,6 +33,12 @@ export class ApiRequestError extends Error {
   status: number
   /** Machine code from the backend, e.g. "email_not_verified". */
   code?: string
+  /** Seconds until a cooldown / restriction lock expires. */
+  retryAfter?: number
+  /** How many failed attempts remain before the next penalty. */
+  attemptsLeft?: number
+  /** What the next penalty will be: "cooldown" or "restriction". */
+  nextPenalty?: string
   constructor(message: string, status: number, code?: string) {
     super(message)
     this.name = 'ApiRequestError'
@@ -91,7 +97,23 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
       data && typeof data === 'object' && typeof (data as { code?: unknown }).code === 'string'
         ? ((data as { code: string }).code)
         : undefined
-    throw new ApiRequestError(messageFrom(data, 'Something went wrong. Please try again.'), response.status, code)
+    const retryAfter =
+      data && typeof data === 'object' && typeof (data as { retry_after?: unknown }).retry_after === 'number'
+        ? ((data as { retry_after: number }).retry_after)
+        : undefined
+    const attemptsLeft =
+      data && typeof data === 'object' && typeof (data as { attempts_left?: unknown }).attempts_left === 'number'
+        ? ((data as { attempts_left: number }).attempts_left)
+        : undefined
+    const nextPenalty =
+      data && typeof data === 'object' && typeof (data as { next_penalty?: unknown }).next_penalty === 'string'
+        ? ((data as { next_penalty: string }).next_penalty)
+        : undefined
+    const err = new ApiRequestError(messageFrom(data, 'Something went wrong. Please try again.'), response.status, code)
+    if (retryAfter !== undefined) err.retryAfter = retryAfter
+    if (attemptsLeft !== undefined) err.attemptsLeft = attemptsLeft
+    if (nextPenalty !== undefined) err.nextPenalty = nextPenalty
+    throw err
   }
   return data as T
 }

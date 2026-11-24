@@ -8,6 +8,19 @@
   border-bottom: 0;
   padding-bottom: 14px;
   color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+
+.ld-hero .g-wrap.ld-hero-grid,
+.ld-hero .ld-copy,
+.ld-hero .ld-trust,
+.ld-hero .ld-h,
+.ld-hero .ld-lead,
+.ld-hero .btn,
+.ld-hero .car {
+  position: relative;
+  z-index: 2;
 }
 
 .ld-hero .eyebrow {
@@ -225,11 +238,27 @@
   border-radius: 14px;
   border: 1px dashed var(--line);
   background: var(--bg);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
 }
-
 .lock-tile:hover {
   border-color: var(--blue);
   background: var(--soft);
+  transform: translateY(-1px);
+}
+.lock-tile:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+:root[data-theme='dark'] .lock-tile:hover,
+:root[data-theme='dark'] .lock-tile:focus-visible {
+  border-color: var(--yellow);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lock-tile {
+    transition: none;
+    transform: none;
+  }
 }
 
 .lt-ic {
@@ -278,13 +307,23 @@
 }
 
 .ld-faq summary::after {
-  content: '+';
-  font-weight: 800;
-  color: var(--blue);
+  content: '';
+  flex: none;
+  align-self: center;
+  width: 18px;
+  height: 18px;
+  background-color: var(--blue);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  transition: transform 0.25s ease;
 }
 
 .ld-faq[open] summary::after {
-  content: '\2212';
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ld-faq summary::after { transition: none; }
 }
 
 .ld-faq p {
@@ -384,6 +423,7 @@
   overflow-y: auto;
   animation: popupSlideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   color: var(--ink);
+  position: relative;
 }
 
 .popup-close {

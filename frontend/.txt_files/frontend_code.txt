@@ -472,15 +472,6 @@ export interface BrandLoaderProps {
   immediate?: boolean;
 }
 
-function getInitialVariant(variant: BrandLoaderVariant): "full" | "compact" {
-  if (variant !== "auto") return variant;
-  try {
-    return window.sessionStorage.getItem(SESSION_KEY) ? "compact" : "full";
-  } catch {
-    return "full";
-  }
-}
-
 function markIntroSeen(): void {
   try {
     window.sessionStorage.setItem(SESSION_KEY, "1");
@@ -591,8 +582,24 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
       // Clear overflow so CSS (and the app's normal scrolling) takes over.
       document.body.style.removeProperty("overflow");
       rootEl?.removeAttribute("aria-busy");
+      // Always clear the inline navy background so the app's CSS background
+      // (var(--bg)) shows through even if the exit animation never ran.
+      document.body.style.removeProperty("background-color");
+      document.body.style.removeProperty("margin");
+      document.body.style.removeProperty("height");
     };
   }, [shouldRender]);
+
+  // 7. Safety net: if the loader stays visible for more than 10 seconds
+  //    (e.g. auth/restore or listings fetch is hung), force the exit so the
+  //    user is never trapped behind a blank navy overlay.
+  useEffect(() => {
+    if (!shouldRender || !isLoading) return;
+    const safetyTimer = window.setTimeout(() => {
+      runExit(0.2);
+    }, 10000);
+    return () => window.clearTimeout(safetyTimer);
+  }, [shouldRender, isLoading]);
 
   // 4. Trigger exit animation helper
   const runExit = (adaptiveExitDuration?: number) => {
@@ -675,7 +682,6 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
               return "full";
             }
           })();
-    const currentOnExited = onExitedRef.current;
     const currentTimeScale = timeScaleRef.current;
 
     const prefersReduced = window.matchMedia(
@@ -901,6 +907,8 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
   // 6. Bidirectional adaptive speed:
   //    - While loading drags on, smoothly decelerate the build (calm, never frozen)
   //    - When loading finishes, fast-forward proportionally to how fast it actually was
+  //    - Safety: if the build timeline is null (e.g. context was recreated), force
+  //      the exit so the overlay never traps the app under a blank navy screen.
   useEffect(() => {
     if (!shouldRender) return;
 
@@ -947,15 +955,19 @@ export const BrandLoader: React.FC<BrandLoaderProps> = ({
     }
 
     // ----- Loading finished: fast-forward adaptively -----
-    if (!isLoading && buildTlRef.current) {
+    if (!isLoading) {
       const elapsedMs = Date.now() - loadStartMsRef.current;
+      adaptiveExitSecRef.current =
+        elapsedMs < 400 ? 0.24 : elapsedMs < 1200 ? 0.32 : 0.40;
 
       if (buildCompletedRef.current) {
-        adaptiveExitSecRef.current =
-          elapsedMs < 400 ? 0.24 : elapsedMs < 1200 ? 0.32 : 0.40;
         runExit(adaptiveExitSecRef.current);
-      } else {
+      } else if (buildTlRef.current) {
         accelerateToFinish(buildTlRef.current);
+      } else {
+        // No timeline exists â€” force the exit immediately so we never
+        // leave the user staring at a blank navy overlay.
+        runExit(adaptiveExitSecRef.current);
       }
     }
   }, [isLoading, shouldRender]);
@@ -1373,6 +1385,130 @@ export function EmptyState({ icon = 'bag', title, children, action }: EmptyState
       {action}
     </div>
   )
+}
+
+
+// ===== C:\Users\Lian Andrew\Desktop\RTU_Tindahan_Capstone\RTU_Tindahan_Final\RTU_Tindahan\frontend\src\common\components\ErrorBoundary.tsx =====
+/**
+ * Root ErrorBoundary â€” catches any render/lifecycle error in the app tree
+ * and shows it on screen instead of a blank navy #1a2f57 page.
+ * Must be a class component (React only supports error boundaries in classes).
+ */
+import { Component, type ReactNode, type ErrorInfo, type ReactElement } from 'react'
+
+export interface ErrorBoundaryProps {
+  children: ReactNode
+  fallback?: ReactElement
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean
+  error: Error | null
+  errorInfo: string | null
+}
+
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = {
+    hasError: false,
+    error: null,
+    errorInfo: null,
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error, errorInfo: null }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    this.setState({
+      hasError: true,
+      error,
+      errorInfo: errorInfo.componentStack ?? null,
+    })
+  }
+
+  render(): ReactNode {
+    if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback
+      return (
+        <div
+          style={{
+            padding: 32,
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            color: '#1a2f57',
+            background: '#ffffff',
+            minHeight: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 16,
+          }}
+        >
+          <h2 style={{ fontSize: 20, margin: 0 }}>RTU Tindahan encountered an error</h2>
+          <p style={{ margin: 0, color: '#5f6f87', maxWidth: 420, textAlign: 'center' }}>
+            {this.state.error?.message ?? 'Unknown error'}
+          </p>
+          {this.state.errorInfo && (
+            <details
+              style={{
+                marginTop: 12,
+                textAlign: 'left',
+                width: 'min(90vw, 600px)',
+                fontSize: 11,
+                fontFamily: 'monospace',
+                color: '#c0392b',
+              }}
+            >
+              <summary style={{ cursor: 'pointer', marginBottom: 6 }}>Show stack trace</summary>
+              <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{this.state.errorInfo}</pre>
+            </details>
+          )}
+          <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null, errorInfo: null })
+                window.location.reload()
+              }}
+              style={{
+                padding: '8px 16px',
+                background: '#1a2f57',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              Reload
+            </button>
+            <button
+              onClick={() => {
+                try {
+                  localStorage.clear()
+                  sessionStorage.clear()
+                } catch {
+                  /* ignore storage errors */
+                }
+                window.location.reload()
+              }}
+              style={{
+                padding: '8px 16px',
+                background: '#f2f5f9',
+                color: '#1a2f57',
+                border: '1px solid #dde4ee',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              Clear local cache & reload
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
 
 
@@ -14235,8 +14371,8 @@ interface TindahanContextValue {
   // Cart & Orders
   cartCount: number
   cartTotal: number
-  cartStep: 1 | 2
-  setCartStep: (s: 1 | 2) => void
+  cartStep: 1 | 2 | 3
+  setCartStep: (s: 1 | 2 | 3) => void
   cartMsg: string
   setCartMsg: (s: string) => void
   cartAgree: boolean
@@ -14255,10 +14391,11 @@ interface TindahanContextValue {
   sendMeetupRequest: () => void
 
   lastOrderId: string | null
+  lastOrderIds: string[]
   selectedOrderId: string | null
   setSelectedOrderId: (id: string | null) => void
-  orderTab: 'Active' | 'Completed' | 'Cancelled'
-  setOrderTab: (t: 'Active' | 'Completed' | 'Cancelled') => void
+  orderTab: 'Requesting' | 'For Pickup' | 'Completed' | 'Cancelled'
+  setOrderTab: (t: 'Requesting' | 'For Pickup' | 'Completed' | 'Cancelled') => void
   proposeOrderMeetup: (orderId: string, place: string, time: string) => void
   confirmOrderPickup: (orderId: string, proofImgId?: string | null) => void
   cancelOrderRequest: (orderId: string) => void
@@ -14515,7 +14652,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null)
 
   // Cart UI state
-  const [cartStep, setCartStep] = useState<1 | 2>(1)
+  const [cartStep, setCartStep] = useState<1 | 2 | 3>(1)
   const [cartMsg, setCartMsg] = useState(
     'Hi! I will be at the pickup spot a few minutes early. Please confirm your preferred payment method after accepting.',
   )
@@ -14523,8 +14660,9 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
   const [cartErr, setCartErr] = useState('')
   const [selectedCartItems, setSelectedCartItems] = useState<Set<number>>(new Set())
   const [lastOrderId, setLastOrderId] = useState<string | null>(null)
+  const [lastOrderIds, setLastOrderIds] = useState<string[]>([])
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
-  const [orderTab, setOrderTab] = useState<'Active' | 'Completed' | 'Cancelled'>('Active')
+  const [orderTab, setOrderTab] = useState<'Requesting' | 'For Pickup' | 'Completed' | 'Cancelled'>('Requesting')
 
   // Seller / Create Listing UI state
   const [shopTab, setShopTab] = useState<'overview' | 'orders' | 'listings' | 'reviews'>('overview')
@@ -14765,6 +14903,47 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     const email = user.email.trim().toLowerCase()
     return db.accounts.find((a) => a.email === email) || null
   }, [user, db.accounts])
+
+  const defaultTabSetRef = useRef<boolean>(false)
+
+  // Determine whether an Active order belongs in 'Requesting' or 'For Pickup'.
+  // Student seller orders: status 'Awaiting seller'/'Pending' or stage <= 1 => Requesting;
+  // status 'Meetup set' or stage >= 2 => For Pickup.
+  // Official RTU Store (BAO) orders: status 'Request Received' => Requesting;
+  // status 'Confirmed'/'Ready for Pickup' => For Pickup.
+  function isRequestingOrder(o: OrderRecord): boolean {
+    if (o.tab !== 'Active') return false
+    const t = baoTxnFor(o, db.txn)
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Request Received'
+    }
+    return o.status === 'Awaiting seller' || o.stage <= 1
+  }
+
+  function isForPickupOrder(o: OrderRecord): boolean {
+    if (o.tab !== 'Active') return false
+    const t = baoTxnFor(o, db.txn)
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Confirmed' || st === 'Ready for Pickup'
+    }
+    return o.status === 'Meetup set' || o.stage >= 2
+  }
+
+  // Default the initial active tab: 'For Pickup' if there are pickup-ready
+  // active orders and none requesting, otherwise 'Requesting'.
+  useEffect(() => {
+    if (!currentAccount || defaultTabSetRef.current) return
+    const requesting = currentAccount.orders.filter(o => isRequestingOrder(o)).length
+    const forPickup = currentAccount.orders.filter(o => isForPickupOrder(o)).length
+    if (forPickup > 0 && requesting === 0) {
+      setOrderTab('For Pickup')
+    } else {
+      setOrderTab('Requesting')
+    }
+    defaultTabSetRef.current = true
+  }, [currentAccount])
 
   // Kick blocked user if status changed in another tab or action
   useEffect(() => {
@@ -15162,38 +15341,68 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       } else {
         cleanVid = ''
       }
-      const ex = currentAccount.cart.find((c) => c.id === id && (c.vid || '') === cleanVid)
+      const exIdx = currentAccount.cart.findIndex((c) => c.id === id && (c.vid || '') === cleanVid)
+      const ex = exIdx >= 0 ? currentAccount.cart[exIdx] : undefined
       const have = ex ? ex.qty : 0
       const stock = stockOf(p, cleanVid)
       if (have + cleanQty > stock) {
         toast(stock ? `Only ${stock} left.` : 'Sold out.')
         return false
       }
+
+      // Build the new cart array with the latest reserved item on top (index 0)
+      let newCart: typeof currentAccount.cart
+      if (exIdx >= 0) {
+        // Existing line: increment qty, optionally update fulfillment, move to index 0
+        newCart = currentAccount.cart.map((c, i) => {
+          if (i === exIdx) {
+            return {
+              ...c,
+              qty: c.qty + cleanQty,
+              ...(fulfillment ? { fulfillment: chosenFulfillment } : {}),
+            }
+          }
+          return c
+        })
+        const [movedLine] = newCart.splice(exIdx, 1)
+        newCart.unshift(movedLine!)
+      } else {
+        // New line: prepend at index 0
+        const dateOpts = getPickupDates(p).options
+        const defaultDate = dateOpts[0]?.label || 'Today'
+        const sellerWins = getSellerTimeWindows(p)
+        const newLine = {
+          id,
+          qty: cleanQty,
+          vid: cleanVid,
+          place: (p.when.split(',')[0] || (p.cat === 'Official' ? 'BAU Office' : PLACES[1])).trim(),
+          time: sellerWins[0] || (p.when.split(',')[1] || TIMES[1]).trim(),
+          date: defaultDate,
+          fulfillment: p.cat === 'Official' ? 'pickup' : chosenFulfillment,
+          deliverySpot: '',
+        }
+        newCart = [newLine, ...currentAccount.cart]
+      }
+
+      // Remap selectedCartItems: newly reserved item auto-checked at index 0,
+      // previous selections shifted to account for the reorder
+      setSelectedCartItems(prev => {
+        const next = new Set<number>()
+        next.add(0) // the newly reserved / moved item is always checked
+        prev.forEach(oldIdx => {
+          if (exIdx >= 0 && oldIdx === exIdx) return // already at index 0
+          if (exIdx >= 0 && oldIdx < exIdx) next.add(oldIdx + 1)
+          else if (exIdx >= 0 && oldIdx > exIdx) next.add(oldIdx)
+          else next.add(oldIdx + 1)
+        })
+        return next
+      })
+
       setDb((prev) => ({
         ...prev,
         accounts: prev.accounts.map((a) => {
           if (a.email !== currentAccount.email) return a
-          const nextCart = a.cart.map((c) => ({ ...c }))
-          const found = nextCart.find((c) => c.id === id && (c.vid || '') === cleanVid)
-          if (found) {
-            found.qty += cleanQty
-            if (fulfillment) found.fulfillment = chosenFulfillment
-          } else {
-            const dateOpts = getPickupDates(p).options
-            const defaultDate = dateOpts[0]?.label || 'Today'
-            const sellerWins = getSellerTimeWindows(p)
-            nextCart.push({
-              id,
-              qty: cleanQty,
-              vid: cleanVid,
-              place: (p.when.split(',')[0] || (p.cat === 'Official' ? 'BAU Office' : PLACES[1])).trim(),
-              time: sellerWins[0] || (p.when.split(',')[1] || TIMES[1]).trim(),
-              date: defaultDate,
-              fulfillment: p.cat === 'Official' ? 'pickup' : chosenFulfillment,
-              deliverySpot: '',
-            })
-          }
-          return { ...a, cart: nextCart }
+          return { ...a, cart: newCart }
         }),
       }))
       playSuccess()
@@ -15250,6 +15459,14 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
           return { ...a, cart: nextCart }
         }),
       }))
+      setSelectedCartItems(prev => {
+        const next = new Set<number>()
+        prev.forEach(i => {
+          if (i === idx) return
+          next.add(i > idx ? i - 1 : i)
+        })
+        return next
+      })
       playRemove()
       toast('Removed from your cart.')
     },
@@ -15424,6 +15641,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
 
     let firstOrder: OrderRecord | null = null
     let orderCount = 0
+    let createdIds: string[] = []
 
     setDb((prev) => {
       const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
@@ -15801,6 +16019,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       // Remove only selected items from cart; unselected items stay
       const selectedSet = new Set(selectedIdx)
       buyer.cart = buyer.cart.filter((_, i) => !selectedSet.has(i))
+      createdIds = madeOrders.map((o) => o.id)
       firstOrder = madeOrders[0] || null
       orderCount = madeOrders.length
       return next
@@ -15809,13 +16028,15 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     setTimeout(() => {
       if (firstOrder) {
         const fo = firstOrder as OrderRecord
-        setLastOrderId(fo.id)
+        setLastOrderIds(createdIds)
+        setLastOrderId(createdIds[0] || '')
         setSelectedOrderId(fo.id)
-        setOrderTab('Active')
-        setCartStep(1)
+        setOrderTab('Requesting')
         setCartAgree(false)
         setCartErr('')
-        navigate('confirm')
+        setSelectedCartItems(new Set())
+        // Stay on CartPage at Step 3 so the confirmation renders in-place
+        setCartStep(3)
         toast(
           `Request sent to ${fo.seller}` +
             (orderCount > 1 ? ` and ${orderCount - 1} more.` : '.'),
@@ -15881,12 +16102,17 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         toast('Only the BAO can mark an Official RTU Store request as claimed.')
         return
       }
+      if (curOrd && curOrd.status !== 'Meetup set') {
+        toast('You can confirm pickup after the seller accepts your request.')
+        return
+      }
       const nowIso = new Date().toISOString()
       setDb((prev) => {
         const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
         const buyer = next.accounts.find((a) => a.email === currentAccount.email)
         const o = buyer?.orders.find((x) => x.id === orderId)
         if (!buyer || !o) return prev
+        if (o.status !== 'Meetup set') return prev
         o.stage = 4
         o.status = 'Completed'
         o.tab = 'Completed'
@@ -16335,6 +16561,23 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     (orderId: string) => {
       if (!currentAccount) return
       const curOrd = currentAccount.orders.find((x) => x.id === orderId)
+      if (!curOrd) return
+
+      // Block cancellation once meetup is set (For Pickup / Completed / Cancelled)
+      const t = baoTxnFor(curOrd, db.txn ?? [])
+      if (baoIsOfficialTxn(t) && t) {
+        const st = baoStatusOf(t)
+        if (st !== 'Request Received') {
+          toast('This order is already set for meetup and can no longer be cancelled.')
+          return
+        }
+      } else {
+        if (curOrd.status !== 'Awaiting seller' && curOrd.stage > 1) {
+          toast('This order is already set for meetup and can no longer be cancelled.')
+          return
+        }
+      }
+
       const offTxn = baoTxnFor(curOrd, db.txn)
       if (offTxn && baoIsOfficialTxn(offTxn)) {
         confirmDlg({
@@ -17406,7 +17649,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         case 'order': {
           const o = currentAccount.orders.find((x) => x.id === L.id)
           if (!o) return toast('That order is no longer available.')
-          setOrderTab(o.tab)
+          setOrderTab(isRequestingOrder(o) ? 'Requesting' : isForPickupOrder(o) ? 'For Pickup' : o.tab === 'Active' ? 'Requesting' : o.tab)
           setSelectedOrderId(o.id)
           navigate('orders')
           return
@@ -17985,7 +18228,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       }
       const o = currentAccount.orders.find((x) => x.id === orderId)
       if (o) {
-        setOrderTab(o.tab)
+        setOrderTab(isRequestingOrder(o) ? 'Requesting' : isForPickupOrder(o) ? 'For Pickup' : o.tab === 'Active' ? 'Requesting' : o.tab)
         setSelectedOrderId(o.id)
         navigate('orders')
         return
@@ -21078,6 +21321,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       setCartAgree,
       cartErr,
       setCartErr,
+      selectedCartItems,
       addToCart,
       reserveNow,
       updateCartQty,
@@ -21088,6 +21332,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       updateCartMeetup,
       sendMeetupRequest,
       lastOrderId,
+      lastOrderIds,
       selectedOrderId,
       setSelectedOrderId,
       orderTab,
@@ -21245,6 +21490,7 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
       updateCartMeetup,
       sendMeetupRequest,
       lastOrderId,
+      lastOrderIds,
       selectedOrderId,
       orderTab,
       proposeOrderMeetup,
@@ -28591,30 +28837,177 @@ export function BrowsePage() {
   gap: 18px;
   align-items: start;
 }
+
+/* Selection bar â€” design-system card pattern */
+.selection-bar {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Checkbox wrapper â€” clean .check pattern beside thumbnail */
+.cart-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  gap: 9px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.cart-check input[type="checkbox"] {
+  margin-top: 2px;
+  accent-color: var(--navy);
+  width: 15px;
+  height: 15px;
+}
+
+:root[data-theme='dark'] .cart-check input[type="checkbox"] {
+  accent-color: var(--yellow);
+}
+
+/* Dim unselected cart items â€” subtle, clean state */
+.cart-item-dimmed {
+  background: var(--soft);
+  border-color: var(--line);
+  opacity: 0.68;
+}
+.cart-item-dimmed .price {
+  color: var(--muted);
+}
+
+/* Selected cart items â€” crisp */
+.cart-item-selected {
+  background: var(--card);
+  border-color: var(--blue);
+  opacity: 1;
+}
+:root[data-theme='dark'] .cart-item-selected {
+  border-color: var(--line);
+}
+
 .photo.cart-photo {
   width: 68px;
   aspect-ratio: 1;
   flex: none;
 }
 
-/* Dim unselected cart items */
-.cart-item-dimmed {
-  opacity: 0.72;
-  border: 1px solid var(--line);
-  filter: grayscale(0.15);
-}
-.cart-item-dimmed .price {
-  color: var(--muted);
-}
 @media (max-width: 1000px) {
   .cart-two {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
+@media (min-width: 1001px) {
+  .cart-summary {
+    position: sticky;
+    top: calc(var(--header-offset, 76px) + 18px);
+  }
+}
+
+.confirm-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+@media (max-width: 1000px) {
+  .confirm-two {
+    grid-template-columns: 1fr;
+  }
+}
+
+.order-deck {
+  position: relative;
+  width: 100%;
+}
+
+.deck-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.deck-back-1 {
+  transform: translateY(8px) scale(0.97);
+  opacity: 0.7;
+}
+
+.deck-back-2 {
+  transform: translateY(15px) scale(0.94);
+  opacity: 0.4;
+}
+
+.deck-active {
+  position: relative;
+  z-index: 2;
+  animation: deckCardIn 0.45s ease-out forwards;
+}
+
+@keyframes deckCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck-active {
+    animation: none;
+  }
+}
+
+.deck-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.deck-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.deck-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--navy);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.deck-dot.active {
+  background: var(--yellow);
+}
+
+:root[data-theme='dark'] .deck-dot {
+  background: var(--navy);
+}
+
+:root[data-theme='dark'] .deck-dot.active {
+  background: var(--yellow);
+}
+
 
 // ===== C:\Users\Lian Andrew\Desktop\RTU_Tindahan_Capstone\RTU_Tindahan_Final\RTU_Tindahan\frontend\src\features\marketplace\pages\CartPage.tsx =====
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@/common/components/Icon'
 import type { IconName } from '@/common/components/icons'
 import { playRemove, playSuccess } from '@/common/sounds'
@@ -28648,10 +29041,54 @@ export function CartPage() {
     sendMeetupRequest,
     selectedCartItems,
     toast,
+    lastOrderId,
+    lastOrderIds,
+    myConversations,
+    sendOrderMessage,
+    batchOrders,
   } = useTindahan()
+
+  const [activeOrderIdx, setActiveOrderIdx] = useState(0)
+  const [chatInput, setChatInput] = useState('')
+
+  const cartStepRef = useRef(cartStep)
+  cartStepRef.current = cartStep
+
+  useEffect(() => {
+    setActiveOrderIdx(0)
+    setChatInput('')
+  }, [lastOrderIds])
+
+  useEffect(() => {
+    if (cartStep === 2 && cart.length > 0 && selectedCount === 0) {
+      setCartStep(1)
+    }
+  }, [cartStep, cart.length, selectedCount, setCartStep])
+
+  useEffect(() => {
+    return () => {
+      if (cartStepRef.current === 3) {
+        setCartStep(1)
+      }
+    }
+  }, [])
 
   const [othersCartIdx, setOthersCartIdx] = useState<Record<number, boolean>>({})
   const presetPlaces = PLACES.filter((pl) => pl !== 'Others')
+
+  const getFulfillment = (p: any, c: any): { avail: FulfillmentMethod | 'none'; chosen: ChosenFulfillment } => {
+    const avail: FulfillmentMethod | 'none' =
+      p.cat === 'Official' && !p.fulfillment
+        ? 'pickup'
+        : p.fulfillment === 'pickup' ||
+            p.fulfillment === 'delivery' ||
+            p.fulfillment === 'both'
+          ? p.fulfillment
+          : 'none'
+    const chosen: ChosenFulfillment =
+      c.fulfillment || (avail === 'delivery' ? 'delivery' : 'pickup')
+    return { avail, chosen }
+  }
 
   if (!currentAccount) return null
   const cart = currentAccount.cart || []
@@ -28668,24 +29105,15 @@ export function CartPage() {
     if (!selectedCartItems.has(i)) return false
     const p = byId(c.id)
     if (!p) return true
-    const avail: FulfillmentMethod | 'none' =
-      p.cat === 'Official' && !p.fulfillment
-        ? 'pickup'
-        : p.fulfillment === 'pickup' ||
-            p.fulfillment === 'delivery' ||
-            p.fulfillment === 'both'
-          ? p.fulfillment
-          : 'none'
+    const { avail, chosen } = getFulfillment(p, c)
     if (avail === 'none') return true
-    const chosen: ChosenFulfillment =
-      c.fulfillment || (avail === 'delivery' ? 'delivery' : 'pickup')
     if (avail === 'pickup' && chosen !== 'pickup') return true
     if (avail === 'delivery' && chosen !== 'delivery') return true
     return false
   })
 
   const selectedCartCount = cart.reduce(
-    (acc, _, i) => (selectedCartItems.has(i) ? acc + 1 : acc),
+    (acc, c, i) => (selectedCartItems.has(i) ? acc + c.qty : acc),
     0,
   )
   const selectedCartTotal = cart.reduce(
@@ -28708,13 +29136,15 @@ export function CartPage() {
   }
 
   return (
-    <div>
-      <span className="eyebrow">PICKUP & DELIVERY REQUEST</span>
-      <h1>Review and schedule your order</h1>
-      <p className="muted small">
-        No online checkout. You are sending a pickup or delivery request to the seller and paying
-        in person on campus.
-      </p>
+    <>
+      <div>
+        <span className="eyebrow">PICKUP & DELIVERY REQUEST</span>
+        <h1>Review and schedule your order</h1>
+        <p className="muted small">
+          No online checkout. You are sending a pickup or delivery request to the seller and paying
+          in person on campus.
+        </p>
+      </div>
 
       <div className="steps" role="list">
         {(
@@ -28757,17 +29187,8 @@ export function CartPage() {
       ) : (
         <div className="cart-two two">
           <div className="stack">
-            <div
-              className="row between wrap"
-              style={{
-                padding: '10px 12px',
-                background: 'var(--soft)',
-                borderRadius: 10,
-                border: '1px solid var(--line)',
-                marginBottom: 12,
-              }}
-            >
-              <label className="check row wrap" style={{ gap: 8, alignItems: 'center', cursor: 'pointer', margin: 0 }}>
+            <div className="selection-bar">
+              <label className="check row between wrap">
                 <input
                   type="checkbox"
                   checked={selectedCount > 0 && selectedCount === cart.length}
@@ -28825,24 +29246,9 @@ export function CartPage() {
               return (
                 <div
                   key={`${c.id}-${c.vid || ''}-${idx}`}
-                  className={`card stack ${!isSelected ? 'cart-item-dimmed' : ''}`}
+                  className={`card stack ${isSelected ? 'cart-item-selected' : 'cart-item-dimmed'}`}
                 >
                   <div className="row between wrap">
-                    <label
-                      className="check"
-                      style={{
-                        margin: 0,
-                        alignSelf: 'flex-start',
-                        cursor: 'pointer',
-                        paddingTop: 6,
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleCartSelect(idx)}
-                      />
-                    </label>
                     <div className="row" style={{ minWidth: 0 }}>
                       <div
                         className={`photo cart-photo ${p.tone || 't-study'} ${
@@ -28866,8 +29272,7 @@ export function CartPage() {
                         <span className="price tnum">{peso(pr)}</span>
                       </div>
                     </div>
-
-                    <div className="row">
+                    <div className="row" style={{ gap: 8, alignItems: 'center' }}>
                       <div className="qty" role="group" aria-label={`Quantity for ${p.name}`}>
                         <button
                           type="button"
@@ -28900,6 +29305,14 @@ export function CartPage() {
                       >
                         <Icon name="trash" />
                       </button>
+                      <label className="check">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleCartSelect(idx)}
+                          aria-label={`Select ${p.name}`}
+                        />
+                      </label>
                     </div>
                   </div>
 
@@ -29270,7 +29683,7 @@ export function CartPage() {
               </span>
             </div>
             {selectedCount === 0 ? (
-              <div className="note" style={{ background: 'var(--soft)', borderColor: 'transparent' }}>
+              <div className="note blue">
                 <Icon name="info" size="sm" />
                 <span className="small">
                   Select at least 1 item to continue.
@@ -29315,7 +29728,7 @@ export function CartPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 
@@ -29338,205 +29751,25 @@ export function CartPage() {
 
 
 // ===== C:\Users\Lian Andrew\Desktop\RTU_Tindahan_Capstone\RTU_Tindahan_Final\RTU_Tindahan\frontend\src\features\marketplace\pages\ConfirmPage.tsx =====
-import { useState } from 'react'
-import { Icon } from '@/common/components/Icon'
+import { useEffect } from 'react'
 import { navigate } from '@/common/router/router'
-import { peso } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
-import './ConfirmPage.css'
 
 export function ConfirmPage() {
-  const {
-    currentAccount,
-    lastOrderId,
-    myConversations,
-    sendOrderMessage,
-  } = useTindahan()
+  const { cartStep, setCartStep } = useTindahan()
 
-  const [chatInput, setChatInput] = useState('')
+  useEffect(() => {
+    // Old /#/confirm links: if Step 3 is active on Cart, return there;
+    // otherwise fall back to orders.
+    if (cartStep === 3) {
+      setCartStep(1)
+      navigate('cart')
+    } else {
+      navigate('orders')
+    }
+  }, [cartStep, setCartStep])
 
-  const orders = currentAccount?.orders || []
-  const o = orders.find((x) => x.id === lastOrderId) || orders[0]
-
-  if (!o) {
-    return (
-      <div
-        className="card stack"
-        style={{ alignItems: 'center', textAlign: 'center', padding: 40 }}
-      >
-        <b>No recent request</b>
-        <p className="small muted">
-          Open My Orders to see your requests, or browse the marketplace.
-        </p>
-        <div className="row wrap" style={{ justifyContent: 'center' }}>
-          <button type="button" className="btn" onClick={() => navigate('orders')}>
-            My Orders
-          </button>
-          <button type="button" className="btn ghost" onClick={() => navigate('browse')}>
-            Browse listings
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  const isDelivery = o.fulfillment === 'delivery'
-
-  // Build chat messages matching chatMsgs() in js/9b-services-messages-transactions.js
-  const conv = myConversations.find((c) =>
-    o.sellerEmail ? c.seller === o.sellerEmail : !c.seller,
-  )
-  const firstSystemMsg = {
-    me: false,
-    t: o.sellerEmail
-      ? 'Your request was sent. This seller is a student on Tindahan. They will reply here and in Messages.'
-      : 'Your request was sent to the Official RTU Store. Staff will confirm it and can reply here and in Messages.',
-  }
-  const threadMsgs = [
-    firstSystemMsg,
-    ...(conv
-      ? conv.msgs
-          .filter((m) => !m.ref || m.ref.type !== 'order' || m.ref.id === o.id)
-          .map((m) => ({ me: m.from === currentAccount?.email, t: m.text }))
-      : []),
-  ]
-
-  return (
-    <>
-      <div
-        className="card stack"
-        style={{ alignItems: 'center', textAlign: 'center', padding: 28 }}
-      >
-        <div
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: '50%',
-            background: 'var(--green-bg)',
-            color: 'var(--green)',
-            display: 'grid',
-            placeItems: 'center',
-          }}
-        >
-          <Icon name="check" />
-        </div>
-        <div className="row wrap" style={{ justifyContent: 'center', gap: 6 }}>
-          <span className="pill green">Request sent Â· #{o.id}</span>
-          <span className={`pill ${isDelivery ? 'blue' : 'green'}`}>
-            {isDelivery ? 'Delivery' : 'Pickup'}
-          </span>
-        </div>
-        <h1>
-          Your {isDelivery ? 'delivery' : 'pickup'} request is on its way
-        </h1>
-        <p className="muted small" style={{ maxWidth: 460 }}>
-          {o.seller} has been notified. Coordinate below for{' '}
-          <b>{isDelivery ? 'Campus Delivery' : 'Campus Pickup'}</b> at <b>{o.when}</b>.
-        </p>
-      </div>
-
-      <div className="confirm-two two">
-        <div className="card stack">
-          <b>Order & fulfillment details</b>
-          <div className="row between small">
-            <span className="muted">Item</span>
-            <b>{o.title}</b>
-          </div>
-          <div className="row between small">
-            <span className="muted">Seller</span>
-            <b>{o.seller}</b>
-          </div>
-          <div className="row between small">
-            <span className="muted">Fulfillment method</span>
-            <span className={`pill ${isDelivery ? 'blue' : 'green'}`}>
-              {isDelivery ? 'Delivery' : 'Pickup'}
-            </span>
-          </div>
-          <div className="row between small">
-            <span className="muted">{isDelivery ? 'Delivery schedule' : 'Meetup'}</span>
-            <b>{o.when}</b>
-          </div>
-          <div className="row between small">
-            <span className="muted">Pay in person</span>
-            <span className="price tnum">{peso(o.total)}</span>
-          </div>
-          <div className="note blue">
-            <Icon name="shield" />
-            <span>
-              Meet only at visible campus spots during school hours. Inspect the item before
-              handing over cash.
-            </span>
-          </div>
-          <div className="row wrap">
-            <button type="button" className="btn" onClick={() => navigate('orders')}>
-              Track in My Orders
-            </button>
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={() => navigate('marketplace')}
-            >
-              Back to marketplace
-            </button>
-          </div>
-        </div>
-
-        <div className="card stack">
-          <b>Message {o.seller}</b>
-          <div
-            className="stack"
-            style={{
-              background: 'var(--bg)',
-              padding: 12,
-              borderRadius: 10,
-              maxHeight: 220,
-              overflow: 'auto',
-            }}
-          >
-            {threadMsgs.map((m, idx) => (
-              <div
-                key={idx}
-                style={{
-                  alignSelf: m.me ? 'flex-end' : 'flex-start',
-                  background: m.me ? 'var(--blue)' : 'var(--card)',
-                  color: m.me ? '#fff' : 'var(--ink)',
-                  padding: '8px 11px',
-                  borderRadius: 10,
-                  maxWidth: '82%',
-                  fontSize: 12.5,
-                  border: '1px solid var(--line)',
-                }}
-              >
-                {m.t}
-              </div>
-            ))}
-          </div>
-          <form
-            className="row"
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (sendOrderMessage(o.id, chatInput, false)) {
-                setChatInput('')
-              }
-            }}
-          >
-            <input
-              className="input"
-              id="chatmsg"
-              placeholder="Write a message to the seller..."
-              aria-label="Message"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-            />
-            <button type="submit" className="btn">
-              <Icon name="send" size="sm" />
-              Send
-            </button>
-          </form>
-        </div>
-      </div>
-    </>
-  )
+  return null
 }
 
 
@@ -37501,9 +37734,87 @@ export function OfficialStorePage() {
   height: 14px;
 }
 
+/* Tab bar â€” matches Browse page segmented tabs (All / Students / RTU Store) */
+.orders-tabs {
+  display: flex;
+  width: 100%;
+  gap: 4px;
+  background: var(--soft);
+  padding: 4px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.orders-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.orders-tabs .tab {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: center;
+  justify-content: center;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.orders-tabs .tab.on {
+  background: var(--navy);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(26, 47, 87, 0.25);
+}
+
+:root[data-theme='dark'] .orders-tabs .tab.on {
+  background: var(--yellow);
+  color: var(--yellow-ink);
+}
+
+.orders-tabs .tab .tnum {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .orders-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .orders-tabs .tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
 @media (max-width: 1000px) {
   .orders-two {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 540px) {
+  .order-actions .btn {
+    flex: 1 1 calc(50% - 8px);
+  }
+  .order-actions .btn:first-child {
+    flex-basis: 100%;
   }
 }
 
@@ -37519,7 +37830,7 @@ export function OfficialStorePage() {
 
 
 // ===== C:\Users\Lian Andrew\Desktop\RTU_Tindahan_Capstone\RTU_Tindahan_Final\RTU_Tindahan\frontend\src\features\marketplace\pages\OrdersPage.tsx =====
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Icon } from '@/common/components/Icon'
 import type { IconName } from '@/common/components/icons'
 import { navigate } from '@/common/router/router'
@@ -37532,7 +37843,6 @@ import {
   baoIsOfficialTxn,
   baoProgress,
   baoStatusOf,
-  baoStudentCanCancel,
   baoTxnFor,
 } from '../baoHelpers'
 import { PLACES, TIMES, getSellerTimeWindows, peso, stamp } from '../constants'
@@ -37587,13 +37897,13 @@ export function OrdersPage() {
     byId,
     proposeOrderMeetup,
     confirmOrderPickup,
+    confirmDlg,
     cancelOrderRequest,
     sendOrderMessage,
     orderRateable,
     reviewOf,
     submitReview,
     openModal,
-    toast,
   } = useTindahan()
 
   const [openBox, setOpenBox] = useState<'' | 'msg' | 'edit' | 'cancel'>('')
@@ -37605,13 +37915,57 @@ export function OrdersPage() {
 
   if (!currentAccount) return null
   const orders = currentAccount.orders || []
-  const tabs: ('Active' | 'Completed' | 'Cancelled')[] = ['Active', 'Completed', 'Cancelled']
-  const list = orders.filter((o) => o.tab === orderTab)
+  const tabs: ('Requesting' | 'For Pickup' | 'Completed' | 'Cancelled')[] = ['Requesting', 'For Pickup', 'Completed', 'Cancelled']
+
+  // Determine whether an Active order belongs in 'Requesting' or 'For Pickup'.
+  // Student seller orders: status 'Awaiting seller'/'Pending' or stage <= 1 => Requesting;
+  // status 'Meetup set'/'Confirmed'/'Ready' or stage >= 2 => For Pickup.
+  // Official RTU Store (BAO) orders: status 'Request Received' => Requesting;
+  // status 'Confirmed'/'Ready for Pickup' => For Pickup.
+  const isRequestingOrder = (o: OrderRecord): boolean => {
+    if (o.tab !== 'Active') return false
+    const t = baoTxnFor(o, db.txn ?? [])
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Request Received'
+    }
+    return o.status === 'Awaiting seller' || o.stage <= 1
+  }
+
+  const isForPickupOrder = (o: OrderRecord): boolean => {
+    if (o.tab !== 'Active') return false
+    const t = baoTxnFor(o, db.txn ?? [])
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Confirmed' || st === 'Ready for Pickup'
+    }
+    return o.status === 'Meetup set' || o.stage >= 2
+  }
+
+  // Split Active orders into Requesting vs For Pickup; Completed/Cancelled stay as-is.
+  const list = orders.filter((o) => {
+    if (orderTab === 'Requesting') return isRequestingOrder(o)
+    if (orderTab === 'For Pickup') return isForPickupOrder(o)
+    return o.tab === orderTab
+  })
+
+  // Auto-select the first order in the current tab (or null if empty)
+  useEffect(() => {
+    const first = list.length ? list[0].id : null
+    setSelectedOrderId(first)
+    setOpenBox('')
+  }, [orderTab, list])
+
   const sel = list.find((o) => o.id === selectedOrderId) || list[0]
-  const steps = ['Requested', 'Meetup set', 'Meet on campus', 'Completed']
+
+  const steps = [
+    { label: 'Requested', stageThreshold: 1 },
+    { label: 'Meetup set', stageThreshold: 2 },
+    { label: 'Completed', stageThreshold: 4 },
+  ]
 
   const renderOrderPill = (o: OrderRecord) => {
-    const t = baoTxnFor(o, db.txn)
+    const t = baoTxnFor(o, db.txn ?? [])
     if (baoIsOfficialTxn(t) && t) {
       const st = baoStatusOf(t)
       return <span className={`pill ${BAO_PILL[st] || ''}`.trim()}>{st}</span>
@@ -37643,9 +37997,26 @@ export function OrdersPage() {
     )
   }
 
-  const selTxn = sel ? baoTxnFor(sel, db.txn) : null
-  const selIsOfficial = Boolean(sel && baoIsOfficialOrder(sel, db.txn) && selTxn)
-  const selCanCancel = sel ? baoStudentCanCancel(sel, db.txn, db.bao) : false
+  const selTxn = sel ? baoTxnFor(sel, db.txn ?? []) : null
+  const selIsOfficial = Boolean(sel && baoIsOfficialOrder(sel, db.txn ?? []) && selTxn)
+  const sellerAccepted = sel ? sel.status === 'Meetup set' : false
+
+  // Strict cancel check: only while still pending (Requesting).
+  // Allowed: Active + status Awaiting seller / Pending / stage <= 1 (student seller),
+  //          or BAO status Request Received (Official RTU Store).
+  // Blocked: Meetup set, Confirmed, Ready, Completed, Cancelled.
+  const canCancelOrder = (o?: OrderRecord): boolean => {
+    if (!o || o.tab !== 'Active') return false
+    if (o.status === 'Completed' || o.status === 'Cancelled') return false
+    const t = baoTxnFor(o, db.txn ?? [])
+    if (baoIsOfficialTxn(t) && t) {
+      const st = baoStatusOf(t)
+      return st === 'Request Received'
+    }
+    return o.status === 'Awaiting seller' || o.stage <= 1
+  }
+
+  const selCanCancel = canCancelOrder(sel)
   const selFirstProd = sel && sel.lines && sel.lines[0] ? byId(sel.lines[0].pid) : undefined
   const selTimeOptions = selFirstProd ? getSellerTimeWindows(selFirstProd) : TIMES
 
@@ -37659,9 +38030,13 @@ export function OrdersPage() {
         </p>
       </div>
 
-      <div className="tabs" role="tablist">
+      <div className="tabs orders-tabs" role="tablist">
         {tabs.map((t) => {
-          const count = orders.filter((o) => o.tab === t).length
+          const count = t === 'Requesting'
+            ? orders.filter(isRequestingOrder).length
+            : t === 'For Pickup'
+              ? orders.filter(isForPickupOrder).length
+              : orders.filter((o) => o.tab === t).length
           return (
             <button
               key={t}
@@ -37688,10 +38063,35 @@ export function OrdersPage() {
           <span style={{ color: 'var(--blue)' }}>
             <Icon name="bag" />
           </span>
-          <b>No {orderTab.toLowerCase()} orders</b>
-          <p className="small muted">
-            Items you reserve will show up here with their meetup schedule.
-          </p>
+          {orderTab === 'Requesting' ? (
+            <>
+              <b>No pending requests right now.</b>
+              <p className="small muted">
+                Your active requests awaiting seller confirmation will show here.
+              </p>
+            </>
+          ) : orderTab === 'For Pickup' ? (
+            <>
+              <b>No items ready for pickup yet.</b>
+              <p className="small muted">
+                Accepted requests scheduled for meetup will show here.
+              </p>
+            </>
+          ) : orderTab === 'Completed' ? (
+            <>
+              <b>No completed pickups.</b>
+              <p className="small muted">
+                Completed campus pickups will show here.
+              </p>
+            </>
+          ) : (
+            <>
+              <b>No cancelled requests.</b>
+              <p className="small muted">
+                Cancelled requests will show here.
+              </p>
+            </>
+          )}
           <button type="button" className="btn" onClick={() => navigate('browse')}>
             Browse listings
           </button>
@@ -37864,11 +38264,10 @@ export function OrdersPage() {
               {!selIsOfficial &&
                 (sel.tab !== 'Cancelled' ? (
                   <div className="stack" style={{ gap: 10 }}>
-                    {steps.map((s, i) => {
-                      const done = i < sel.stage
-                      const isMeetStep = i === 2
+                    {steps.map((step, i) => {
+                      const done = sel.stage >= step.stageThreshold
                       return (
-                        <div key={s} className="stack" style={{ gap: 6 }}>
+                        <div key={step.label} className="stack" style={{ gap: 6 }}>
                           <div className="row">
                             <span
                               style={{
@@ -37889,73 +38288,42 @@ export function OrdersPage() {
                               className="small"
                               style={{ fontWeight: done ? 600 : 400 }}
                             >
-                              {s}
+                              {step.label}
                             </span>
                           </div>
-
-                          {isMeetStep && sel.tab === 'Active' && (
-                            <>
-                              {sel.proofPhoto && imgSrc(sel.proofPhoto) && (
-                                <div
-                                  className="card flat stack"
-                                  style={{
-                                    marginLeft: 30,
-                                    background: 'var(--bg)',
-                                    padding: 12,
-                                    gap: 6,
-                                  }}
-                                >
-                                  <div className="row between wrap">
-                                    <b className="small">
-                                      Meetup / Pickup Photo Proof
-                                    </b>
-                                    <span className="pill green">Proof uploaded</span>
-                                  </div>
-                                  <img
-                                    src={imgSrc(sel.proofPhoto)}
-                                    alt="Meetup proof"
-                                    style={{
-                                      width: '100%',
-                                      maxWidth: 260,
-                                      maxHeight: 200,
-                                      objectFit: 'cover',
-                                      borderRadius: 10,
-                                      border: '1px solid var(--line)',
-                                    }}
-                                  />
-                                  <span className="tiny muted">
-                                    Uploaded by {sel.proofBy || 'Seller'}
-                                    {sel.proofAt ? ` Â· ${stamp(sel.proofAt)}` : ''}
-                                  </span>
-                                </div>
-                              )}
-                              {!sel.proofPhoto && (
-                                <div
-                                  className="card flat stack"
-                                  style={{
-                                    marginLeft: 30,
-                                    background: 'var(--bg)',
-                                    padding: 12,
-                                    gap: 6,
-                                    border: '1px dashed var(--line)',
-                                  }}
-                                >
-                                  <div className="row between wrap">
-                                    <b className="small">
-                                      Meetup / Pickup Photo Proof
-                                    </b>
-                                  </div>
-                                  <span className="tiny muted">
-                                    Seller will upload a meetup handover photo when marking this
-                                    order as picked up.
-                                  </span>
-                                </div>
-                              )}
-                            </>
-                          )}
                         </div>
                       )
                     })}
+
+                    {sel.tab === 'Active' && sel.proofPhoto && imgSrc(sel.proofPhoto) && (
+                      <div
+                        className="card flat stack"
+                        style={{ background: 'var(--bg)', padding: 12, gap: 6 }}
+                      >
+                        <div className="row between wrap">
+                          <b className="small">
+                            Meetup / Pickup Photo Proof
+                          </b>
+                          <span className="pill green">Proof uploaded</span>
+                        </div>
+                        <img
+                          src={imgSrc(sel.proofPhoto)}
+                          alt="Meetup proof"
+                          style={{
+                            width: '100%',
+                            maxWidth: 260,
+                            maxHeight: 200,
+                            objectFit: 'cover',
+                            borderRadius: 10,
+                            border: '1px solid var(--line)',
+                          }}
+                        />
+                        <span className="tiny muted">
+                          Uploaded by {sel.proofBy || 'Seller'}
+                          {sel.proofAt ? ` Â· ${stamp(sel.proofAt)}` : ''}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div
@@ -37989,16 +38357,33 @@ export function OrdersPage() {
 
               {sel.tab === 'Active' && (
                 <>
-                  <div className="row wrap">
+                  <div className="order-actions">
                     {!selIsOfficial && (
-                      <button
-                        type="button"
-                        className="btn sm"
-                        onClick={() => confirmOrderPickup(sel.id, sel.proofPhoto || null)}
-                      >
-                        <Icon name="check" size="sm" />
-                        Confirm {sel.fulfillment === 'delivery' ? 'delivery' : 'pickup'}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="btn sm"
+                          disabled={!sellerAccepted}
+                          aria-disabled={!sellerAccepted}
+                          onClick={() => {
+                            confirmDlg({
+                              title:
+                                'Confirm ' +
+                                (sel.fulfillment === 'delivery' ? 'delivery' : 'pickup') + '?',
+                              msg: `Only confirm once you have received "${sel.title}" from ${sel.seller} and paid in person. This marks the order as completed and lets the seller know.`,
+                              yes: 'Yes, I received it',
+                              no: 'Not yet',
+                              danger: false,
+                              run: () => {
+                                confirmOrderPickup(sel.id, sel.proofPhoto || null)
+                              },
+                            })
+                          }}
+                        >
+                          <Icon name="check" size="sm" />
+                          Confirm {sel.fulfillment === 'delivery' ? 'delivery' : 'pickup'}
+                        </button>
+                      </>
                     )}
                     <button
                       type="button"
@@ -38047,7 +38432,7 @@ export function OrdersPage() {
                         Report issue
                       </button>
                     )}
-                    {selCanCancel && (
+                    {sel && selCanCancel ? (
                       <button
                         type="button"
                         className="btn danger sm"
@@ -38057,8 +38442,26 @@ export function OrdersPage() {
                       >
                         Cancel request
                       </button>
-                    )}
+                    ) : sel && !selCanCancel ? (
+                      <button
+                        type="button"
+                        className="btn danger sm disabled"
+                        disabled
+                        title="Cannot cancel once meetup is set. Message the seller or request a reschedule instead."
+                      >
+                        Cancel request
+                      </button>
+                    ) : null}
                   </div>
+
+                  {!sellerAccepted && !selIsOfficial && (
+                    <div className="note blue">
+                      <Icon name="info" size="sm" />
+                      <span>
+                        Confirm {sel.fulfillment === 'delivery' ? 'delivery' : 'pickup'} unlocks once the seller accepts your request.
+                      </span>
+                    </div>
+                  )}
 
                   {openBox === 'msg' && (
                     <form
@@ -44948,15 +45351,16 @@ export default function App() {
 
 // ===== C:\Users\Lian Andrew\Desktop\RTU_Tindahan_Capstone\RTU_Tindahan_Final\RTU_Tindahan\frontend\src\main.tsx =====
 import { createRoot } from 'react-dom/client'
+import { ErrorBoundary } from '@/common/components/ErrorBoundary'
 import './index.css'
 import App from './App.tsx'
 
 // StrictMode is intentionally omitted: it double-invokes useLayoutEffect,
 // which kills GSAP animation contexts before their onComplete callbacks fire,
 // leaving the loader stuck on screen.
-createRoot(document.getElementById('root')!).render(<App />)
-
-
-
-
+createRoot(document.getElementById('root')!).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+)
 

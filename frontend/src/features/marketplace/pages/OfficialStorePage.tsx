@@ -7,6 +7,7 @@ import { baoItemType } from '../baoHelpers'
 import { useTindahan } from '../context/TindahanContext'
 import { ProductCard } from '../components/ProductCard'
 import { RatingText } from '../components/StarRating'
+import { Banderitas } from '@/common/components/Banderitas'
 import './OfficialStorePage.css'
 
 export function OfficialStorePage() {
@@ -69,14 +70,16 @@ export function OfficialStorePage() {
       )}
       {!listingsLoading && (
         <>
-          <div className="srchead school">
-        <div className="stack" style={{ gap: 6, maxWidth: 'none' }}>
+          <div className="srchead school" style={{ position: 'relative', overflow: 'hidden' }}>
+        <Banderitas compact opacity={0.75} surface="dark" variant="corner-left" />
+        <Banderitas variant="corner-right" surface="dark" opacity={0.85} />
+        <div className="stack" style={{ gap: 6, maxWidth: 'none', position: 'relative', zIndex: 2 }}>
           <span className="pill yellow" style={{ alignSelf: 'flex-start' }}>
             <Icon name="shield" size="sm" />
             OFFICIAL RTU PASIG STORE
           </span>
-          <h1 style={{ fontSize: 24 }}>Uniforms, books and campus merchandise</h1>
-          <p className="small" style={{ opacity: 0.9 }}>
+          <h1 style={{ fontSize: 24, position: 'relative', zIndex: 2 }}>Uniforms, books and campus merchandise</h1>
+          <p className="small" style={{ opacity: 0.9, position: 'relative', zIndex: 2 }}>
             Published and managed by RTU staff. Reserve online, then pay and claim at the Pasig
             Campus Store window with your student ID. Student listings are on the{' '}
             <button
@@ -89,11 +92,11 @@ export function OfficialStorePage() {
             </button>
             .
           </p>
-          <div className="small" style={{ opacity: 0.95 }}>
+          <div className="small" style={{ opacity: 0.95, position: 'relative', zIndex: 2 }}>
             Store rating: <RatingText kind="seller" targetKey="official" />
           </div>
         </div>
-        <div className="stack" style={{ gap: 8, alignItems: 'flex-end' }}>
+        <div className="stack" style={{ gap: 8, alignItems: 'flex-end', position: 'relative', zIndex: 2 }}>
 
           {currentAccount && (
             <button

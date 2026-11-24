@@ -27,8 +27,10 @@ export function ProductPage() {
     currentAccount,
     isStaffUser,
     selectedProductId,
+    setSelectedProductId,
     byId,
     allOnSale,
+    allServices,
     sellerKind,
     sellerKeyOf,
     acctByEmail,
@@ -43,10 +45,18 @@ export function ProductPage() {
     openModal,
     toast,
   } = useTindahan()
-  const pid = params.get('id') || selectedProductId
+  const urlId = params.get('id')
+  const pid = urlId || selectedProductId
   const p = pid ? byId(pid) : undefined
   const isOwner = Boolean(p && currentAccount && p.owner === currentAccount.email)
-  const canView = allOnSale.some((x) => x.id === p?.id) || isOwner || isStaffUser
+  const canView = p ? allOnSale.some((x) => String(x.id) === String(p.id)) || allServices.some((x) => String(x.id) === String(p.id)) || isOwner || isStaffUser : false
+
+  // Keep the internal selection in sync with the URL id (e.g. after login from a guest link).
+  useEffect(() => {
+    if (urlId && selectedProductId !== urlId) {
+      setSelectedProductId(urlId)
+    }
+  }, [urlId, selectedProductId, setSelectedProductId])
   const [selectedOpts, setSelectedOpts] = useState<Record<string, string>>({})
   const [variationWarned, setVariationWarned] = useState(false)
   const [qty, setQty] = useState(1)
@@ -111,6 +121,16 @@ export function ProductPage() {
       .filter((r) => r.kind === 'item' && r.pid === p.id)
       .sort((a, b) => b.ts - a.ts)
   }, [db.reviews, p])
+
+  // If listings are still loading, don't show "not available" yet — the
+  // product may just not have arrived from the backend.
+  if (listingsLoading) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', minHeight: 400 }}>
+        <MiniLoader variant="section" size="lg" label="Loading listing…" />
+      </div>
+    )
+  }
 
   if (!p || !canView) {
     return (
@@ -238,10 +258,11 @@ export function ProductPage() {
 
       <div className="pgrid2">
         {/* Left column: gallery + about */}
-        <div className="stack">
-          <ProductGallery
-            product={p}
-            favButton={
+        <div className="stack pgrid2-left">
+          <div className="pgrid2-media">
+            <ProductGallery
+              product={p}
+              favButton={
               <button
                 type="button"
                 className={`heart ${fav ? 'on' : ''}`.trim()}
@@ -270,8 +291,9 @@ export function ProductPage() {
               </button>
             }
           />
+          </div>
 
-          <div className="card stack">
+          <div className="card stack pgrid2-about">
             <b>{svc ? 'About this service' : 'About this listing'}</b>
             <p className="small muted" style={{ overflowWrap: 'anywhere' }}>
               {p.desc}
@@ -296,7 +318,7 @@ export function ProductPage() {
         </div>
 
         {/* Right column: buy card + seller card */}
-        <div className="stack">
+        <div className="stack pgrid2-right">
           <div className={`card stack pdetail-card ${svc ? 'type-service' : sk === 'school' ? 'type-school' : 'type-student'}`}>
             <div className="row between wrap">
               <span className="row wrap" style={{ gap: 6 }}>

@@ -209,3 +209,33 @@ class VerificationCode(models.Model):
 
     def __str__(self) -> str:
         return f"Code for {self.user.email}"
+
+
+class LoginAttempt(models.Model):
+    """Failed login attempt counter used for login lockout (SE-05).
+
+    Keyed by email (lowercased) rather than by user so that an address that
+    does not exist behaves the same as a real one — nobody can probe which
+    accounts exist.  The row is never created for successful logins; it only
+    accumulates on failure and is cleared by :func:`reset` on success or
+    password reset.
+    """
+
+    email = models.EmailField(
+        "email address",
+        unique=True,
+        db_index=True,
+        help_text="Login address that failed, stored lowercased.",
+    )
+    failed_count = models.PositiveSmallIntegerField(default=0)
+    last_failed_at = models.DateTimeField(null=True, blank=True)
+    locked_until = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "login attempt"
+        verbose_name_plural = "login attempts"
+        ordering = ["-updated_at"]
+
+    def __str__(self) -> str:
+        return f"Login attempts for {self.email}: {self.failed_count}"

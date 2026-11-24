@@ -2,7 +2,8 @@ import { Icon } from '@/common/components/Icon'
 import { navigate } from '@/common/router/router'
 import { useTindahan } from '../context/TindahanContext'
 import { ProductCard } from '../components/ProductCard'
-import './GuestSectionPage.css'
+import { Banderitas } from '@/common/components/Banderitas'
+import './GuestMarketplacePages.css'
 
 /** Guest-facing page: items sold by verified RTU students.
  * Guests see only the first 4 listings with seller names masked.
@@ -19,10 +20,10 @@ export function GuestStudentSellersPage() {
   const guest = !currentAccount
 
   const mine = allProducts.filter((p) => sellerKind(p) === 'student')
-  const total = mine.length
+  const totalCount = mine.length
 
-  const shown = guest ? mine.slice(0, 4) : mine
-  const hiddenCount = guest ? Math.max(0, total - shown.length) : 0
+  const shown = guest ? mine.slice(0, 50) : mine
+  const shownCount = shown.length
 
   const handleSellHere = () => {
     if (guest) {
@@ -33,41 +34,29 @@ export function GuestStudentSellersPage() {
   }
 
   return (
-    <main className="page" style={{ margin: '0 auto', padding: '22px clamp(16px, 4.45vw, 64px)' }}>
-      <div className="row between wrap">
-        <div style={{ maxWidth: '62ch' }}>
+    <div className="guest-page">
+      <div className="guest-hero" style={{ position: 'relative', overflow: 'hidden' }}>
+        <Banderitas variant="corner-right" opacity={0.85} />
+        <div className="guest-hero-copy" style={{ position: 'relative', zIndex: 2 }}>
           <span className="eyebrow">STUDENT SELLERS</span>
-          <h1>Items sold by students</h1>
+          <h1>Items sold by RTU students</h1>
           <p className="muted small">
-            Listings posted by verified RTU students. Staff checked each one before it went live.
+            Verified student listings reviewed by RTU staff before going live. Sign in to view
+            seller details, reserve, or message.
           </p>
         </div>
-        <button type="button" className="btn yellow" onClick={handleSellHere}>
-          <Icon name="plus" size="sm" /> Sell an item
-        </button>
-      </div>
-
-      {guest && (
-        <div className="note blue" role="status">
-          <Icon name="lock" />
-          <span className="grow">
-            <b>You are browsing as a guest.</b> You can see {Math.min(4, total)} of {total}{' '}
-            listings with seller names hidden. Sign in to see everything, open details, reserve and
-            message sellers.
-          </span>
-          <span className="row">
-            <button type="button" className="btn sm" onClick={() => navigate('login')}>
-              Sign in
-            </button>
-            <button type="button" className="btn ghost sm" onClick={() => navigate('register')}>
-              Create account
-            </button>
+        <div className="guest-hero-actions" style={{ position: 'relative', zIndex: 2 }}>
+          <button type="button" className="btn yellow" onClick={handleSellHere}>
+            <Icon name="plus" size="sm" /> Sell an item
+          </button>
+          <span className="guest-count-pill">
+            <Icon name="lock" size="sm" /> Guest preview · {shownCount} of {totalCount} shown
           </span>
         </div>
-      )}
+      </div>
 
       {shown.length ? (
-        <div className="pgrid">
+        <div className="guest-pgrid">
           {shown.map((p) => (
             <ProductCard
               key={p.id}
@@ -80,6 +69,7 @@ export function GuestStudentSellersPage() {
                         kind: 'gate',
                         route: 'product',
                         why: 'open a listing and reserve it',
+                        after: `product?id=${p.id}`,
                       })
                   : undefined
               }
@@ -94,22 +84,20 @@ export function GuestStudentSellersPage() {
         </div>
       )}
 
-      {hiddenCount > 0 && (
-        <div className="card row wrap" style={{ justifyContent: 'space-between', background: 'var(--soft)' }}>
-          <span className="row">
-            <Icon name="lock" />
+      {totalCount > shownCount && (
+        <div className="guest-unlock-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Icon name="lock" size="sm" />
             <span>
-              <b>More listings</b>
-              <span className="small muted" style={{ display: 'block' }}>
-                Available to signed-in RTU members.
-              </span>
+              <b>{totalCount - shownCount} more listing{totalCount - shownCount === 1 ? '' : 's'}</b>{' '}
+              available to verified RTU members
             </span>
-          </span>
+          </div>
           <button type="button" className="btn" onClick={() => navigate('login')}>
-            Sign in to see everything
+            Sign in to view all
           </button>
         </div>
       )}
-    </main>
+    </div>
   )
 }

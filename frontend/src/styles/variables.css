@@ -97,27 +97,27 @@
    TARGETS: the html element only when it carries data-theme="dark" (set by ACT.theme and by the inline script in index.html).
    EFFECT: Replaces the same variable names with dark values (near-black backgrounds, light text, grey lines), so every rule that uses var(--...) changes color without being rewritten. Note that in dark mode --blue becomes a light grey (#e8e8e8) and --blue-ink becomes dark, so blue buttons turn light with dark text. --yellow stays the same. color-scheme: dark makes built-in controls dark. */
 :root[data-theme="dark"] {
-  --navy: #050505;
+  --navy: #121417;
   --navy2: #262626;
-  --blue: #e8e8e8;
-  --blue-ink: #111111;
-  --yellow: #f4b63a;
-  --yellow-ink: #3a2a00;
-  --bg: #121212;
-  --card: #1c1c1c;
-  --ink: #f5f5f5;
-  --muted: #a3a3a3;
-  --line: #333333;
-  --soft: #2a2a2a;
+  --blue: #6ba3f7;
+  --blue-ink: #121417;
+  --yellow: #e5b54c;
+  --yellow-ink: #16171a;
+  --bg: #16171a;
+  --card: #1f2125;
+  --ink: #e4e6eb;
+  --muted: #9aa0aa;
+  --line: #2e323a;
+  --soft: #2a2d33;
   --green: #6fcf97;
   --green-bg: #1f2a24;
-  --red: #ef8a80;
-  --red-bg: #2e1f1f;
+  --red: #ef6b6b;
+  --red-bg: rgba(239, 107, 107, 0.14);
   --warn-bg: #2b2b2b;
   --warn-line: #4a4a4a;
-  --side-ink: #e5e5e5;
-  --side-mute: #8a8a8a;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --side-ink: #e4e6eb;
+  --side-mute: #9aa0aa;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
   color-scheme: dark;
 }
 /* RULE: :root[data-theme="dark"] .photo { filter: grayscale(1) }
@@ -125,6 +125,16 @@
    EFFECT: Turns the colored gradients into grey. */
 :root[data-theme="dark"] .photo {
   filter: none;
+}
+
+/* During a theme switch, freeze all transitions so the theme change happens
+   instantly without stuttering across dozens of elements simultaneously.
+   The class is added for one animation frame by useTheme.ts and removed right after. */
+:root.theme-switching,
+:root.theme-switching *,
+:root.theme-switching *::before,
+:root.theme-switching *::after {
+  transition-duration: 0s !important;
 }
 
 /* ==========================================================================

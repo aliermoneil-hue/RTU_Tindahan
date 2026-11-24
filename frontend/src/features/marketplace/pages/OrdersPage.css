@@ -29,7 +29,7 @@
 
 .bstep {
   list-style: none;
-  margin: 0;
+  margin: 4px 0;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -50,12 +50,13 @@
 .bstep li:not(:last-child)::after {
   content: '';
   position: absolute;
-  top: 13px;
+  top: 12px;
   left: calc(50% + 16px);
   right: calc(-50% + 16px);
   height: 3px;
   background: var(--line);
   border-radius: 2px;
+  z-index: 0;
 }
 
 .bstep li.done:not(:last-child)::after {
@@ -73,6 +74,12 @@
   background: var(--card);
   border: 2px solid var(--line);
   color: var(--muted);
+  position: relative;
+  top: auto;
+  right: auto;
+  z-index: 1;
+  flex: none;
+  padding: 0;
 }
 
 .bstep .lbl {
@@ -125,9 +132,176 @@
   height: 14px;
 }
 
+/* Tab bar — matches Browse page segmented tabs (All / Students / RTU Store) */
+.orders-tabs {
+  display: flex;
+  width: 100%;
+  gap: 4px;
+  background: var(--soft);
+  padding: 4px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.orders-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.orders-tabs .tab {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: center;
+  justify-content: center;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.orders-tabs .tab.on {
+  background: var(--navy);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(26, 47, 87, 0.25);
+}
+
+:root[data-theme='dark'] .orders-tabs .tab.on {
+  background: var(--yellow);
+  color: var(--yellow-ink);
+}
+
+.orders-tabs .tab .tnum {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (min-width: 1001px) {
+  .orders-detail {
+    position: sticky;
+    top: calc(var(--header-offset, 76px) + 18px);
+  }
+}
+
+.order-list-card {
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+}
+
+.order-list-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.order-list-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex: none;
+}
+
+.orders-detail-meta {
+  background: var(--bg);
+  padding: 14px;
+  gap: 8px;
+}
+
+.order-list-card.selected {
+  border-color: var(--blue);
+}
+
+:root[data-theme='dark'] .order-list-card.selected {
+  border-color: var(--yellow);
+}
+
+/* Multi-select bar — matches CartPage.css .selection-bar pattern */
+.orders-select-bar {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.orders-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin: 0;
+  flex: none;
+}
+
+.orders-check input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--navy);
+  cursor: pointer;
+}
+
+:root[data-theme='dark'] .orders-check input[type="checkbox"] {
+  accent-color: var(--yellow);
+}
+
+.bstep.bstep-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 540px) {
+  .bstep.bstep-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .orders-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .orders-tabs .tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
 @media (max-width: 1000px) {
   .orders-two {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 540px) {
+  .order-actions .btn {
+    flex: 1 1 calc(50% - 8px);
+  }
+  .order-actions .btn:first-child {
+    flex-basis: 100%;
   }
 }
 

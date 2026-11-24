@@ -1,0 +1,213 @@
+/* ==========================================================================
+   GUEST MARKETPLACE PAGES (prototype: .guest-page, .guest-hero, .guest-pgrid)
+   ========================================================================== */
+
+/* Page container */
+.guest-page {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+}
+
+/* Compact navy hero card */
+.guest-hero {
+  background: var(--navy);
+  color: #fff;
+  border-radius: 16px;
+  padding: 24px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  box-shadow: 0 10px 28px rgba(20, 36, 68, 0.16);
+  position: relative;
+  overflow: hidden;
+}
+
+.guest-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 640px;
+  min-width: 0;
+}
+
+.guest-hero .eyebrow {
+  color: var(--yellow);
+  margin: 0;
+}
+
+.guest-hero h1 {
+  color: #fff;
+  margin: 0;
+  font-size: clamp(22px, 2.8vw, 30px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.guest-hero p {
+  color: rgba(255, 255, 255, 0.82);
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.guest-hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex: none;
+}
+
+.guest-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Category filter pills (Official RTU Store) */
+.guest-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.guest-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.guest-pill:hover {
+  border-color: var(--navy);
+  color: var(--navy);
+}
+
+.guest-pill .guest-pill-count {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.guest-pill.on {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+
+.guest-pill.on .guest-pill-count {
+  color: var(--yellow);
+}
+
+:root[data-theme='dark'] .guest-pill:hover {
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
+:root[data-theme='dark'] .guest-pill.on {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--yellow-ink);
+}
+
+:root[data-theme='dark'] .guest-pill.on .guest-pill-count {
+  color: var(--yellow-ink);
+  opacity: 0.85;
+}
+
+/* Responsive product grid — up to 5 across on desktop */
+.guest-pgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .guest-pgrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guest-pgrid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .guest-pgrid .pcard {
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .guest-pgrid .pcard h4 {
+    font-size: 13px;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+  }
+
+  .guest-pgrid .pcard .srcpill,
+  .guest-pgrid .pcard .pill {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .guest-pgrid .pcard .price {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .guest-page {
+    padding: 18px 14px 36px;
+    gap: 16px;
+  }
+  .guest-hero {
+    padding: 18px;
+  }
+  .guest-hero-actions {
+    align-items: flex-start;
+    width: 100%;
+  }
+}
+
+/* Bottom dashed unlock strip (shown only when more listings exist) */
+.guest-unlock-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border-radius: 14px;
+  border: 1.5px dashed var(--line);
+  background: var(--card);
+}

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { navigate, useRoute } from '@/common/router/router'
+import { clearAfterLogin, peekAfterLogin, setAfterLogin } from '@/common/utils/afterLogin'
 import { LoginPage, VerifyPage, ForgotPasswordPage, useAuth } from '@/features/authentication'
 import { useTindahan } from '../marketplace/context/TindahanContext'
 import { BrowsePage } from '@/features/marketplace/pages/BrowsePage'
@@ -93,6 +94,22 @@ const PAGE_FAVICONS: Record<string, string> = {
   login: signInIco,
   register: signUpIco,
   'forgot-password': signInIco,
+}
+
+/** Routes that use the icon of another page (sub pages and alias paths). */
+const FAVICON_ALIASES: Record<string, string> = {
+  post: 'forum',
+  market: 'marketplace',
+  official: 'store',
+  sellers: 'student-sellers',
+  list: 'create',
+  seller: 'shop',
+  forumreports: 'forum-reports',
+  'store-orders': 'baoorders',
+  'store-inventory': 'baostock',
+  confirm: 'orders',
+  'help-center': 'help',
+  verify: 'register',
 }
 
 function renderActiveRoute(path: string, user: { email: string; role: string } | null) {
@@ -198,7 +215,7 @@ function renderActiveRoute(path: string, user: { email: string; role: string } |
 }
 
 export function AppRoutes() {
-  const { path } = useRoute()
+  const { path, params } = useRoute()
   const { user, isLoading: authLoading, isSigningIn } = useAuth()
   const { hasSettledInitialFetch } = useTindahan()
 
@@ -223,7 +240,7 @@ export function AppRoutes() {
     !authLoading &&
     (user
       ? path === 'login' || path === 'register' || path === 'verify' || path === 'forgot-password'
-        ? 'marketplace'
+        ? peekAfterLogin() ?? 'marketplace'
         : null
       : !isPublicPath
         ? 'login'
@@ -239,14 +256,37 @@ export function AppRoutes() {
 
   /** Swap the page favicon to match the current route. */
   useEffect(() => {
-    const href = PAGE_FAVICONS[activePage] || '/favicon.svg'
+    const key = FAVICON_ALIASES[activePage] || activePage
+    const href = PAGE_FAVICONS[key] || '/favicon.svg'
     const link = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null
-    if (link) link.href = href
+    if (!link) return
+    // index.html declares the icon as svg+xml, but the page icons are .ico files
+    link.type = href === '/favicon.svg' ? 'image/svg+xml' : 'image/x-icon'
+    link.href = href
   }, [activePage])
 
   useEffect(() => {
     if (redirectTo) navigate(redirectTo, { replace: true })
   }, [redirectTo])
+
+  // When the user lands on the page they were redirected to after login, clear the saved target.
+  useEffect(() => {
+    if (!user) return
+    const target = peekAfterLogin()
+    if (!target) return
+    const targetPath = target.split('?')[0]
+    if (path === targetPath || path === '' && targetPath === 'marketplace') {
+      clearAfterLogin()
+    }
+  }, [user, path])
+
+  // When a visitor opens a member page directly, save the current path so it can be restored after login.
+  useEffect(() => {
+    if (redirectTo === 'login' && !user) {
+      const withQuery = params.toString() ? `${path}?${params.toString()}` : path
+      setAfterLogin(withQuery)
+    }
+  }, [redirectTo, user, path, params])
 
   /** Mobile only: after signing in / creating an account from the landing page,
    * stay at the top for 3 seconds, then scroll down with animation. The flag is

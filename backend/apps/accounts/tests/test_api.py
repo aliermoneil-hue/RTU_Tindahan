@@ -1,5 +1,6 @@
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.core.cache import cache
 from django.test import override_settings
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -28,10 +29,32 @@ def verification_payload(user: User) -> dict:
     }
 
 
-@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    REST_FRAMEWORK={
+        "DEFAULT_AUTHENTICATION_CLASSES": [
+            "rest_framework.authentication.TokenAuthentication",
+            "rest_framework.authentication.SessionAuthentication",
+        ],
+        "DEFAULT_PERMISSION_CLASSES": [
+            "rest_framework.permissions.IsAuthenticated",
+        ],
+        "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+        "PAGE_SIZE": 20,
+        "DEFAULT_RENDERER_CLASSES": [
+            "rest_framework.renderers.JSONRenderer",
+        ],
+        "DEFAULT_THROTTLE_RATES": {
+            "login": "5/min",
+            "register": "100/minute",
+            "verify": "20/hour",
+        },
+    },
+)
 class RegistrationTests(APITestCase):
     def setUp(self):
         mail.outbox = []
+        cache.clear()
 
     def test_register_creates_visitor_and_sends_verification_email(self):
         response = self.client.post("/api/v1/auth/register/", STUDENT_PAYLOAD, format="json")
@@ -71,10 +94,16 @@ class RegistrationTests(APITestCase):
         self.assertIn("privacy_consent", response.data)
 
     def test_register_rejects_duplicate_email(self):
+        """An unverified email can be re-registered; a verified email cannot."""
         self.client.post("/api/v1/auth/register/", STUDENT_PAYLOAD, format="json")
-
+        # Same unverified email: second call succeeds (updates the pending account).
         response = self.client.post("/api/v1/auth/register/", STUDENT_PAYLOAD, format="json")
-
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(User.objects.filter(email="2024-123456@rtu.edu.ph").count(), 1)
+        # Now verify it: a third call must be rejected.
+        user = User.objects.get(email="2024-123456@rtu.edu.ph")
+        user.verify()
+        response = self.client.post("/api/v1/auth/register/", STUDENT_PAYLOAD, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("email", response.data)
 
@@ -85,6 +114,39 @@ class RegistrationTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("password_confirm", response.data)
+
+    def test_register_unverified_email_twice_returns_201_and_updates(self):
+        """An unverified account can be re-registered; only one user row exists."""
+        self.client.post("/api/v1/auth/register/", STUDENT_PAYLOAD, format="json")
+
+        payload = STUDENT_PAYLOAD | {
+            "display_name": "Maria Clara",
+            "password": "NewSecurePass123!",
+            "password_confirm": "NewSecurePass123!",
+            "year_level": 3,
+        }
+        response = self.client.post("/api/v1/auth/register/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(User.objects.filter(email="2024-123456@rtu.edu.ph").count(), 1)
+        user = User.objects.get(email="2024-123456@rtu.edu.ph")
+        self.assertEqual(user.display_name, "Maria Clara")
+        self.assertEqual(user.year_level, 3)
+        self.assertFalse(user.is_verified)
+        self.assertTrue(user.check_password("NewSecurePass123!"))
+        self.assertFalse(user.check_password("SecurePass123!"))
+
+    def test_register_verified_email_returns_400(self):
+        """A verified account cannot be re-registered with the same email."""
+        self.client.post("/api/v1/auth/register/", STUDENT_PAYLOAD, format="json")
+        user = User.objects.get(email="2024-123456@rtu.edu.ph")
+        user.verify()
+
+        response = self.client.post("/api/v1/auth/register/", STUDENT_PAYLOAD, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
+        self.assertEqual(User.objects.filter(email="2024-123456@rtu.edu.ph").count(), 1)
 
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
@@ -244,3 +306,73 @@ class ProfileTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.client.credentials()
+
+    def test_change_password_success(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(
+            "/api/v1/auth/change-password/",
+            {
+                "current_password": "SecurePass123!",
+                "new_password": "NewSecurePass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("NewSecurePass123!"))
+
+    def test_change_password_wrong_current(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(
+            "/api/v1/auth/change-password/",
+            {
+                "current_password": "WrongPass123!",
+                "new_password": "NewSecurePass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("current_password", response.data)
+
+    def test_change_password_weak_new(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(
+            "/api/v1/auth/change-password/",
+            {
+                "current_password": "SecurePass123!",
+                "new_password": "weak",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("new_password", response.data)
+
+    def test_delete_account_with_no_listings_or_orders(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(
+            "/api/v1/auth/delete-account/",
+            {"password": "SecurePass123!"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(User.objects.filter(pk=self.user.pk).exists())
+
+    def test_delete_account_wrong_password(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(
+            "/api/v1/auth/delete-account/",
+            {"password": "WrongPass123!"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password", response.data)
