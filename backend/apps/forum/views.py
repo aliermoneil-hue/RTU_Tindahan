@@ -457,7 +457,7 @@ class ForumReportViewSet(
     def get_queryset(self):
         queryset = ForumReport.objects.select_related(
             "reporter", "post", "post__author", "comment", "comment__author", "order",
-            "order__buyer", "order__seller", "handled_by",
+            "order__buyer", "order__seller", "listing", "reported_user", "review", "handled_by",
         )
         user = self.request.user
         if not is_staff(user):
@@ -480,6 +480,9 @@ class ForumReportViewSet(
             post=data.get("post"),
             comment=data.get("comment"),
             order=data.get("order"),
+            listing=data.get("listing"),
+            reported_user=data.get("reported_user"),
+            review=data.get("review"),
             reporter=request.user,
             reason=data["reason"].strip(),
             details=(data.get("details") or "").strip(),
@@ -487,7 +490,7 @@ class ForumReportViewSet(
             snapshot_text=data.get("snapshot_text", ""),
         )
         notify_staff(
-            f"A forum {report.type} was reported: {report.reason}.",
+            f"A {report.type} was reported: {report.reason}.",
             link_kind="freports",
             actor=request.user,
         )

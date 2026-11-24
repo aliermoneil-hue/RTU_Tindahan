@@ -214,7 +214,13 @@ export function ForumReportsPage() {
                       ? `Order Report (${r.reporterRole === 'seller' ? 'Seller → Buyer' : 'Buyer → Seller'})`
                       : r.type === 'post'
                         ? 'Post'
-                        : 'Comment'}
+                        : r.type === 'listing'
+                          ? 'Listing'
+                          : r.type === 'user'
+                            ? 'Member'
+                            : r.type === 'review'
+                              ? 'Review'
+                              : 'Comment'}
                   </span>
                   <b>{r.reason}</b>
                 </div>
@@ -231,7 +237,13 @@ export function ForumReportsPage() {
                 <div className="tiny muted">
                   {r.type === 'order'
                     ? `Transaction / Meetup Report · ${r.snap.title}`
-                    : `Reported ${r.type}${r.type === 'comment' ? ` on the post "${r.snap.title}"` : ''}${
+                    : r.type === 'listing'
+                      ? 'Reported listing'
+                      : r.type === 'user'
+                        ? 'Reported member'
+                        : r.type === 'review'
+                          ? 'Reported review'
+                        : `Reported ${r.type}${r.type === 'comment' ? ` on the post "${r.snap.title}"` : ''}${
                         gone
                           ? ' (no longer exists, copy saved when reported)'
                           : live && live.hidden
@@ -239,7 +251,11 @@ export function ForumReportsPage() {
                             : ''
                       }`}
                 </div>
-                {(r.type === 'post' || r.type === 'order') && (
+                {(r.type === 'post' ||
+                  r.type === 'order' ||
+                  r.type === 'listing' ||
+                  r.type === 'user' ||
+                  r.type === 'review') && (
                   <b>{r.type === 'order' ? r.snap.title : f ? postTitle(f) : r.snap.title}</b>
                 )}
                 <div

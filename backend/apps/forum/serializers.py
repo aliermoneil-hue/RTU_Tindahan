@@ -9,6 +9,8 @@ from django.core.files.storage import default_storage
 from rest_framework import serializers
 
 from apps.accounts.models import User
+from apps.catalog.models import Listing
+from apps.reviews.models import Review
 from apps.orders.models import Order
 
 from .models import ForumComment, ForumPost, ForumReaction, ForumReport
@@ -360,6 +362,20 @@ class ForumReportWriteSerializer(serializers.Serializer):
     order = serializers.SlugRelatedField(
         slug_field="reference", queryset=Order.objects.all(), required=False, allow_null=True
     )
+    listing = serializers.SlugRelatedField(
+        slug_field="slug",
+        queryset=Listing.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    # By email, because that is what the screen knows about a seller: the
+    # listing carries the owner's address, not their database id.
+    reported_user = serializers.SlugRelatedField(
+        slug_field="email", queryset=User.objects.all(), required=False, allow_null=True
+    )
+    review = serializers.PrimaryKeyRelatedField(
+        queryset=Review.objects.all(), required=False, allow_null=True
+    )
     reason = serializers.CharField(max_length=80)
     details = serializers.CharField(max_length=400, required=False, allow_blank=True)
 
@@ -377,6 +393,43 @@ class ForumReportWriteSerializer(serializers.Serializer):
             if user.id not in (order.buyer_id, order.seller_id):
                 raise serializers.ValidationError("You can only report your own order.")
             attrs["snapshot_title"] = f"Order {order.reference}"
+            attrs["snapshot_text"] = attrs.get("details", "")
+            return attrs
+
+        # RM-01: a listing, reported by anyone who can see it and not by its
+        # own seller; the snapshot is the title and description the moderator
+        # will judge, taken now so a later edit cannot change the evidence.
+        if kind == ForumReport.Type.LISTING:
+            listing = attrs.get("listing")
+            if listing is None:
+                raise serializers.ValidationError("Choose the listing you are reporting.")
+            if listing.seller_id == user.id:
+                raise serializers.ValidationError("You cannot report your own listing.")
+            attrs["snapshot_title"] = listing.title
+            attrs["snapshot_text"] = listing.description
+            return attrs
+
+        # RM-01: a review, reported by anyone but its author. The stars and the
+        # words are copied now: a review can be edited after it is reported.
+        if kind == ForumReport.Type.REVIEW:
+            review = attrs.get("review")
+            if review is None:
+                raise serializers.ValidationError("Choose the review you are reporting.")
+            if review.buyer_id == user.id:
+                raise serializers.ValidationError("You cannot report your own review.")
+            attrs["snapshot_title"] = f"{review.stars}-star review"
+            attrs["snapshot_text"] = review.text
+            return attrs
+
+        # RM-01: a member, reported by someone else. RM-07 then keeps the
+        # reporter's name off the reported member's screen.
+        if kind == ForumReport.Type.USER:
+            target = attrs.get("reported_user")
+            if target is None:
+                raise serializers.ValidationError("Choose the member you are reporting.")
+            if target.id == user.id:
+                raise serializers.ValidationError("You cannot report yourself.")
+            attrs["snapshot_title"] = target.display_name or target.email
             attrs["snapshot_text"] = attrs.get("details", "")
             return attrs
 
@@ -411,6 +464,9 @@ class ForumReportSerializer(serializers.ModelSerializer):
     post = serializers.IntegerField(source="post_id", read_only=True)
     comment = serializers.IntegerField(source="comment_id", read_only=True)
     order = serializers.SerializerMethodField()
+    listing = serializers.SerializerMethodField()
+    reported_user = serializers.SerializerMethodField()
+    review = serializers.SerializerMethodField()
     target_name = serializers.SerializerMethodField()
     handled_by_name = serializers.SerializerMethodField()
 
@@ -422,6 +478,9 @@ class ForumReportSerializer(serializers.ModelSerializer):
             "post",
             "comment",
             "order",
+            "listing",
+            "reported_user",
+            "review",
             "reporter_name",
             "is_mine",
             "reason",
@@ -444,14 +503,30 @@ class ForumReportSerializer(serializers.ModelSerializer):
     def get_order(self, obj):
         return obj.order.reference if obj.order_id else None
 
+    def get_listing(self, obj):
+        return obj.listing.slug if obj.listing_id else None
+
+    def get_reported_user(self, obj):
+        return obj.reported_user_id
+
+    def get_review(self, obj):
+        return obj.review_id
+
     def get_is_mine(self, obj):
         request = self.context.get("request")
         user = getattr(request, "user", None)
         return bool(user and user.is_authenticated and obj.reporter_id == user.id)
 
     def get_target_name(self, obj):
+        """Who or what the report is about, in the queue's own words."""
         if obj.type == ForumReport.Type.ORDER and obj.order_id:
             return obj.order.seller.display_name if obj.reporter_id == obj.order.buyer_id else obj.order.buyer.display_name
+        if obj.type == ForumReport.Type.LISTING and obj.listing_id:
+            return obj.listing.title
+        if obj.type == ForumReport.Type.USER and obj.reported_user_id:
+            return short_name(obj.reported_user)
+        if obj.type == ForumReport.Type.REVIEW and obj.review_id:
+            return f"{obj.review.stars}-star review"
         target = obj.comment.author if obj.comment_id else (obj.post.author if obj.post_id else None)
         return short_name(target) if target else "RTU"
 

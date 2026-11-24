@@ -132,7 +132,7 @@ DECIDED = {
     "AI-15": ("verified", "screening audit row plus the item's moderation status"),
     "AI-16": ("verified", "the same component states the check is not a quality or safety guarantee"),
     # --- moderation and audit ----------------------------------------------
-    "RM-01": ("partial", "posts, comments and orders can be reported; listings, users, reviews and conversations cannot"),
+    "RM-01": ("verified", "listings, members, posts, comments, reviews and conversations are all reportable, with the SRS reason list and a snapshot"),
     "RM-02": ("partial", "statuses are open, reviewed, dismissed, actioned"),
     "RM-03": ("verified", "hide, restore, delete, dismiss; moderators only"),
     "RM-05": ("verified", "`apps/audit/record()` on every staff moderation action"),

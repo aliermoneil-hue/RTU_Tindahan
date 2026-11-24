@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 63 |
+| Implemented, verified | 64 |
 | Implemented | 79 |
-| Partial | 25 |
+| Partial | 24 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
@@ -219,7 +219,7 @@ browser or the tests in this repository.
 
 | ID | Requirement (from the SRS) | SRS v1.3 | State here | Basis |
 | --- | --- | --- | --- | --- |
-| RM-01 | The system shall let a user report a listing, user, post, comment, review, or conversation and choose a reason: Misleading, Scam, Inappropriate, No... | Partly | Partial | posts, comments and orders can be reported; listings, users, reviews and conversations cannot |
+| RM-01 | The system shall let a user report a listing, user, post, comment, review, or conversation and choose a reason: Misleading, Scam, Inappropriate, No... | Partly | Implemented, verified | listings, members, posts, comments, reviews and conversations are all reportable, with the SRS reason list and a snapshot |
 | RM-02 | The system shall place each report in the moderator queue with a status: Received, Under Review, or Resolved. | - | Partial | statuses are open, reviewed, dismissed, actioned |
 | RM-03 | The system shall let a moderator remove content, warn a user, or dismiss a report. A moderator may also recommend that a user be suspended. An Admi... | - | Implemented, verified | hide, restore, delete, dismiss; moderators only |
 | RM-04 | The system shall let the person who made a report see its status: Received, Under Review, or Resolved. A Resolved report shall show whether action... | - | Implemented | a reporter sees their own reports and each one's status |

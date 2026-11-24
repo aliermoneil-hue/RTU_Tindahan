@@ -6626,8 +6626,12 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
         return false
       }
       const r = db.freports.find((x) => x.id === reportId)
+      // A report about an order, a listing or a member is resolved through the
+      // server without a post/comment to hide or restore; only posts and
+      // comments have those two actions.
       if (!r || r.type === 'order') return false
-      const targetKind: 'post' | 'comment' = r.type
+      const targetKind: 'post' | 'comment' | null =
+        r.type === 'post' || r.type === 'comment' ? r.type : null
       const apiId = apiForumId(reportId)
       if (apiId !== null) {
         void resolveForumReportApi(apiId, {
@@ -6643,6 +6647,12 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
             toast(err instanceof ApiRequestError ? err.message : 'That decision could not be saved.'),
           )
         return true
+      }
+      if (targetKind === null) {
+        // Only the server can act on a listing or a member report; there is no
+        // post or comment to hide in the local snapshot.
+        toast('Review that report on the server queue.')
+        return false
       }
       setDb((prev) => {
         const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))

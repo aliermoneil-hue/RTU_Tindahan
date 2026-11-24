@@ -336,6 +336,21 @@ and no other message of the thread, ever; a whole-thread report carries none.
 `suspend`) and a `note`, which is required for anything but a dismissal because
 it is what the sender is told. See `MESSAGE-REPORTS.md`.
 
+## 8a2. Reporting a listing or a member (RM-01)
+
+`POST /forum/reports/` now takes `type` of `listing` (with the listing `slug`),
+`user` (with the member's email) and `review` (with the review id), alongside the
+post, comment and order rows it already took — six targets in all, with a
+conversation covered by the message reports above. The screen offers the SRS's
+reasons: Misleading, Scam, Inappropriate, Not from RTU, Other. The snapshot rule holds: the listing's title and description, or the
+member's display name, are copied at filing time so an edit cannot change the
+evidence. You cannot report your own listing or yourself, and the reported person
+never sees the report (RM-07). They land in the same staff queue as everything
+else, labelled **Listing** or **Member**.
+
+On screen: **Report listing** and **Report seller** beside the seller card on a
+product page, both opening `#/report?type=…`.
+
 ## 8b. Appeals API (AI-06, RM-08)
 
 `GET /appeals/?status=` lists a member's own appeals, or the whole queue for

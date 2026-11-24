@@ -803,3 +803,171 @@ class SellingSchedulePostTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.json())
         self.assertIsNone(response.json()["event_date"])
         self.assertEqual(response.json()["event_place"], "")
+
+
+class ListingAndUserReportTests(APITestCase):
+    """RM-01: a listing or a member can be reported, on the same queue as a post."""
+
+    def setUp(self):
+        self.seller = make_user("2024-444001@rtu.edu.ph")
+        self.reporter = make_user("2024-444002@rtu.edu.ph")
+        self.moderator = make_user("2024-444003@rtu.edu.ph", role=User.Role.MODERATOR)
+        self.category = Category.objects.create(name="Services")
+        self.listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Thesis editing service",
+            description="I will rewrite your thesis overnight, guaranteed approval.",
+            listing_type=Listing.Type.SERVICE,
+            condition=Listing.Condition.USED,
+            price=Decimal("1500.00"),
+            quantity=1,
+            meetup_place="Main lobby",
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+        )
+
+    def report(self, **payload):
+        self.client.force_authenticate(self.reporter)
+        return self.client.post("/api/v1/forum/reports/", payload, format="json")
+
+    def test_a_listing_can_be_reported_with_its_text_snapshotted(self):
+        response = self.report(
+            type="listing",
+            listing=self.listing.slug,
+            reason="Academic cheating",
+            details="Offers to write the whole thesis.",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.json())
+        body = response.json()
+        self.assertEqual(body["type"], "listing")
+        self.assertEqual(body["listing"], self.listing.slug)
+        self.assertEqual(body["snapshot_title"], "Thesis editing service")
+        self.assertIn("rewrite your thesis", body["snapshot_text"])
+
+    def test_a_seller_cannot_report_their_own_listing(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            "/api/v1/forum/reports/",
+            {"type": "listing", "listing": self.listing.slug, "reason": "Mine"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("your own listing", str(response.json()))
+
+    def test_the_reported_seller_does_not_see_the_report(self):
+        self.report(type="listing", listing=self.listing.slug, reason="Academic cheating")
+
+        self.client.force_authenticate(self.seller)
+        rows = self.client.get("/api/v1/forum/reports/").json()
+        rows = rows["results"] if isinstance(rows, dict) else rows
+        self.assertEqual(rows, [])
+
+    def test_staff_see_the_listing_report_in_the_queue(self):
+        self.report(type="listing", listing=self.listing.slug, reason="Academic cheating")
+
+        self.client.force_authenticate(self.moderator)
+        rows = self.client.get("/api/v1/forum/reports/?type=listing").json()
+        rows = rows["results"] if isinstance(rows, dict) else rows
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["target_name"] or rows[0]["snapshot_title"], "Thesis editing service")
+
+    def test_a_member_can_be_reported_without_naming_the_reporter_to_them(self):
+        response = self.report(
+            type="user",
+            reported_user=self.seller.email,
+            reason="Harassment",
+            details="Kept messaging after I asked them to stop.",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.json())
+        self.assertEqual(response.json()["reported_user"], self.seller.id)
+
+        self.client.force_authenticate(self.seller)
+        mine = self.client.get("/api/v1/forum/reports/").json()
+        mine = mine["results"] if isinstance(mine, dict) else mine
+        self.assertEqual(mine, [])
+
+    def test_you_cannot_report_yourself(self):
+        self.client.force_authenticate(self.seller)
+
+        response = self.client.post(
+            "/api/v1/forum/reports/",
+            {"type": "user", "reported_user": self.seller.email, "reason": "Me"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("report yourself", str(response.json()))
+
+    def test_a_listing_report_without_a_listing_is_refused(self):
+        response = self.report(type="listing", reason="Something")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Choose the listing", str(response.json()))
+
+    def test_a_user_report_without_a_member_is_refused(self):
+        response = self.report(type="user", reason="Something")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Choose the member", str(response.json()))
+
+
+class ReviewReportTests(APITestCase):
+    """RM-01: a review can be reported too, by anyone but its author."""
+
+    def setUp(self):
+        self.seller = make_user("2024-555001@rtu.edu.ph")
+        self.buyer = make_user("2024-555002@rtu.edu.ph")
+        self.other = make_user("2024-555003@rtu.edu.ph")
+        self.category = Category.objects.create(name="Gadgets")
+
+    def make_review(self, buyer):
+        from apps.orders.models import Order
+        from apps.reviews.models import Review
+
+        order = Order.objects.create(
+            reference=f"ORD-T90{Order.objects.count() + 1:03d}",
+            buyer=buyer,
+            seller=self.seller,
+            status=Order.Status.COMPLETED,
+            meetup_place="Main lobby",
+        )
+        return Review.objects.create(
+            order=order,
+            buyer=buyer,
+            seller=self.seller,
+            stars=1,
+            text="Seller never showed up and kept the money.",
+        )
+
+    def test_a_review_can_be_reported_with_its_words_snapshotted(self):
+        review = self.make_review(self.buyer)
+        self.client.force_authenticate(self.other)
+
+        response = self.client.post(
+            "/api/v1/forum/reports/",
+            {"type": "review", "review": review.id, "reason": "Misleading"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.json())
+        self.assertEqual(response.json()["review"], review.id)
+        self.assertEqual(response.json()["snapshot_title"], "1-star review")
+        self.assertIn("never showed up", response.json()["snapshot_text"])
+
+    def test_you_cannot_report_your_own_review(self):
+        review = self.make_review(self.buyer)
+        self.client.force_authenticate(self.buyer)
+
+        response = self.client.post(
+            "/api/v1/forum/reports/",
+            {"type": "review", "review": review.id, "reason": "Mine"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("your own review", str(response.json()))

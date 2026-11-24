@@ -185,6 +185,11 @@ class ForumReport(models.Model):
         POST = "post", "Post"
         COMMENT = "comment", "Comment"
         ORDER = "order", "Order"
+        # RM-01: a listing or a person can be reported too. The report queue was
+        # built around a post; the same shape serves the marketplace it sits on.
+        LISTING = "listing", "Listing"
+        USER = "user", "Member"
+        REVIEW = "review", "Review"
 
     class Status(models.TextChoices):
         OPEN = "open", "Open"
@@ -201,6 +206,27 @@ class ForumReport(models.Model):
     )
     order = models.ForeignKey(
         "orders.Order",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="reports",
+    )
+    listing = models.ForeignKey(
+        "catalog.Listing",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="reports",
+    )
+    reported_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="reports_against",
+    )
+    review = models.ForeignKey(
+        "reviews.Review",
         null=True,
         blank=True,
         on_delete=models.CASCADE,

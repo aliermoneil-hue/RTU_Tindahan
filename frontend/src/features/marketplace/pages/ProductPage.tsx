@@ -767,6 +767,35 @@ export function ProductPage() {
               >
                 View seller profile
               </button>
+              {!isOwnListing && (
+                <>
+                  {/* RM-01: the listing and the person behind it, both reportable. */}
+                  <button
+                    type="button"
+                    className="link"
+                    onClick={() =>
+                      navigate(
+                        `report?type=listing&slug=${encodeURIComponent(
+                          String(p.id).replace(/^api:/, ''),
+                        )}`,
+                      )
+                    }
+                  >
+                    Report listing
+                  </button>
+                  {p.owner && (
+                    <button
+                      type="button"
+                      className="link"
+                      onClick={() =>
+                        navigate(`report?type=user&user=${encodeURIComponent(p.owner as string)}`)
+                      }
+                    >
+                      Report seller
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -872,6 +901,17 @@ export function ProductPage() {
                             {r.buyerEmail === currentAccount?.email ? 'Delete' : 'Remove'}
                           </button>
                         )}
+                        {currentAccount &&
+                          r.buyerEmail !== currentAccount.email &&
+                          Number.isFinite(Number(r.id)) && (
+                            <button
+                              type="button"
+                              className="link"
+                              onClick={() => navigate(`report?type=review&id=${r.id}`)}
+                            >
+                              Report
+                            </button>
+                          )}
                       </span>
                     </div>
                     {r.text ? (

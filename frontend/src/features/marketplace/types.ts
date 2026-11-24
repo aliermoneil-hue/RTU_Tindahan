@@ -351,7 +351,7 @@ export interface ForumPost {
 
 export interface ForumReport {
   id: string
-  type: 'post' | 'comment' | 'order'
+  type: 'post' | 'comment' | 'order' | 'listing' | 'user' | 'review'
   postId: string
   commentId: string | null
   orderId?: string | null
@@ -381,7 +381,7 @@ export interface ModerationLogEntry {
   by: string
   byEmail: string
   kind: string
-  type: 'post' | 'comment' | 'order'
+  type: 'post' | 'comment' | 'order' | 'listing' | 'user' | 'review'
   postId: string
   commentId?: string | null
   reportId: string | null

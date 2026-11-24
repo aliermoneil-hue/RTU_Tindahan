@@ -81,7 +81,7 @@ export interface ApiForumPost {
 
 export interface ApiForumReport {
   id: number
-  type: 'post' | 'comment' | 'order'
+  type: 'post' | 'comment' | 'order' | 'listing' | 'user' | 'review' | 'review'
   post: number | null
   comment: number | null
   order: string | null
@@ -226,10 +226,14 @@ export function moderateForumComment(
 }
 
 export interface ForumReportInput {
-  type: 'post' | 'comment' | 'order'
+  type: 'post' | 'comment' | 'order' | 'listing' | 'user' | 'review'
   post?: number | null
   comment?: number | null
   order?: string | null
+  /** RM-01: the listing slug, the member's email, or the review's id. */
+  listing?: string | null
+  reported_user?: string | null
+  review?: number | null
   reason: string
   details?: string
 }

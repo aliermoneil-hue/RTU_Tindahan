@@ -128,6 +128,11 @@ export const AppealsPage = lazy(() =>
     default: m.AppealsPage,
   })),
 )
+export const ReportPage = lazy(() =>
+  import('@/features/marketplace/pages/ReportPage').then((m) => ({
+    default: m.ReportPage,
+  })),
+)
 export const AppealPage = lazy(() =>
   import('@/features/marketplace/pages/AppealPage').then((m) => ({
     default: m.AppealPage,
