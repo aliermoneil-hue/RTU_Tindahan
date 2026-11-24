@@ -107,9 +107,12 @@ class ListingViewSet(viewsets.ModelViewSet):
         )
         # Item ratings come from verified completed orders. Seller reviews have
         # no listing, so this join only ever counts item reviews.
+        # RR-07 with RR-06: only a published review counts towards the average.
+        # A held edit is out until a moderator releases it.
+        published = Q(reviews__moderation_status="visible")
         queryset = queryset.annotate(
-            rating_avg=Avg("reviews__stars"),
-            rating_count=Count("reviews"),
+            rating_avg=Avg("reviews__stars", filter=published),
+            rating_count=Count("reviews", filter=published),
         )
 
         # "Small sellers": the size of each seller's live catalogue, counted in

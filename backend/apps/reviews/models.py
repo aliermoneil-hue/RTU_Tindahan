@@ -51,6 +51,22 @@ class Review(models.Model):
     # edit and miss two edits inside the same second.
     edited_at = models.DateTimeField(null=True, blank=True)
 
+    # RR-06: an edited review is screened again before the change is published.
+    # A held edit keeps its words but is out of the average and off the page
+    # until a moderator releases it — the alternative, silently republishing an
+    # edit nobody checked, is the one thing a rating must not allow.
+    class ModerationStatus(models.TextChoices):
+        VISIBLE = "visible", "Published"
+        NEEDS_REVIEW = "needs_review", "Held for review"
+
+    moderation_status = models.CharField(
+        max_length=16,
+        choices=ModerationStatus.choices,
+        default=ModerationStatus.VISIBLE,
+        db_index=True,
+    )
+    held_reason = models.CharField(max_length=240, blank=True)
+
     class Meta:
         ordering = ["-created_at"]
         indexes = [

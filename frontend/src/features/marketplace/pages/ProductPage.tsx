@@ -42,6 +42,7 @@ export function ProductPage() {
     reserveNow,
     startProductConversation,
     confirmDeleteReview,
+    publishHeldReview,
     openModal,
     toast,
   } = useTindahan()
@@ -895,6 +896,20 @@ export function ProductPage() {
                           })}
                           {r.edited ? ' · edited' : ''}
                         </span>
+                        {r.held && (
+                          <span className="pill yellow" title="An edit is waiting for a moderator">
+                            Held for review
+                          </span>
+                        )}
+                        {r.held && isStaffUser && Number.isFinite(Number(r.id)) && (
+                          <button
+                            type="button"
+                            className="link"
+                            onClick={() => void publishHeldReview(String(r.id))}
+                          >
+                            Publish this edit
+                          </button>
+                        )}
                         {canDelete && (
                           <button
                             type="button"

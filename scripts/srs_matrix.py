@@ -106,9 +106,9 @@ DECIDED = {
     "MS-05": ("verified", "the report carries a copy of the reported message only; no endpoint exposes the rest of the thread"),
     # --- reviews ------------------------------------------------------------
     "RR-03": ("verified", "average, count and one-per-order on the seller"),
-    "RR-04": ("policy", "reviews are not screened on purpose: `docs/SCREENING.md` §6"),
+    "RR-04": ("policy", "a first review publishes unscreened by choice; an edit is screened (RR-06): `docs/SCREENING.md` §6"),
     "RR-05": ("verified", "only the author edits a review, only staff remove one, and a seller can report it from the product page"),
-    "RR-06": ("partial", "the buyer can write one review per order; edit and delete are not exposed"),
+    "RR-06": ("verified", "the buyer edits or deletes their own review, and an edit is screened before it publishes: held, out of the average, released by staff"),
     # --- seller dashboard ---------------------------------------------------
     "SD-01": ("verified", "My shop lists received orders"),
     "SD-02": ("verified", "the seller overview has a period selector; completed sales, the amount from completed orders only, and counts by status"),

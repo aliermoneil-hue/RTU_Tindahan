@@ -491,6 +491,8 @@ export interface ReviewRecord {
   text: string
   ts: number
   edited: number | null
+  /** RR-06: the author's edit is waiting on a moderator; not published yet. */
+  held?: boolean
 }
 
 export interface AuditLogEntry {

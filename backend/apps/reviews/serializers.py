@@ -32,6 +32,8 @@ class ReviewSerializer(serializers.ModelSerializer):
     buyer_name = serializers.SerializerMethodField()
     is_mine = serializers.SerializerMethodField()
     edited = serializers.BooleanField(source="was_edited", read_only=True)
+    # RR-06: the author is told when their edit is waiting on a moderator.
+    held = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
@@ -50,6 +52,8 @@ class ReviewSerializer(serializers.ModelSerializer):
             "stars",
             "text",
             "edited",
+            "held",
+            "held_reason",
             "created_at",
             "updated_at",
         )
@@ -57,6 +61,9 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     def get_buyer_name(self, obj):
         return short_name(obj.buyer)
+
+    def get_held(self, obj):
+        return obj.moderation_status == Review.ModerationStatus.NEEDS_REVIEW
 
     def get_is_mine(self, obj):
         request = self.context.get("request")

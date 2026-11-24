@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 76 |
+| Implemented, verified | 77 |
 | Implemented | 80 |
-| Partial | 15 |
+| Partial | 14 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 1 |
@@ -167,9 +167,9 @@ browser or the tests in this repository.
 | RR-01 | The system shall let a buyer rate a seller from 1 to 5 stars and write a review after an order is completed. | Built | Implemented | `apps/reviews` |
 | RR-02 | The system shall allow only one review per completed order. | Built | Implemented | `apps/reviews` |
 | RR-03 | The system shall show on each seller profile the average rating, the number of reviews, and the number of completed transactions. | Partly | Implemented, verified | average, count and one-per-order on the seller |
-| RR-04 | The system shall hold review text for AI screening before it is published. | Not yet | Deliberately not done | reviews are not screened on purpose: `docs/SCREENING.md` §6 |
+| RR-04 | The system shall hold review text for AI screening before it is published. | Not yet | Deliberately not done | a first review publishes unscreened by choice; an edit is screened (RR-06): `docs/SCREENING.md` §6 |
 | RR-05 | The system shall not let a seller edit or delete a review. A seller may report a review. | Partly | Implemented, verified | only the author edits a review, only staff remove one, and a seller can report it from the product page |
-| RR-06 | The system shall let a buyer edit or delete their own review. An edited review shall be screened again before the change is published. | Partly | Partial | the buyer can write one review per order; edit and delete are not exposed |
+| RR-06 | The system shall let a buyer edit or delete their own review. An edited review shall be screened again before the change is published. | Partly | Implemented, verified | the buyer edits or deletes their own review, and an edit is screened before it publishes: held, out of the average, released by staff |
 | RR-07 | The system shall count only published reviews in the average and the number of reviews. Reviews that are waiting, rejected, or removed shall not co... | Built | Implemented | `apps/reviews` |
 | RR-08 | The system shall not ask for reviews on official orders, because the Official Store has no seller account. | Partly | Implemented | `apps/reviews` |
 
@@ -325,7 +325,7 @@ with the reason:
 
 | ID | Requirement | Why it is open |
 | --- | --- | --- |
-| RR-04 | The system shall hold review text for AI screening before it is published. | reviews are not screened on purpose: `docs/SCREENING.md` §6 |
+| RR-04 | The system shall hold review text for AI screening before it is published. | a first review publishes unscreened by choice; an edit is screened (RR-06): `docs/SCREENING.md` §6 |
 | AI-03 | The system shall automatically publish submissions that receive an Approved classification. | a clean verdict still waits for a human: `docs/SCREENING.md` §6 |
 
 ## Note on identifier drift

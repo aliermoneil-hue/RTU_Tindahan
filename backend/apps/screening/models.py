@@ -50,6 +50,14 @@ class ScreeningResult(models.Model):
         on_delete=models.CASCADE,
         related_name="screening_results",
     )
+    # RR-06: an edited review is screened too, and the audit row names it.
+    review = models.ForeignKey(
+        "reviews.Review",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="screening_results",
+    )
     verdict = models.CharField(max_length=10, choices=Verdict.choices, db_index=True)
 
     # 0 = certainly harmless, 100 = certainly prohibited. Null when the
@@ -94,17 +102,23 @@ class ScreeningResult(models.Model):
             models.Index(fields=["listing", "-created_at"]),
             models.Index(fields=["post", "-created_at"]),
             models.Index(fields=["comment", "-created_at"]),
+            models.Index(fields=["review", "-created_at"]),
         ]
         constraints = [
             models.CheckConstraint(
                 name="screening_result_exactly_one_target",
                 condition=(
-                    models.Q(listing__isnull=False, post__isnull=True, comment__isnull=True)
-                    | models.Q(
-                        listing__isnull=True, post__isnull=False, comment__isnull=True
+                    models.Q(
+                        listing__isnull=False, post__isnull=True, comment__isnull=True, review__isnull=True
                     )
                     | models.Q(
-                        listing__isnull=True, post__isnull=True, comment__isnull=False
+                        listing__isnull=True, post__isnull=False, comment__isnull=True, review__isnull=True
+                    )
+                    | models.Q(
+                        listing__isnull=True, post__isnull=True, comment__isnull=False, review__isnull=True
+                    )
+                    | models.Q(
+                        listing__isnull=True, post__isnull=True, comment__isnull=True, review__isnull=False
                     )
                 ),
             )
@@ -121,6 +135,8 @@ class ScreeningResult(models.Model):
             return f"post {self.post_id}"
         if self.comment_id:
             return f"comment {self.comment_id}"
+        if self.review_id:
+            return f"review {self.review_id}"
         return "unattached result"
 
     @property

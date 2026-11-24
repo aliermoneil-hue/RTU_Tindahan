@@ -83,6 +83,22 @@ the words a moderator would have judged.
 A post has no "pending" state to leave alone: it is live the moment it is
 written. So the gate inverts, and the safe default stays safe.
 
+### Reviews (RR-06)
+
+    buyer edits a review  ->  POST /api/v1/reviews/   (create-or-update)
+                                    |
+                                    +--> first review  -> published at once (RR-04)
+                                    |
+                                    +--> an edit       -> run_review_screening()
+                                          +--> clean    -> published, marked edited
+                                          +--> held     -> moderation_status=needs_review
+                                                           + out of the average (RR-07)
+                                                           + hidden from everyone but
+                                                             its author and staff
+                                                           + buyer and staff notified
+                                    |
+                                    +--> moderator: POST /api/v1/reviews/<id>/release/
+
     member POSTs /api/v1/forum/posts/
               |
               v
@@ -333,9 +349,13 @@ Each listing in that response carries, for moderators only:
 
 ## 6. What is not done
 
-- **Reviews are not screened, on purpose.** Listings, posts and comments are;
-  a review relies on reporting and moderator action. Screening a rating is a
-  product-policy decision (see above), not a missing adapter.
+- **A review's first publication is not screened, on purpose (RR-04).** A
+  critical rating of a seller must not wait on a machine to approve it; a bad
+  review is reported by a person and read by a moderator. **An edit is screened**
+  (RR-06): that is how innocent text becomes abuse after the seller has already
+  answered, so the change waits for a person while the published text stays as
+  it was. A held edit leaves the item's average until it is released, which is
+  what RR-07 asks of anything unpublished.
 - **Nothing publishes automatically.** A clean verdict still waits for a
   moderator on a listing, and a flagged post is held rather than deleted.
   Auto-publishing would be a deliberate change to `run_screening` plus its

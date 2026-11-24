@@ -244,6 +244,55 @@ def run_post_screening(post) -> ScreeningResult:
 
 
 @transaction.atomic
+def run_review_screening(review) -> ScreeningResult:
+    """RR-06: screen an edited review before the change is published.
+
+    Only an edit is screened. A first review publishes at once, which is a
+    deliberate decision recorded against RR-04: a critical rating of a seller
+    must not wait on a machine to approve it. An edit is different — it is how
+    innocent text becomes abuse after the seller has already answered, so the
+    change waits for a person while the old text stays as it was.
+
+    Reviews are judged against the prohibited list only. A review that mentions
+    a phone number or a GCash request is describing what happened, not offering
+    it, so the listing-only signals are skipped by the provider itself.
+    """
+    from apps.reviews.models import Review
+
+    result = _run(
+        {"review": review},
+        TextSubject(kind="review", title="", description=review.text or ""),
+    )
+
+    if result.verdict == ScreeningResult.Verdict.CLEAN and not needs_a_human(result):
+        review.moderation_status = Review.ModerationStatus.VISIBLE
+        review.held_reason = ""
+        review.save(update_fields=["moderation_status", "held_reason"])
+        return result
+
+    review.moderation_status = Review.ModerationStatus.NEEDS_REVIEW
+    review.held_reason = "; ".join(result.reasons or ["It matched the screening rules."])[:240]
+    review.save(update_fields=["moderation_status", "held_reason"])
+
+    summary = (review.text or f"Review {review.pk}").strip()[:60]
+    notify_staff(
+        f"An edited review is held for review: \"{summary}\"."[:240],
+        link_kind="reviews",
+        link_id=str(review.pk),
+    )
+    if review.buyer_id:
+        notify(
+            review.buyer,
+            "Your edited review is held for review. The published review is unchanged until a "
+            "moderator looks at it.",
+            kind=Notification.Kind.REVIEW,
+            link_kind="reviews",
+            link_id=str(review.pk),
+        )
+    return result
+
+
+@transaction.atomic
 def run_comment_screening(comment) -> ScreeningResult:
     """Screen one forum comment and hold it if the verdict flags it (AI-03).
 

@@ -35,6 +35,9 @@ export interface ApiReview {
   stars: number
   text: string
   edited: boolean
+  /** RR-06: an edited review waiting on a moderator. */
+  held?: boolean
+  held_reason?: string
   created_at: string
   updated_at: string
 }
@@ -79,6 +82,11 @@ export function submitReview(
 }
 
 /** Delete one review. The buyer, or a moderator, may do this. */
+/** RR-06: a moderator publishes an edited review that screening held. */
+export function releaseReview(id: number): Promise<ApiReview> {
+  return apiFetch<ApiReview>(`/reviews/${id}/release/`, { method: 'POST' })
+}
+
 export function deleteReview(id: number): Promise<void> {
   return apiFetch<void>(`/reviews/${id}/`, { method: 'DELETE' })
 }
@@ -102,5 +110,6 @@ export function reviewRecordFromApi(row: ApiReview, viewerEmail: string): Review
     text: row.text,
     ts: Date.parse(row.created_at),
     edited: row.edited ? Date.parse(row.updated_at) : null,
+    held: Boolean(row.held),
   }
 }

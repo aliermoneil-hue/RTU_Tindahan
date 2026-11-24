@@ -71,6 +71,7 @@ import {
 } from '../api/favorites'
 import {
   deleteReview as deleteApiReview,
+  releaseReview,
   fetchReviews,
   reviewRecordFromApi,
   submitReview as postReview,
@@ -690,6 +691,8 @@ interface TindahanContextValue {
   reviewOf: (kind: 'seller' | 'item', orderId: string, pid?: string) => ReviewRecord | undefined
   submitReview: (kind: 'seller' | 'item', orderId: string, pid: string, stars: number, text: string) => boolean
   confirmDeleteReview: (reviewId: string) => void
+  /** RR-06: publish an edited review that screening held. Staff only. */
+  publishHeldReview: (reviewId: string) => Promise<void>
 
   // Browse & selection state
   browseState: BrowseFilterState
@@ -6680,6 +6683,24 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     [currentAccount, isStaffUser, db.freports, applyModTargetInternal, toast],
   )
 
+  const publishHeldReview = useCallback(
+    async (reviewId: string) => {
+      if (!currentAccount || !isStaffUser) {
+        toast('Only staff can publish a held review.')
+        return
+      }
+      if (!/^\d+$/.test(String(reviewId))) return
+      try {
+        await releaseReview(Number(reviewId))
+        await refreshReviews()
+        toast('The edited review is published.')
+      } catch (err) {
+        toast(err instanceof ApiRequestError ? err.message : 'That review could not be published.')
+      }
+    },
+    [currentAccount, isStaffUser, toast, refreshReviews],
+  )
+
   // Admin / Staff Actions
   const decideFlag = useCallback(
     (decision: 'approved' | 'removed', note: string) => {
@@ -9068,6 +9089,7 @@ const value = useMemo<TindahanContextValue>(
       reviewOf,
       submitReview,
       confirmDeleteReview,
+      publishHeldReview,
       browseState,
       setBrowseState,
       browseFor,
@@ -9245,6 +9267,7 @@ const value = useMemo<TindahanContextValue>(
       reviewOf,
       submitReview,
       confirmDeleteReview,
+      publishHeldReview,
       browseState,
       browseFor,
       clearBrowseFilters,

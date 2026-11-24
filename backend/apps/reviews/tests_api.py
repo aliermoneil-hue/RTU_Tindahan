@@ -2,12 +2,14 @@
 
 from decimal import Decimal
 
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
 from apps.catalog.models import Category, Listing
 from apps.orders.models import Order, OrderLine
+from apps.screening.models import ScreeningResult
 
 from .models import Review
 
@@ -249,3 +251,135 @@ class ReviewApiTests(APITestCase):
         page = self.client.get("/api/v1/listings/").json()["results"]
         row = next(item for item in page if item["slug"] == self.listing.slug)
         self.assertEqual(row["rating_count"], 2)
+
+
+@override_settings(SCREENING_PROVIDER="stub")
+class EditedReviewScreeningTests(APITestCase):
+    """RR-06: an edit is screened again before the change is published.
+
+    A first review publishes at once — the RR-04 decision — but an edit is how
+    innocent words become abuse after the seller has already answered, so the
+    change waits for a person while the published text stays as it was.
+    """
+
+    def setUp(self):
+        self.seller = make_user("2024-770001@rtu.edu.ph")
+        self.buyer = make_user("2024-770002@rtu.edu.ph")
+        self.other = make_user("2024-770003@rtu.edu.ph")
+        self.moderator = make_user("2024-770004@rtu.edu.ph", role=User.Role.MODERATOR)
+        self.category = Category.objects.first() or Category.objects.create(name="Misc")
+        self.listing = Listing.objects.create(
+            seller=self.seller,
+            category=self.category,
+            title="Scientific calculator",
+            description="Casio fx-991, working, complete with case.",
+            listing_type=Listing.Type.PRODUCT,
+            condition=Listing.Condition.USED,
+            price=Decimal("800.00"),
+            quantity=1,
+            meetup_place="Main lobby",
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+        )
+        self.order = Order.objects.create(
+            reference="ORD-261124-901",
+            buyer=self.buyer,
+            seller=self.seller,
+            status=Order.Status.COMPLETED,
+            meetup_place="Main lobby",
+        )
+        OrderLine.objects.create(
+            order=self.order, listing=self.listing, quantity=1, unit_price=Decimal("800.00")
+        )
+
+    def write(self, text, stars=2):
+        self.client.force_authenticate(self.buyer)
+        return self.client.post(
+            "/api/v1/reviews/",
+            {"order": self.order.reference, "listing": self.listing.id, "stars": stars, "text": text},
+            format="json",
+        )
+
+    def test_a_critical_review_publishes_at_once(self):
+        response = self.write("Seller arrived forty minutes late and the case was missing.")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.json())
+        self.assertFalse(response.json()["held"])
+        self.assertEqual(
+            Review.objects.get().moderation_status, Review.ModerationStatus.VISIBLE
+        )
+
+    def test_an_edit_with_ordinary_words_publishes(self):
+        self.write("Good enough, the calculator works.")
+        response = self.write("Good enough, the calculator works and the case was included.")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.json())
+        self.assertFalse(response.json()["held"])
+        review = Review.objects.get()
+        self.assertIsNotNone(review.edited_at)
+        self.assertEqual(review.moderation_status, Review.ModerationStatus.VISIBLE)
+
+    def test_an_edit_that_becomes_prohibited_is_held(self):
+        self.write("Fine.")
+        response = self.write("Fine. Also selling vape pods and a fake school id if you need one.")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.json())
+        self.assertTrue(response.json()["held"])
+
+        review = Review.objects.get()
+        self.assertEqual(review.moderation_status, Review.ModerationStatus.NEEDS_REVIEW)
+        self.assertTrue(review.held_reason)
+
+        # The audit row names the review and says which provider answered.
+        result = ScreeningResult.objects.get(review=review)
+        self.assertIn(result.verdict, ("flagged", "rejected"))
+
+    def test_a_held_edit_is_not_shown_to_anyone_else(self):
+        self.write("Fine.")
+        self.write("Fine. Selling vape pods and a fake school id if you need one.")
+
+        self.client.force_authenticate(self.other)
+        seen = self.client.get(f"/api/v1/reviews/?listing={self.listing.id}").json()
+        self.assertEqual(seen["results"], [])
+
+        # The author still sees it, marked as held, so it is not a silent loss.
+        self.client.force_authenticate(self.buyer)
+        mine = self.client.get("/api/v1/reviews/?mine=1").json()["results"]
+        self.assertEqual(len(mine), 1)
+        self.assertTrue(mine[0]["held"])
+
+    def test_a_held_edit_leaves_the_item_average(self):
+        self.write("Excellent, five stars.", stars=5)
+        self.client.force_authenticate(None)
+        before = self.client.get(f"/api/v1/listings/{self.listing.slug}/").json()
+        self.assertEqual(before["rating_avg"], 5.0)
+        self.assertEqual(before["rating_count"], 1)
+
+        self.write("Excellent. Selling vape pods and a fake school id too.", stars=5)
+        self.client.force_authenticate(None)
+        after = self.client.get(f"/api/v1/listings/{self.listing.slug}/").json()
+        self.assertEqual(after["rating_count"], 0)
+        self.assertIsNone(after["rating_avg"])
+
+    def test_a_moderator_releases_a_held_edit(self):
+        self.write("Fine.")
+        self.write("Fine. Selling vape pods and a fake school id if you need one.")
+        review = Review.objects.get()
+
+        self.client.force_authenticate(self.moderator)
+        released = self.client.post(f"/api/v1/reviews/{review.id}/release/")
+
+        self.assertEqual(released.status_code, status.HTTP_200_OK, released.json())
+        review.refresh_from_db()
+        self.assertEqual(review.moderation_status, Review.ModerationStatus.VISIBLE)
+        self.assertEqual(review.held_reason, "")
+
+    def test_a_buyer_cannot_release_their_own_held_edit(self):
+        self.write("Fine.")
+        self.write("Fine. Selling vape pods and a fake school id if you need one.")
+        review = Review.objects.get()
+
+        self.client.force_authenticate(self.buyer)
+        refused = self.client.post(f"/api/v1/reviews/{review.id}/release/")
+
+        self.assertEqual(refused.status_code, status.HTTP_403_FORBIDDEN)
