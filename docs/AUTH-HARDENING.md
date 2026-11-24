@@ -56,9 +56,10 @@ uses, so a reset cannot install something sign-up would have refused.
 
 ### Frontend note
 
-The screens are not built yet. The API is ready; the reset page needs two
-states (ask for the code, then enter code + new password) and should call
-`auth/password-reset/` then `auth/password-reset/confirm/`.
+The reset screens are built: `frontend/src/features/authentication/pages/
+ForgotPasswordPage.tsx` (route `#/forgot-password`) has the two states (ask for
+the code, then enter code + new password) and calls `auth/password-reset/`
+followed by `auth/password-reset/confirm/`.
 
 ---
 
@@ -102,8 +103,8 @@ they can never authenticate again, this changes no behaviour.
 `--days N` overrides the setting for one run. With `AUTH_TOKEN_TTL_DAYS=0`
 tokens never expire, so the command says so and deletes nothing.
 
-Run it daily from cron (the host already runs per-user units, so a timer works
-just as well):
+It runs daily from cron on this host. The line is installed (03:10, kallisto-1);
+if you rebuild a machine, add it again rather than assuming it is there:
 
     10 3 * * * cd /home/kallisto/RTU_Tindahan/backend && .venv/bin/python manage.py prune_tokens >/dev/null 2>&1
 
@@ -137,9 +138,8 @@ move to per-device tokens, which is the change that will actually need it.
   opaque token, at the cost of a dependency and a client change. The current
   scheme expires and rotates correctly; it just cannot refresh silently.
 - **A "your password changed" confirmation email.** Standard practice, cheap to
-  add, not yet written.
-- **Deleting expired tokens.** They are refused but kept. A management command
-  (`manage.py clearsessions`-style) should sweep them once the table grows.
+  add, not yet written. The only signal a student gets today is that the reset
+  code arrived; if they did not ask for it, the mail itself is the alarm.
 
 ---
 
