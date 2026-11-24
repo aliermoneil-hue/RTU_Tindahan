@@ -107,7 +107,7 @@ DECIDED = {
     # --- seller dashboard ---------------------------------------------------
     "SD-01": ("verified", "My shop lists received orders"),
     "SD-02": ("partial", "counts and totals per status exist; no period selector"),
-    "SD-03": ("open", "no date-range or status filter on sales history"),
+    "SD-03": ("verified", "GET /orders/?role=seller&status=&from=&to= plus the filter row on the seller dashboard"),
     "SD-04": ("verified", "GET /orders/export/ returns the seller's own rows as CSV, filters honoured"),
     # --- forum --------------------------------------------------------------
     "CF-01": ("verified", "topics, notices, pinned announcements"),

@@ -11,10 +11,10 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 54 |
+| Implemented, verified | 55 |
 | Implemented | 79 |
 | Partial | 26 |
-| Not implemented | 8 |
+| Not implemented | 7 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
 | **total** | **174** |
@@ -179,7 +179,7 @@ browser or the tests in this repository.
 | --- | --- | --- | --- | --- |
 | SD-01 | The system shall give each seller a dashboard that lists the orders received and the sales records. | Built | Implemented, verified | My shop lists received orders |
 | SD-02 | The system shall show on the dashboard the total number of completed sales, the number of orders by status, and the total sales amount for a chosen... | Partly | Partial | counts and totals per status exist; no period selector |
-| SD-03 | The system shall allow sellers to filter their historical sales records by date range and order status. | Not yet | Not implemented | no date-range or status filter on sales history |
+| SD-03 | The system shall allow sellers to filter their historical sales records by date range and order status. | Not yet | Implemented, verified | GET /orders/?role=seller&status=&from=&to= plus the filter row on the seller dashboard |
 | SD-04 | The system shall allow sellers to export and download their sales records as a structured file. | Not yet | Implemented, verified | GET /orders/export/ returns the seller's own rows as CSV, filters honoured |
 
 ## Community forum (CF)
@@ -330,7 +330,6 @@ with the reason:
 | MS-04 | The system shall allow a participant to formally report a conversation thread for policy violations (refer to Section 3. | no report action on a conversation |
 | MS-05 | The system shall let a moderator see only the messages in a conversation that has been reported. | moderators cannot read a reported conversation |
 | RR-04 | The system shall hold review text for AI screening before it is published. | reviews are not screened on purpose: `docs/SCREENING.md` §6 |
-| SD-03 | The system shall allow sellers to filter their historical sales records by date range and order status. | no date-range or status filter on sales history |
 | AI-03 | The system shall automatically publish submissions that receive an Approved classification. | a clean verdict still waits for a human: `docs/SCREENING.md` §6 |
 | AI-06 | The system shall let a user appeal a Rejected decision after a moderator has confirmed it (AI-11). A different moderator | no appeal flow for a rejected item |
 | AI-10 | The system shall let an Administrator update the screening rules without changing the program code. | screening rules live in `providers.py`, not in an admin-editable table |
