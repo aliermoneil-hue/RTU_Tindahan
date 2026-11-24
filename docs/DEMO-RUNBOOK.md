@@ -13,7 +13,7 @@ use the recovery notes at the end rather than improvising in front of the panel.
     backups          nightly at 02:10, database + uploads, verified, 14 kept
     roles            visitor, student member, office staff, moderator, administrator
     surface          11 Django apps, 30 models, 35 views
-    requirements     174 in the SRS: 169 implemented, 3 partial,
+    requirements     174 in the SRS: 170 implemented, 2 partial,
                      0 open, 2 deliberately not done, 5 unmeasured
                      (docs/SRS-STATUS.md, regenerated from the SRS itself)
 

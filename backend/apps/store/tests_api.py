@@ -743,3 +743,128 @@ class StoreMailTests(StoreApiTestCase):
         self.assertTrue(
             EmailOutbox.objects.filter(subject=f"Bulk {OUTBOX_LIMIT + 4}").exists()
         )
+
+
+class StoreRuleSettingsTests(StoreApiTestCase):
+    """OS-12: staff edit the transitions, the reason list, the queue number and
+    the store-wide claim note — and the store obeys what they set."""
+
+    def settings_patch(self, **body):
+        self.client.force_authenticate(self.staff)
+        return self.client.patch("/api/v1/store/settings/", body, format="json")
+
+    def new_ticket(self):
+        from apps.store.models import TicketItem
+
+        ticket = OfficialTicket.objects.create(
+            buyer=self.student, status=OfficialTicket.Status.REQUEST_RECEIVED
+        )
+        TicketItem.objects.create(
+            ticket=ticket,
+            listing=self.listing,
+            variant=self.variant,
+            quantity=1,
+            unit_price=Decimal("450.00"),
+        )
+        return ticket
+
+    def test_the_settings_are_readable_and_writable(self):
+        patched = self.settings_patch(
+            queue_prefix="BAO",
+            queue_number_width=4,
+            claim_note="Bring your RTU ID and your order reference.",
+        )
+
+        self.assertEqual(patched.status_code, 200, patched.content)
+        body = patched.json()
+        self.assertEqual(body["queue_prefix"], "BAO")
+        self.assertEqual(body["queue_number_width"], 4)
+        self.assertIn("RTU ID", body["claim_note"])
+
+    def test_an_edited_graph_is_enforced(self):
+        # Take the direct confirm away: Request Received may only go on hold.
+        self.settings_patch(
+            allowed_transitions={
+                "request_received": ["on_hold", "cancelled"],
+                "confirmed": ["ready_for_pickup", "cancelled"],
+            }
+        )
+        ticket = self.new_ticket()
+        from apps.store.services import change_ticket_status
+
+        with self.assertRaises(Exception) as caught:
+            change_ticket_status(ticket, OfficialTicket.Status.CONFIRMED, by=self.staff)
+        self.assertIn("Cannot change", str(caught.exception))
+
+        allowed = change_ticket_status(
+            ticket, OfficialTicket.Status.ON_HOLD, by=self.staff, note="Waiting for stock."
+        )
+        self.assertEqual(allowed.status, OfficialTicket.Status.ON_HOLD)
+
+    def test_a_graph_naming_an_unknown_status_is_refused(self):
+        refused = self.settings_patch(allowed_transitions={"request_received": ["shipped"]})
+
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("not a store status", refused.content.decode())
+
+    def test_a_status_moved_into_the_reason_list_now_needs_a_note(self):
+        self.settings_patch(reason_required=["confirmed"])
+        ticket = self.new_ticket()
+        from apps.store.services import change_ticket_status
+
+        with self.assertRaises(Exception) as caught:
+            change_ticket_status(ticket, OfficialTicket.Status.CONFIRMED, by=self.staff)
+        self.assertIn("reason is required", str(caught.exception))
+
+        accepted = change_ticket_status(
+            ticket, OfficialTicket.Status.CONFIRMED, by=self.staff, note="Checked the stock."
+        )
+        self.assertEqual(accepted.status, OfficialTicket.Status.CONFIRMED)
+
+    def test_confirming_assigns_a_queue_number_from_the_settings(self):
+        self.settings_patch(queue_prefix="BAO", queue_number_width=4)
+        from apps.store.services import change_ticket_status
+
+        first = self.new_ticket()
+        change_ticket_status(first, OfficialTicket.Status.CONFIRMED, by=self.staff)
+        first.refresh_from_db()
+
+        self.assertTrue(first.queue_number.startswith("BAO-"))
+        self.assertTrue(first.queue_number.endswith("-0001"), first.queue_number)
+
+        second = self.new_ticket()
+        change_ticket_status(second, OfficialTicket.Status.CONFIRMED, by=self.staff)
+        second.refresh_from_db()
+        self.assertTrue(second.queue_number.endswith("-0002"), second.queue_number)
+
+    def test_the_queue_number_is_not_reissued_when_the_status_moves_on(self):
+        from apps.store.services import change_ticket_status
+
+        ticket = self.new_ticket()
+        change_ticket_status(ticket, OfficialTicket.Status.CONFIRMED, by=self.staff)
+        ticket.refresh_from_db()
+        first_number = ticket.queue_number
+
+        change_ticket_status(ticket, OfficialTicket.Status.READY_FOR_PICKUP, by=self.staff)
+        ticket.refresh_from_db()
+
+        self.assertEqual(ticket.queue_number, first_number)
+
+    def test_the_store_wide_note_reaches_the_students_message(self):
+        from apps.store.mail import prepare_ticket_email
+
+        self.settings_patch(claim_note="Bring your RTU ID to the BAO window.")
+        ticket = self.new_ticket()
+
+        row = prepare_ticket_email(ticket)
+
+        self.assertIn("Bring your RTU ID", row.body)
+
+    def test_a_member_cannot_edit_the_rules(self):
+        self.client.force_authenticate(self.student)
+
+        refused = self.client.patch(
+            "/api/v1/store/settings/", {"queue_prefix": "X"}, format="json"
+        )
+
+        self.assertEqual(refused.status_code, 403)

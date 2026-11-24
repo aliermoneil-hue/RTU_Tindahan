@@ -213,6 +213,45 @@ sellers first" sort uses the same fields.
 
 ---
 
+## 5a. The store's own rules, editable (OS-12)
+
+The office edits five things without a deployment, through
+`PATCH /api/v1/store/settings/` (Office Staff) and the **Store rules** card on
+Staff tools:
+
+| Setting | What it does |
+| --- | --- |
+| `queue_prefix`, `queue_number_width` | The queue number stamped on a ticket when the office confirms it: `BAO-2026-11-25-0001`. Width 1–6 digits. |
+| `claim_note` | The store-wide note that goes out with every ticket message ("Bring your RTU ID to the BAO window.") |
+| `reason_required` | The statuses that cannot be set without a note. |
+| `allowed_transitions` | The move graph, as `status → [statuses]`. Empty means the built-in graph. |
+
+The code's own graph and reason list stay the floor: an empty setting behaves
+exactly as before, so an untouched store is unchanged, and a setting naming a
+status that does not exist is refused with `"'shipped' is not a store status."`
+rather than saved. A typo cannot strand a ticket — that is the whole point of
+validating the graph where it is written instead of where it is used.
+
+A queue number is assigned once, on confirmation, from a per-day counter over the
+existing `queue_number` values with that day's pattern, so the second ticket of
+the day is `-0002` and yesterday's numbers cannot collide with today's. A ticket
+that moves on to Ready for Pickup keeps the number it was given.
+
+The transition graph is edited as JSON rather than a drag-and-drop graph editor,
+on purpose: it changes twice a term, and a textarea with server-side validation is
+honest about that where a hand-built visual editor would be a week of work for a
+setting nobody touches weekly.
+
+Proved live as Office Staff: saved `BAO`/4 digits with a store-wide note and
+`confirmed` in the reason list (200, and read back changed); an edited graph naming
+`shipped` was refused; and confirming a real ticket stamped
+`BAO-2026-11-25-0001` and carried the store note in the student's message. The probe
+was then undone exactly — the reservation released, its two ledger rows removed, the
+ticket returned to Request Received with no number, the outbox rows deleted, and the
+settings put back to their defaults — so the demo data is as it was.
+
+---
+
 ## 6a. The store's mail: outbox, preview, export (EM-01 to EM-06, NT-02)
 
 Nothing in the store sends email. Every status change and every low-stock crossing

@@ -99,6 +99,8 @@ class OfficialTicketSerializer(serializers.ModelSerializer):
             "status",
             "status_display",
             "pickup_date",
+            # OS-12: assigned when the office confirms.
+            "queue_number",
             "claim_notes",
             "cancelled_reason",
             "items",
@@ -199,9 +201,56 @@ class StoreSettingSerializer(serializers.ModelSerializer):
             "allow_cancel_from",
             # EM-04: where a low stock message goes.
             "low_stock_emails",
+            # OS-12: the store's own rules.
+            "allowed_transitions",
+            "reason_required",
+            "queue_prefix",
+            "queue_number_width",
+            "claim_note",
             "updated_at",
         )
         read_only_fields = ("updated_at",)
+
+    def validate_allowed_transitions(self, value):
+        """OS-12: an edited graph may only name statuses that exist."""
+        if value in (None, ""):
+            return {}
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Send an object of status -> list of statuses.")
+        valid = set(OfficialTicket.Status.values)
+        cleaned = {}
+        for status, targets in value.items():
+            if status not in valid:
+                raise serializers.ValidationError(f"{status!r} is not a store status.")
+            if not isinstance(targets, list):
+                raise serializers.ValidationError(f"{status}: send a list of statuses.")
+            for target in targets:
+                if target not in valid:
+                    raise serializers.ValidationError(f"{target!r} is not a store status.")
+            cleaned[status] = list(dict.fromkeys(targets))
+        return cleaned
+
+    def validate_reason_required(self, value):
+        if value in (None, ""):
+            return []
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Send a list of statuses.")
+        valid = set(OfficialTicket.Status.values)
+        for status in value:
+            if status not in valid:
+                raise serializers.ValidationError(f"{status!r} is not a store status.")
+        return list(dict.fromkeys(value))
+
+    def validate_queue_number_width(self, value):
+        if value is not None and not 1 <= int(value) <= 6:
+            raise serializers.ValidationError("Use between 1 and 6 digits.")
+        return value
+
+    def validate_queue_prefix(self, value):
+        text = (value or "").strip()
+        if len(text) > 6:
+            raise serializers.ValidationError("Keep the prefix to six characters or fewer.")
+        return text
 
     def validate_low_stock_emails(self, value):
         if value in (None, ""):

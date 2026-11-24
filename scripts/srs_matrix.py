@@ -88,7 +88,7 @@ DECIDED = {
     "ST-04": ("verified", "reserve on request, release on cancel, take on claim; ledger enforces"),
     "ST-05": ("verified", "eight statuses, staff-only moves, reasons required"),
     "OS-02": ("verified", "status, source, queue number, history"),
-    "OS-12": ("partial", "transitions and windows are configurable; the status set itself is code"),
+    "OS-12": ("verified", "staff edit the transition graph, the statuses needing a reason, the queue prefix and width, and the store-wide claim note; unknown statuses in an edited graph are refused"),
     "IV-11": ("verified", "ledger replay check in Store inventory"),
     "IV-12": ("verified", "ledger CSV export"),
     "FF-01": ("verified", "Record sale writes the ledger; `store/tests_api.py`"),

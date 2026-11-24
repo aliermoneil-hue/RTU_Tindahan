@@ -31,6 +31,9 @@ class OfficialTicket(models.Model):
         db_index=True,
     )
     pickup_date = models.DateField(null=True, blank=True)
+    # OS-12: assigned when the office confirms, from the settings' prefix and
+    # width; blank until then, which is what "the queue number if any" means.
+    queue_number = models.CharField(max_length=16, blank=True)
     claim_notes = models.TextField(blank=True)
     cancelled_reason = models.TextField(blank=True)
     processed_by = models.ForeignKey(
@@ -93,6 +96,28 @@ class StoreSetting(models.Model):
     ordering_window_start = models.TimeField(null=True, blank=True)
     ordering_window_end = models.TimeField(null=True, blank=True)
     # EM-04: where a low stock message goes. Empty means the message is Skipped.
+    # OS-12: the store's own rules, editable by staff rather than a deploy.
+    # Empty means "use the code's defaults" so an untouched store behaves as before.
+    allowed_transitions = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="status -> list of statuses it may move to; empty uses the built-in graph.",
+    )
+    reason_required = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="statuses that cannot be set without a note.",
+    )
+    queue_prefix = models.CharField(
+        max_length=6, default="Q", help_text="Printed before the daily queue number."
+    )
+    queue_number_width = models.PositiveSmallIntegerField(
+        default=3, help_text="How many digits the queue number is padded to."
+    )
+    claim_note = models.TextField(
+        blank=True,
+        help_text="Store-wide note shown with every ticket and in its message.",
+    )
     low_stock_emails = models.JSONField(
         default=list,
         blank=True,

@@ -3,6 +3,7 @@ import { Icon } from '@/common/components/Icon'
 import { navigate } from '@/common/router/router'
 import { monthYear } from '../../constants'
 import { JsonBackupCard } from '../../components/JsonBackupCard'
+import { StoreRulesCard } from '../../components/StoreRulesCard'
 import { useTindahan } from '../../context/TindahanContext'
 import './StaffToolsPage.css'
 
@@ -232,6 +233,8 @@ export function StaffToolsPage() {
           </div>
 
           <JsonBackupCard isAdmin={isAdminUser} />
+
+          {isStaffUser && <StoreRulesCard />}
 
           <div
             className="card stack"

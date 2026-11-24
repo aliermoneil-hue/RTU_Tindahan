@@ -127,6 +127,28 @@ def apply_movement(
     return movement
 
 
+def next_queue_number() -> str:
+    """OS-12: the next number for today, padded as the settings ask.
+
+    The count is per day and per prefix, so a new morning starts at one and a
+    ticket printed yesterday cannot collide with today's.
+    """
+    setting = StoreSetting.get_solo()
+    prefix = (setting.queue_prefix or "").strip()
+    width = max(int(setting.queue_number_width or 0), 1)
+    today = timezone.localdate()
+    pattern = f"{prefix}-{today.isoformat()}-"
+    used = OfficialTicket.objects.filter(
+        queue_number__startswith=pattern
+    ).values_list("queue_number", flat=True)
+    highest = 0
+    for value in used:
+        tail = value[len(pattern):]
+        if tail.isdigit():
+            highest = max(highest, int(tail))
+    return f"{pattern}{highest + 1:0{width}d}"
+
+
 def record_stock_in(variant, quantity, *, by=None, reason="New stock received"):
     quantity = int(quantity)
     if quantity < 1:
@@ -265,11 +287,21 @@ def change_ticket_status(ticket, new_status, *, by=None, note=""):
     with transaction.atomic():
         ticket = OfficialTicket.objects.select_for_update().get(pk=ticket.pk)
 
-        if new_status not in TRANSITIONS.get(ticket.status, set()):
+        # OS-12: the office may edit the graph and the reason list. The code's
+        # own values stay the floor: a setting that names an unknown status is
+        # refused by the serializer, and an empty setting means "unchanged".
+        setting = StoreSetting.get_solo()
+        transitions = {
+            status: set(targets)
+            for status, targets in (setting.allowed_transitions or {}).items()
+        } or TRANSITIONS
+        reason_required = set(setting.reason_required or []) or REASON_REQUIRED
+
+        if new_status not in transitions.get(ticket.status, set()):
             raise ValidationError(
                 f"Cannot change {ticket.get_status_display()} to {new_status}."
             )
-        if new_status in REASON_REQUIRED and not note.strip():
+        if new_status in reason_required and not note.strip():
             raise ValidationError("A reason is required for this status.")
 
         if new_status in {
@@ -337,6 +369,15 @@ def change_ticket_status(ticket, new_status, *, by=None, note=""):
             kind="ticket",
             actor=by,
         )
+
+    # OS-12: the queue number is assigned once, when the office confirms the
+    # request, from the prefix and width in the settings.
+    if (
+        new_status == OfficialTicket.Status.CONFIRMED
+        and not ticket.queue_number
+    ):
+        ticket.queue_number = next_queue_number()
+        ticket.save(update_fields=["queue_number"])
 
     # NT-02: every status the office can set leaves a message in the outbox.
     from .mail import prepare_ticket_email, ticket_event_label

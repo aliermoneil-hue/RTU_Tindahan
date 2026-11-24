@@ -62,6 +62,12 @@ def ticket_message(ticket) -> dict:
     ]
     if ticket.claim_notes.strip():
         body_lines.append(f"Claim notes: {ticket.claim_notes.strip()}")
+    # OS-12: the store-wide note the office maintains in the settings.
+    from .models import StoreSetting
+
+    store_note = (StoreSetting.get_solo().claim_note or "").strip()
+    if store_note:
+        body_lines.append(f"Store note: {store_note}")
     if ticket.cancelled_reason.strip():
         body_lines.append(f"Reason: {ticket.cancelled_reason.strip()}")
     body_lines += [

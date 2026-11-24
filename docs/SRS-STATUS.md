@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 89 |
+| Implemented, verified | 90 |
 | Implemented | 79 |
-| Partial | 3 |
+| Partial | 2 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 1 |
@@ -91,7 +91,7 @@ browser or the tests in this repository.
 | OS-09 | The system must give staff a Store orders page with a ticket list that can be browsed and filtered by its status, source, item, request date, and p... | Built | Implemented | `apps/store` tickets |
 | OS-10 | The system must show the claim notes on each ticket. A store-wide note and a note for each item shall be settings that staff can edit. It must be e... | Built | Implemented | `apps/store` tickets |
 | OS-11 | The system must upgrade older official requests to tickets without deleting or renaming anything. Pending becomes Request Received, Confirmed stays... | Built | Implemented | `apps/store` tickets |
-| OS-12 | The system shall let staff edit the allowed transitions, statuses that need a reason, statuses from which a user can cancel, the queue number setti... | Built | Partial | transitions and windows are configurable; the status set itself is code |
+| OS-12 | The system shall let staff edit the allowed transitions, statuses that need a reason, statuses from which a user can cancel, the queue number setti... | Built | Implemented, verified | staff edit the transition graph, the statuses needing a reason, the queue prefix and width, and the store-wide claim note; unknown statuses in an edited graph are refused |
 
 ## Store inventory and ledger (IV)
 

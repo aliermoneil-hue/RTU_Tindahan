@@ -114,6 +114,12 @@ export interface ApiStoreSettings {
   allow_cancel_from: string[]
   /** EM-04: where a low stock message goes; empty means it is Skipped. */
   low_stock_emails: string[]
+  /** OS-12: the store's own rules, editable by staff. */
+  allowed_transitions: Record<string, string[]>
+  reason_required: string[]
+  queue_prefix: string
+  queue_number_width: number
+  claim_note: string
   updated_at: string
 }
 
