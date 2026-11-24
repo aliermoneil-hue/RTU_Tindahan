@@ -11,9 +11,9 @@ gap is named in the note.
 
 | State | Count |
 | --- | --- |
-| Implemented, verified | 62 |
+| Implemented, verified | 63 |
 | Implemented | 79 |
-| Partial | 26 |
+| Partial | 25 |
 | Not implemented | 0 |
 | Deliberately not done | 2 |
 | Not measured | 5 |
@@ -211,7 +211,7 @@ browser or the tests in this repository.
 | AI-11 | The system shall place every Rejected item in the moderator queue so a moderator can confirm or reverse the rejection. A reversed rejection shall b... | Not yet | Partial | held items reach the queue and a moderator decides; there is no rejected-then-appeal path |
 | AI-12 | The system shall have the LLM give a confidence level with each outcome, and shall treat a low confidence result as Needs Review. | Not yet | Partial | a 0-100 score is stored and the threshold flags; no confidence mapping |
 | AI-13 | The system shall tell users in plain language, at registration and on the posting screens, that content is screened automatically and how to appeal... | Not yet | Implemented, verified | ScreeningNotice at sign-up, create-listing, forum composer and comment box |
-| AI-14 | The system shall screen content written in English, Filipino, or a mix of both (Taglish). | Not yet | Partial | the model handles Filipino and Taglish; the rules list is English |
+| AI-14 | The system shall screen content written in English, Filipino, or a mix of both (Taglish). | Not yet | Implemented, verified | Taglish and Filipino phrases in both rule lists, with tests for a flag and for ordinary talk staying clean |
 | AI-15 | The system shall store, for each screened item, the AI outcome and the moderator's final decision, so accuracy, precision, and recall can be measured. | Not yet | Implemented, verified | screening audit row plus the item's moderation status |
 | AI-16 | The system shall show a notice that screening checks only for inappropriate content and does not guarantee the quality, safety, or legality of items. | Not yet | Implemented, verified | the same component states the check is not a quality or safety guarantee |
 

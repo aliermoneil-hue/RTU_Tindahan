@@ -26,6 +26,24 @@ the seed and the floor:
 Every save or delete clears the cache, so an edit is live on the **next item
 screened**, not on the next minute.
 
+## Filipino and Taglish (AI-14)
+
+The lists carry the offers as they are typed on this campus, not only the English:
+`may answer key ako`, `sagot ko exam mo`, `sasagutan ko exam mo`, `gagawa ako ng
+assignment mo`, `peke na school id` on the prohibited side, and `bayad muna`,
+`bayad bago meetup`, `gcash muna`, `mag send ka ng gcash`, `downpayment muna` on
+the scam side.
+
+They are written as **phrases, not single words**, on purpose: `sagot` alone means
+"answer" in ordinary conversation, and a rule that fires on it would bury the
+moderator queue. The tests assert both directions — a Taglish answer-key listing
+flags at 90, and "Maganda pa ang calculator, may case at manual. Meetup sa main
+lobby, bayad pag meetup." comes back clean.
+
+Migration `0006_seed_taglish_rules.py` copies them into the table for a database
+seeded before this change; `get_or_create` keeps an administrator's own note if
+the phrase was already there.
+
 ## The language model is told the same list
 
 `GeminiProvider._payload` appends the current phrases to its instruction:

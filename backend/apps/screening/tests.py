@@ -794,3 +794,72 @@ class ScreeningRuleTableTests(APITestCase):
         self.assertIn("answer key", rules.phrases("prohibited"))
         item = self.listing("Answer key for sale")
         self.assertEqual(StubProvider().screen(item).verdict, "flagged")
+
+
+class TaglishScreeningTests(TestCase):
+    """AI-14: the same offers, in the language students actually type."""
+
+    def subject(self, title, description, price="200"):
+        return TextSubject(kind="listing", title=title, description=description, price=price)
+
+    def test_a_taglish_answer_key_offer_is_flagged(self):
+        verdict = StubProvider().screen(
+            self.subject("Answer key, complete", "May answer key ako sa exam, lahat ng subject.")
+        )
+
+        self.assertEqual(verdict.verdict, "flagged")
+        self.assertEqual(verdict.score, 90)
+        self.assertIn("may answer key ako", " ".join(verdict.reasons))
+
+    def test_a_taglish_offer_to_take_an_exam_is_flagged(self):
+        verdict = StubProvider().screen(
+            self.subject("Tutor for finals", "Sagot ko exam mo, guaranteed pasado.")
+        )
+
+        self.assertEqual(verdict.verdict, "flagged")
+        self.assertIn("sagot ko exam mo", " ".join(verdict.reasons))
+
+    def test_a_taglish_pay_first_pattern_is_flagged_as_a_scam(self):
+        verdict = StubProvider().screen(
+            self.subject("Second-hand phone", "Bayad muna bago tayo magkita sa campus.")
+        )
+
+        self.assertEqual(verdict.verdict, "flagged")
+        self.assertEqual(verdict.score, 85)
+        self.assertIn("bayad muna", " ".join(verdict.reasons))
+
+    def test_ordinary_taglish_is_left_alone(self):
+        verdict = StubProvider().screen(
+            self.subject(
+                "Calculator, complete",
+                "Maganda pa ang calculator, may case at manual. Meetup sa main lobby, bayad pag meetup.",
+            )
+        )
+
+        self.assertEqual(verdict.verdict, "clean")
+        self.assertEqual(verdict.reasons, [])
+
+    def test_the_taglish_phrases_are_in_the_table(self):
+        for phrase in ("may answer key ako", "sagot ko exam mo", "peke na school id"):
+            self.assertTrue(
+                ScreeningRule.objects.filter(phrase=phrase, kind="prohibited").exists(), phrase
+            )
+        for phrase in ("bayad muna", "gcash muna"):
+            self.assertTrue(
+                ScreeningRule.objects.filter(phrase=phrase, kind="scam").exists(), phrase
+            )
+
+    def test_switching_a_taglish_phrase_off_lets_the_listing_through(self):
+        rule = ScreeningRule.objects.get(phrase="bayad muna")
+        self.client  # noqa: B018 - the test is about the rules path, not HTTP
+        rule.is_active = False
+        rule.save(update_fields=["is_active"])
+
+        verdict = StubProvider().screen(
+            self.subject("Second-hand phone", "Bayad muna bago tayo magkita sa campus.")
+        )
+
+        self.assertEqual(verdict.verdict, "clean")
+
+        rule.is_active = True
+        rule.save(update_fields=["is_active"])

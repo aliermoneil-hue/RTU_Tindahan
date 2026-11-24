@@ -48,6 +48,18 @@ PROHIBITED_TERMS = (
     "cracked copy",
     # Exam answers, answer keys, and help that is academic cheating.
     "answer key",
+    # AI-14: the same offers as they are actually typed on this campus, in
+    # Filipino and Taglish. Written as phrases, not single words — "sagot" alone
+    # means "answer" in ordinary conversation and would bury the queue.
+    "may answer key ako",
+    "may sagot ako sa exam",
+    "sagot ko exam mo",
+    "sasagutan ko exam mo",
+    "gagawa ako ng assignment mo",
+    "gagawa ako ng thesis mo",
+    "ako na gagawa ng project mo",
+    "peke na id",
+    "peke na school id",
     "exam answers",
     "quiz answers",
     "leaked exam",
@@ -128,6 +140,15 @@ SCAM_PATTERNS = (
     "telegram",
     "whatsapp",
     "viber",
+    # AI-14: pay-first in Filipino and Taglish — "bayad muna" is the phrase a
+    # student hears before being asked to trust a stranger.
+    "bayad muna",
+    "bayad bago meetup",
+    "bayad bago mag meetup",
+    "gcash muna",
+    "send gcash muna",
+    "mag send ka ng gcash",
+    "downpayment muna",
 )
 
 # A Philippine mobile number in the text is the same off-app contact signal.
