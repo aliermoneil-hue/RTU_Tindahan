@@ -20,7 +20,7 @@ from .emails import (
     send_verification_email,
 )
 from .lockout import current_lock, record_failure, reset
-from .models import College, User
+from .models import College, TokenActivity, User
 from .serializers import (
     ChangePasswordSerializer,
     DeleteAccountSerializer,
@@ -63,6 +63,12 @@ def auth_payload(user: User) -> dict:
     if lifetime is not None and timezone.now() - token.created > lifetime:
         token.delete()
         token = Token.objects.create(user=user)
+
+    # SE-05: the idle clock starts at sign-in. A token re-issued to a returning
+    # user still carries the last_seen of the session it ended — without this
+    # stamp the first request after sign-in is judged idle and the user is
+    # locked straight back out, no matter how many times they sign in.
+    TokenActivity.objects.update_or_create(token=token, defaults={"last_seen": timezone.now()})
 
     return {"token": token.key, "user": UserSerializer(user).data}
 
