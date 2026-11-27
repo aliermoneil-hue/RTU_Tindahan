@@ -2,11 +2,10 @@ import { useState, type CSSProperties, type MouseEvent, type ReactNode } from 'r
 import { Icon } from '@/common/components/Icon'
 import type { IconName } from '@/common/components/icons'
 import { playHeart } from '@/common/sounds'
-import { isSvc, priceLabel, subOf } from '../constants'
+import { isSvc, priceLabel } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
 import { imgSrc, imgsOf } from '../imageStore'
 import type { PrototypeProduct } from '../types'
-import { CardRating } from './StarRating'
 import './ProductCard.css'
 
 interface ProductCardProps {
@@ -23,22 +22,20 @@ export function ProductCard({
   showFav = true,
   rateBasis = 'item',
   extraActions,
-  maskedSeller,
+  maskedSeller: _maskedSeller,
   onOpen,
 }: ProductCardProps) {
-  const { currentAccount, openProduct, sellerKind, toggleFav } = useTindahan()
+  const { currentAccount, openProduct, sellerKind, toggleFav, ratingOf, sellerKeyOf } = useTindahan()
   const sk = sellerKind(product)
   const svc = isSvc(product)
   const fav = Boolean(currentAccount?.favs?.includes(product.id))
   const imgs = imgsOf(product)
   const mainSrc = imgs.length ? imgSrc(imgs[0]) : null
-  const sellerText = maskedSeller ?? product.seller
 
-  // Card border-top color rule:
-  // - School product: Blue (type-school)
-  // - Student product: Yellow (type-student)
-  // - Service: Red (type-service)
   const typeCls = svc ? 'type-service is-service' : sk === 'school' ? 'type-school' : 'type-student'
+
+  const r =
+    rateBasis === 'seller' ? ratingOf('seller', sellerKeyOf(product)) : ratingOf('item', product.id)
 
   const [particles, setParticles] = useState<
     {
@@ -103,87 +100,95 @@ export function ProductCard({
         }
       }}
     >
-      <div className="rel">
-        <div
-          className={`photo ${product.tone || 't-study'} ${mainSrc ? 'has-img' : 'nophoto-tile'}`.trim()}
-        >
-          {mainSrc ? (
-            <img
-              className="pimg"
-              src={mainSrc}
-              alt={product.name}
-              loading="lazy"
-              decoding="async"
-            />
-          ) : null}
-          <Icon name={(product.icon || 'tag') as IconName} />
-          <span className="tag">{product.tag}</span>
-          {!mainSrc && <span className="nophoto">No photo yet</span>}
-        </div>
-        {showFav && (
-          <button
-            type="button"
-            className={`heart ${fav ? 'on' : ''}`.trim()}
-            data-fav={product.id}
-            aria-label={`Save ${product.name}`}
-            aria-pressed={fav}
-            onClick={handleHeartClick}
-          >
-            <Icon name="heart" size="sm" />
-            {ripple && <div className="heart-ripple" style={{ left: '50%', top: '50%' }} />}
-            {particles.map((pt) => (
-              <div
-                key={pt.id}
-                className="heart-particle"
-                style={
-                  {
-                    left: '50%',
-                    top: '50%',
-                    '--r': pt.r,
-                    '--tx': `${pt.tx}px`,
-                    '--ty': `${pt.ty}px`,
-                  } as CSSProperties
-                }
-              />
-            ))}
-          </button>
+      <div className={`photo ${product.tone || 't-study'} ${mainSrc ? 'has-img' : 'nophoto-tile'}`.trim()}>
+        {mainSrc ? (
+          <img
+            className="pimg"
+            src={mainSrc}
+            alt={product.name}
+            loading="lazy"
+            decoding="async"
+          />
+        ) : null}
+        {!mainSrc && (
+          <>
+            <Icon name={(product.icon || 'tag') as IconName} />
+            <span className="nophoto">No photo yet</span>
+          </>
         )}
-      </div>
-
-      <div className="row between wrap" style={{ gap: 6 }}>
-        <span className={`srcpill ${sk}`}>
+        <span className="tag">{product.tag}</span>
+        <span
+          className={`srcpill ${sk} ${svc ? 'svc' : ''}`.trim()}
+          style={{
+            position: 'absolute',
+            bottom: 8,
+            left: 8,
+            zIndex: 2,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            width: 'fit-content',
+            maxWidth: 'calc(100% - 16px)',
+          }}
+        >
           {sk === 'school' ? (
             <>
               <Icon name="shield" size="sm" />
               Official RTU Store
             </>
+          ) : svc ? (
+            'Service'
           ) : (
             'Student seller'
           )}
         </span>
-        {svc ? (
-          <span className="srcpill svc">Service</span>
-        ) : subOf(product) === 'Uniform' || product.tag === 'Uniform' ? (
-          <span className="pill blue" style={{ fontSize: 11, padding: '2px 8px' }}>
-            Uniform
-          </span>
-        ) : product.cat === 'Official' && product.tag ? (
-          <span className="pill" style={{ fontSize: 11, padding: '2px 8px' }}>
-            {product.tag}
-          </span>
-        ) : subOf(product) ? (
-          <span className="pill" style={{ fontSize: 11, padding: '2px 8px' }}>
-            {subOf(product)}
-          </span>
-        ) : null}
       </div>
+      {showFav && (
+        <button
+          type="button"
+          className={`heart ${fav ? 'on' : ''}`.trim()}
+          data-fav={product.id}
+          aria-label={`Save ${product.name}`}
+          aria-pressed={fav}
+          onClick={handleHeartClick}
+        >
+          <Icon name="heart" size="sm" />
+          {ripple && <div className="heart-ripple" style={{ left: '50%', top: '50%' }} />}
+          {particles.map((pt) => (
+            <div
+              key={pt.id}
+              className="heart-particle"
+              style={
+                {
+                  left: '50%',
+                  top: '50%',
+                  '--r': pt.r,
+                  '--tx': `${pt.tx}px`,
+                  '--ty': `${pt.ty}px`,
+                } as CSSProperties
+              }
+            />
+          ))}
+        </button>
+      )}
 
-      <h4>{product.name}</h4>
-      <CardRating product={product} rateBasis={rateBasis} />
-
-      <div className="row between">
-        <span className="price tnum">{priceLabel(product)}</span>
-        <span className="tiny muted pcard-seller">{sellerText}</span>
+      <div className="pcard-body">
+        <h4>{product.name}</h4>
+        <span className="pcard-seller">{_maskedSeller ?? product.seller}</span>
+        <div className="pcard-footer">
+          <span className="price tnum">{priceLabel(product)}</span>
+          <div className="card-rating">
+            {r.n ? (
+              <>
+                <span className="star">★</span>
+                <b className="tnum">{r.avg.toFixed(1)}</b>
+                <span className="muted tnum">({r.n})</span>
+              </>
+            ) : (
+              <span className="tiny muted">No ratings</span>
+            )}
+          </div>
+        </div>
       </div>
       {extraActions}
     </div>

@@ -791,6 +791,7 @@ interface TindahanContextValue {
   startProductConversation: (productId: string, text: string) => boolean
   sendOrderMessage: (orderId: string, text: string, navigateToMessages?: boolean) => boolean
   openSellerRequestChat: (reqId: string) => void
+  openSellerConversation: (sellerEmail: string | null, productId?: string) => void
   sendChatMessage: (convId: string, text: string) => boolean
   reactToChatMessage: (convId: string, msgIdx: number, emoji: string) => void
   markConvRead: (convId: string) => void
@@ -5577,6 +5578,56 @@ export function TindahanProvider({ children }: { children: ReactNode }) {
     ],
   )
 
+  const openSellerConversation = useCallback(
+    (sellerEmail: string | null, productId?: string) => {
+      if (!currentAccount) return
+      if (!sellerEmail) {
+        toast('That seller is no longer available.')
+        return
+      }
+      if (sellerEmail === currentAccount.email) {
+        toast('That is your own listing.')
+        return
+      }
+      let targetConvId = ''
+      const now = new Date().toISOString()
+
+      setDb((prev) => {
+        const next: DatabaseSnapshot = JSON.parse(JSON.stringify(prev))
+        const pk = pairKey(currentAccount.email, sellerEmail)
+        let c = next.conv.find((x) => pairKey(x.buyer, x.seller) === pk)
+        if (!c) {
+          const sellerAcct = next.accounts.find((a) => a.email === sellerEmail)
+          c = {
+            id: 'cv' + ++next.seq.cv,
+            buyer: currentAccount.email,
+            buyerName: currentAccount.name,
+            seller: sellerEmail,
+            sellerName: sellerAcct ? sellerAcct.name : 'RTU Pasig Campus Store',
+            ref: productId
+              ? { type: 'product', id: productId, name: '', pid: productId }
+              : { type: 'product', id: '', name: '', pid: null },
+            msgs: [],
+            last: now,
+            created: now,
+            seen: {},
+          }
+          next.conv.push(c)
+        }
+        targetConvId = c!.id
+        return next
+      })
+
+      setTimeout(() => {
+        if (targetConvId) {
+          setSelectedConvId(targetConvId)
+          navigate('messages')
+        }
+      }, 0)
+    },
+    [currentAccount, acctByEmail, toast, pairKey],
+  )
+
   const openSellerRequestChat = useCallback(
     (reqId: string) => {
       if (!currentAccount) return
@@ -9221,6 +9272,7 @@ const value = useMemo<TindahanContextValue>(
       startProductConversation,
       sendOrderMessage,
       openSellerRequestChat,
+      openSellerConversation,
       sendChatMessage,
       reactToChatMessage,
       markConvRead,
@@ -9385,6 +9437,7 @@ const value = useMemo<TindahanContextValue>(
       startProductConversation,
       sendOrderMessage,
       openSellerRequestChat,
+      openSellerConversation,
       sendChatMessage,
       reactToChatMessage,
       markConvRead,

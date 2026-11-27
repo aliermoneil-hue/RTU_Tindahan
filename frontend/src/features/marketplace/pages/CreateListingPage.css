@@ -91,13 +91,229 @@
 .timepair .tp-to {
   padding-bottom: 12px;
 }
-@media (max-width: 1000px) {
+@media (max-width: 960px) {
   .create-two {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .lt-row {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+/* Paired form fields (.grid2): stack to 1 column on narrow mobile */
+@media (max-width: 540px) {
+  .grid2 {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+  .grid2 .input,
+  .grid2 select,
+  .grid2 textarea {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* Action buttons (Back / Save draft / Continue): stack full-width on narrow mobile */
+@media (max-width: 480px) {
+  .row.between.wrap {
+    flex-direction: column !important;
+    gap: 10px;
+    align-items: stretch !important;
+  }
+  .row.between.wrap .btn {
+    width: 100%;
+    min-height: 44px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+}
+
+/* ==========================================================================
+   CIRCULAR STEPPER (matches My Orders .bstep design)
+   ========================================================================== */
+.sell-bstep {
+  list-style: none;
+  margin: 16px 0 20px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  width: 100%;
+}
+
+.sell-bstep li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  min-width: 0;
+}
+
+.sell-bstep li.todo {
+  cursor: default;
+}
+
+.sell-bstep li:nth-child(2)::before,
+.sell-bstep li:nth-child(3)::before {
+  content: '';
+  position: absolute;
+  top: 13.5px;
+  left: calc(-50% + 21px);
+  right: calc(50% + 21px);
+  height: 3px;
+  border-radius: 99px;
+  background: var(--line, #dbe2ec);
+  z-index: 0;
+}
+
+.sell-bstep li.done:nth-child(2)::before,
+.sell-bstep li.cur:nth-child(2)::before,
+.sell-bstep li.done:nth-child(3)::before,
+.sell-bstep li.cur:nth-child(3)::before {
+  background: var(--green, #1e8e5a);
+}
+
+.sell-bstep .dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 12px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  color: var(--muted);
+  flex: none;
+  padding: 0;
+  inset: auto;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  margin: 0;
+}
+
+.sell-bstep .dot svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: block;
+}
+
+.sell-bstep li.done .dot {
+  background: var(--green, #1e8e5a);
+  border-color: var(--green, #1e8e5a);
+  color: #fff;
+  cursor: pointer;
+}
+
+.sell-bstep li.cur .dot {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--navy);
+}
+
+.sell-bstep li.done .lbl {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.sell-bstep li.cur .lbl {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.sell-bstep li.todo .lbl {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.sell-bstep .lbl {
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: center;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* Dark mode: neutral charcoal palette — crisp contrast, no hue shift */
+:root[data-theme='dark'] .sell-bstep li.done .dot {
+  background: #1e8e5a;
+  border-color: #1e8e5a;
+  color: #ffffff;
+}
+:root[data-theme='dark'] .sell-bstep li.done .lbl {
+  color: var(--ink, #e4e6eb);
+  font-weight: 600;
+}
+:root[data-theme='dark'] .sell-bstep li.cur .dot {
+  background: var(--yellow, #e5b54c);
+  border-color: var(--yellow, #e5b54c);
+  color: var(--yellow-ink, #16171a);
+}
+:root[data-theme='dark'] .sell-bstep li.cur .lbl {
+  color: var(--ink, #e4e6eb);
+  font-weight: 700;
+}
+:root[data-theme='dark'] .sell-bstep li.todo .dot {
+  background: var(--card, #1f2125);
+  border-color: #3a3f4a;
+  color: var(--muted, #9aa0aa);
+}
+:root[data-theme='dark'] .sell-bstep li.todo .lbl {
+  color: var(--muted, #9aa0aa);
+}
+:root[data-theme='dark'] .sell-bstep li:nth-child(2)::before,
+:root[data-theme='dark'] .sell-bstep li:nth-child(3)::before {
+  background: #343944;
+}
+:root[data-theme='dark'] .sell-bstep li.done:nth-child(2)::before,
+:root[data-theme='dark'] .sell-bstep li.cur:nth-child(2)::before,
+:root[data-theme='dark'] .sell-bstep li.done:nth-child(3)::before,
+:root[data-theme='dark'] .sell-bstep li.cur:nth-child(3)::before {
+  background: #1e8e5a;
+}
+
+@media (max-width: 480px) {
+  .sell-bstep {
+    margin: 12px 0 16px;
+  }
+
+  .sell-bstep li {
+    gap: 6px;
+  }
+
+  .sell-bstep .dot {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+
+  .sell-bstep li:nth-child(2)::before,
+  .sell-bstep li:nth-child(3)::before {
+    top: 11.5px;
+    left: calc(-50% + 19px);
+    right: calc(50% + 19px);
+  }
+
+  .sell-bstep .lbl {
+    font-size: 11px;
+    line-height: 1.25;
   }
 }

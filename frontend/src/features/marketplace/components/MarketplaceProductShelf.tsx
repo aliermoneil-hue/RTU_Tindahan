@@ -97,15 +97,15 @@ export function MarketplaceProductShelf({
   return (
     <div className="shelf-section" style={{ gap: 10, display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'visible' }}>
       {/* Header */}
-      <div className="row between wrap">
-        <div>
+      <div className="shelf-header">
+        <div className="shelf-header-left">
           <h2 style={{ fontSize: 18, margin: 0 }}>{title}</h2>
           <span className="small muted">{subtitle}</span>
         </div>
         {hasItems && onViewMore && (
           <button
             type="button"
-            className="link"
+            className="link shelf-view-more"
             onClick={onViewMore}
           >
             {viewMoreLabel}

@@ -36,25 +36,12 @@
   outline-offset: 2px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-}
-/* Right-edge scroll hint on mobile to indicate swipable categories */
-.catrow::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 24px;
-  background: linear-gradient(to right, transparent 0%, var(--bg, #f4f6fa) 100%);
-  pointer-events: none;
-  z-index: 5;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-@media (max-width: 640px) {
-  .catrow::after {
-    opacity: 0.5;
-  }
+  /* Smooth horizontal fade on both edges — works in light and dark mode
+     without hardcoded background colors. Category pills fade cleanly at
+     both edges while the < / > arrows (flex siblings in .catwrap) stay crisp
+     and fully opaque because they sit outside this masked container. */
+  mask-image: linear-gradient(to right, transparent 0%, #000 40px, #000 calc(100% - 40px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 40px, #000 calc(100% - 40px), transparent 100%);
 }
 .catrow::-webkit-scrollbar {
   display: none;

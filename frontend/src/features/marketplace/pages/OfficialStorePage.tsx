@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Icon } from '@/common/components/Icon'
 import { playHeart } from '@/common/sounds'
 import { navigate } from '@/common/router/router'
@@ -23,6 +23,32 @@ export function OfficialStorePage() {
     listingsLoading,
   } = useTindahan()
   const [storeTab, setStoreTab] = useState<string>('All')
+  const [catDropdownOpen, setCatDropdownOpen] = useState(false)
+  const catDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close category dropdown on click outside or Escape
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        catDropdownOpen &&
+        catDropdownRef.current &&
+        !catDropdownRef.current.contains(e.target as Node)
+      ) {
+        setCatDropdownOpen(false)
+      }
+    }
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && catDropdownOpen) {
+        setCatDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [catDropdownOpen])
 
   // Exclusively display products managed and sold by authorized RTU administrators
   const officialItems = allOnSale.filter(
@@ -115,23 +141,69 @@ export function OfficialStorePage() {
         </div>
       </div>
 
-      <div className="tabs" role="tablist">
-        {dynamicTabs.map(([k, label, count]) => (
-          <button
-            key={k}
-            type="button"
-            className={`tab ${activeTab === k ? 'on' : ''}`.trim()}
-            role="tab"
-            aria-selected={activeTab === k}
-            onClick={() => setStoreTab(k)}
+      <div className="official-cats-desktop">
+        <div className="tabs" role="tablist">
+          {dynamicTabs.map(([k, label, count]) => (
+            <button
+              key={k}
+              type="button"
+              className={`tab ${storeTab === k ? 'on' : ''}`.trim()}
+              role="tab"
+              aria-selected={storeTab === k}
+              onClick={() => setStoreTab(k)}
+            >
+              {label} <span className="tnum muted">({count})</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="official-cats-mobile orders-tab-dropdown" ref={catDropdownRef}>
+        <button
+          type="button"
+          className="orders-tab-trigger"
+          aria-haspopup="listbox"
+          aria-expanded={catDropdownOpen}
+          onClick={(e) => {
+            e.stopPropagation()
+            setCatDropdownOpen((prev) => !prev)
+          }}
+        >
+          <span className="orders-tab-label">
+            {dynamicTabs.find((t) => t[0] === storeTab)?.[1] ?? 'All official products'}
+            <span className="orders-tab-count">
+              {dynamicTabs.find((t) => t[0] === storeTab)?.[2] ?? 0}
+            </span>
+          </span>
+          <Icon name="chev" size="sm" className="orders-tab-chevron" />
+        </button>
+        {catDropdownOpen && (
+          <div
+            className="orders-tab-menu"
+            role="listbox"
+            onClick={(e) => e.stopPropagation()}
           >
-            {label} <span className="tnum muted">({count})</span>
-          </button>
-        ))}
+            {dynamicTabs.map(([k, label, count]) => (
+              <button
+                key={k}
+                type="button"
+                className={`orders-tab-option ${storeTab === k ? 'active' : ''}`.trim()}
+                role="option"
+                aria-selected={storeTab === k}
+                onClick={() => {
+                  setStoreTab(k)
+                  setCatDropdownOpen(false)
+                }}
+              >
+                <span className="orders-tab-option-label">{label}</span>
+                <span className="orders-tab-option-count">{count}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {list.length ? (
-        <div className="pgrid">
+        <div className="pgrid official-store-grid">
           {list.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
@@ -178,22 +250,6 @@ export function OfficialStorePage() {
         </div>
       )}
 
-      <div className="grid2">
-        <div className="card stack" style={{ gap: 6 }}>
-          <b>Sizes</b>
-          <p className="small muted">
-            Uniforms and PE shirts follow the campus store size chart (S, M, L, XL). Try the
-            sample rack at the window before you pay.
-          </p>
-        </div>
-        <div className="card stack" style={{ gap: 6 }}>
-          <b>Claiming at the store window</b>
-          <p className="small muted">
-            Show your order number and RTU ID at the window. Unclaimed reservations are released
-            after two school days so other students can reserve them.
-          </p>
-        </div>
-      </div>
       </>)}
     </>
   )

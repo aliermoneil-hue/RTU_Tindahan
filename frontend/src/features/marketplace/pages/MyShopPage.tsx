@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ExpiryNote } from '../components/ExpiryNote'
+import { ItemTitleWithVariant } from '@/common/components/ItemTitleWithVariant'
 import { Icon } from '@/common/components/Icon'
 import { apiDownload } from '@/common/api/client'
 import { navigate } from '@/common/router/router'
@@ -681,7 +682,9 @@ export function MyShopPage() {
                   {sellerList.map((l, i) => (
                     <div key={`${l.lid || l.name}-${i}`} className="stack" style={{ gap: 4 }}>
                       <div className="row between small">
-                        <span style={{ overflowWrap: 'anywhere' }}>{l.name}</span>
+                        <span style={{ overflowWrap: 'anywhere' }}>
+  <ItemTitleWithVariant title={l.name} />
+</span>
                         <span className="tnum muted">
                           {l.views} view{l.views === 1 ? '' : 's'} · {l.req} req
                         </span>
@@ -753,7 +756,9 @@ export function MyShopPage() {
                     {sellerList.map((l, i) => (
                       <div key={`${l.lid || l.name}-${i}`} className="stack" style={{ gap: 4 }}>
                         <div className="row between small">
-                          <span style={{ overflowWrap: 'anywhere' }}>{l.name}</span>
+                          <span style={{ overflowWrap: 'anywhere' }}>
+  <ItemTitleWithVariant title={l.name} />
+</span>
                           <span className="tnum muted">
                             {l.views} view{l.views === 1 ? '' : 's'} · {l.req} req
                           </span>

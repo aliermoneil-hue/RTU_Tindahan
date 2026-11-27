@@ -271,7 +271,6 @@
   background: rgba(244, 182, 58, 0.16);
   color: #fff;
   font-weight: 700;
-  box-shadow: inset 3px 0 0 #f4b63a;
 }
 .nav.on .ico {
   color: #f4b63a;

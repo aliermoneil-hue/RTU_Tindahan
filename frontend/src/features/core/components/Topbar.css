@@ -261,3 +261,425 @@
     padding: 6px 9px;
   }
 }
+
+/* ==========================================================================
+   SIGNED-IN MOBILE NAVBAR (<= 768px) — evenly spaced 7 controls
+   Desktop (> 768px) and logged-out navbar completely untouched.
+   ========================================================================== */
+
+/* Hide mobile-only elements on desktop by default */
+.mobile-search-container,
+.mobile-search-btn,
+.mobile-search-input,
+.mobile-search-close {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .top {
+    display: flex !important;
+    height: 56px;
+    padding: 0 12px;
+    align-items: center;
+    gap: 6px;
+    grid-template-columns: none !important;
+  }
+
+  /* Push right-side action group to the far right */
+  .top-end {
+    gap: 6px !important;
+    margin-left: auto;
+  }
+
+  .right-actions {
+    gap: 6px !important;
+    display: flex;
+    align-items: center;
+    max-width: 220px;
+    transition: max-width 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
+  }
+
+  /* Hide regular desktop search form on mobile */
+  .search {
+    display: none !important;
+  }
+
+  /* Group Sidebar Toggle + Search Button on the left */
+  .nav-mobile-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* Show mobile search container (always mounted, animated via CSS) */
+  .mobile-search-container {
+    display: flex;
+  }
+
+  /* Uniform icon buttons — 36px × 36px, radius 10px */
+  .top .iconbtn,
+  .menu-btn,
+  .top .theme-toggle,
+  .mobile-search-btn {
+    width: 36px !important;
+    height: 36px !important;
+    flex-shrink: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 10px !important;
+  }
+
+  /* Menu button — match other icon buttons */
+  .menu-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 0;
+    color: var(--side-ink);
+    cursor: pointer;
+  }
+  .menu-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+  :root[data-theme='dark'] .menu-btn {
+    color: var(--yellow);
+  }
+
+  /* Mobile search button — ghost/icon-only style matching Messages, Notifications, Cart */
+  .mobile-search-btn {
+    background: transparent;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--side-ink);
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    flex-shrink: 0;
+  }
+  .mobile-search-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Remove highlight box on search button & close button when search bar is open */
+  .mobile-search-container.is-open .mobile-search-btn,
+  .mobile-search-container.is-open .mobile-search-btn:hover,
+  .mobile-search-container.is-open .mobile-search-btn:focus,
+  .mobile-search-container.is-open .mobile-search-btn:active,
+  .mobile-search-container.is-open .mobile-search-close:hover,
+  .mobile-search-container.is-open .mobile-search-close:focus,
+  .mobile-search-container.is-open .mobile-search-close:active {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Badge anchored to top-right of 36px icon button */
+  .dot {
+    top: 2px !important;
+    right: 2px !important;
+  }
+
+  /* Avatar button — 34px × 34px circular */
+  .avw {
+    width: 34px !important;
+    height: 34px !important;
+  }
+  .avimg {
+    width: 34px !important;
+    height: 34px !important;
+    object-fit: cover !important;
+    border-radius: 50% !important;
+  }
+
+  /* Mobile search container — swooshes from 36px icon button to full-width pill */
+  .mobile-search-container {
+    display: flex;
+    align-items: center;
+    height: 36px;
+    overflow: hidden;
+    min-width: 36px;
+    max-width: 36px;
+    width: 36px;
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    justify-content: center;
+    transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+                max-width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+                background-color 220ms ease,
+                border-color 220ms ease;
+  }
+
+  /* Closed state: only the search icon is visible; input and close button are hidden */
+  .mobile-search-container:not(.is-open) .mobile-search-input,
+  .mobile-search-container:not(.is-open) .mobile-search-close {
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    flex: 0 0 0;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  /* Open state: pill expands to fill available navbar space, anchored on the left */
+  .top.is-mobile-search-open .mobile-search-container.is-open {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 0 10px;
+    justify-content: space-between;
+  }
+
+  :root[data-theme='dark'] .top.is-mobile-search-open .mobile-search-container.is-open {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .mobile-search-input {
+    border: 0;
+    background: none;
+    outline: 0;
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    color: var(--side-ink);
+    height: 100%;
+    width: 0;
+    flex: 0 0 0;
+    padding: 0;
+    display: block;
+  }
+  .mobile-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.65);
+  }
+  :root[data-theme='dark'] .mobile-search-input {
+    color: var(--ink);
+  }
+
+  /* Open state: input fills the pill, fully visible and typeable */
+  .top.is-mobile-search-open .mobile-search-container.is-open .mobile-search-input {
+    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 8px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Fade in input and close button with a slight delay after the swoosh starts */
+  .top.is-mobile-search-open .mobile-search-container.is-open .mobile-search-input,
+  .top.is-mobile-search-open .mobile-search-container.is-open .mobile-search-close {
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 220ms ease 80ms;
+  }
+
+  /* Close button — clean ghost style inside the pill */
+  .mobile-search-close {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--side-ink);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .mobile-search-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  :root[data-theme='dark'] .mobile-search-close {
+    color: var(--ink);
+  }
+  :root[data-theme='dark'] .mobile-search-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Collapse the right-side icons container entirely so it holds no space */
+  .top.is-mobile-search-open .right-actions {
+    flex: 0 0 0;
+    max-width: 0;
+    width: 0;
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transition: max-width 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
+  }
+
+  /* Fade and slide out right-side icons (Messages, Notifications, Cart) */
+  .top.is-mobile-search-open .right-actions > .iconbtn,
+  .top.is-mobile-search-open .right-actions > .rel > .bellbtn {
+    opacity: 0;
+    transform: translateX(12px);
+    pointer-events: none;
+    transition: opacity 200ms ease,
+                transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Reduced motion — disable transitions/transforms */
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-search-container,
+    .mobile-search-btn,
+    .mobile-search-input,
+    .mobile-search-close,
+    .top.is-mobile-search-open .right-actions > .iconbtn,
+    .top.is-mobile-search-open .right-actions > .rel > .bellbtn {
+      transition: none !important;
+    }
+    .top.is-mobile-search-open .right-actions > .iconbtn,
+    .top.is-mobile-search-open .right-actions > .rel > .bellbtn {
+      transform: none !important;
+    }
+    .top.is-mobile-search-open .mobile-search-container.is-open {
+      width: 100% !important;
+      max-width: 100% !important;
+      flex: 1 1 auto !important;
+    }
+    .top.is-mobile-search-open .mobile-search-container.is-open .mobile-search-input,
+    .top.is-mobile-search-open .mobile-search-container.is-open .mobile-search-close {
+      opacity: 1 !important;
+      pointer-events: auto !important;
+    }
+  }
+}
+
+/* Desktop (> 768px): mobile search elements stay hidden */
+@media (min-width: 769px) {
+  .mobile-search-container,
+  .mobile-search-btn,
+  .mobile-search-input,
+  .mobile-search-close {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   MOBILE POPUP CENTERING (<= 768px) — Theme & Notifications popovers
+   Centers both popovers horizontally below the mobile navbar so they never
+   clip off the left or right edge of the viewport.
+   Desktop (> 768px) positioning completely untouched.
+   ========================================================================== */
+@media (max-width: 768px) {
+  .theme-menu-popover,
+  .notif-popover {
+    position: fixed !important;
+    top: 64px !important;
+    left: 12px !important;
+    right: 12px !important;
+    margin: 0 auto !important;
+    width: auto !important;
+    max-width: 360px !important;
+    max-height: calc(100dvh - 80px);
+    overflow-y: auto;
+    z-index: 110;
+  }
+
+  /* Compact Notifications popup height — card size, not full-screen stretch */
+  .notif-popover {
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: min(420px, 60dvh) !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* ==========================================================================
+   PROFILE POPUP — Appearance switcher (compact single-row segmented pill)
+   Light Mode + Dark Mode, works on both mobile and desktop.
+   ========================================================================== */
+.profile-appearance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 12px;
+  padding: 6px 6px 6px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+}
+
+.profile-appearance-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.profile-theme-segmented {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+}
+
+.profile-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.profile-theme-btn svg,
+.profile-theme-btn .ico {
+  width: 16px;
+  height: 16px;
+}
+.profile-theme-btn:hover {
+  background: var(--card);
+  color: var(--ink);
+}
+.profile-theme-btn.active {
+  background: var(--navy);
+  color: #fff;
+  border: 0;
+}
+:root[data-theme='dark'] .profile-theme-btn.active {
+  background: var(--yellow);
+  color: var(--yellow-ink);
+}
+.profile-theme-btn.active svg,
+.profile-theme-btn.active .ico {
+  color: inherit;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .profile-theme-btn {
+    transition: none !important;
+  }
+}
+
+/* Hide standalone theme toggle button on mobile navbar (<= 768px) */
+@media (max-width: 768px) {
+  .theme-menu-wrap {
+    display: none !important;
+  }
+}

@@ -1,11 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Icon } from '@/common/components/Icon'
 import type { IconName } from '@/common/components/icons'
 import { navigate } from '@/common/router/router'
 import { setAfterLogin } from '@/common/utils/afterLogin'
+import { apiFetch } from '@/common/api/client'
 import { HeroCarousel } from '../components/HeroCarousel'
 import { Banderitas } from '@/common/components/Banderitas'
+import { MiniLoader } from '@/common/components/BrandLoader'
+import { EmptyState } from '@/common/components/EmptyState'
+import { ProductCard } from '../../marketplace/components/ProductCard'
+import { useTindahan } from '../../marketplace/context/TindahanContext'
+import { initialsOf } from '../../marketplace/constants'
+import { imgSrc } from '../../marketplace/imageStore'
+import type { PrototypeProduct } from '../../marketplace/types'
 import './LandingPage.css'
+
+interface PublicStats {
+  listings_on_sale: number
+  completed_pickups: number
+}
 
 const ABOUT_CARDS: { title: string; text: string; icon: IconName }[] = [
   { title: 'For buyers', icon: 'cart',
@@ -65,6 +78,93 @@ export function LandingPage() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [lockedPopup])
 
+  // ---------- Public stats for logged-out visitors ----------
+  // The /stats/ endpoint is AllowAny on the backend, so guests get real
+  // numbers immediately with no token. Falls back to the listings already
+  // loaded by TindahanContext if the stats endpoint is unreachable.
+  const [stats, setStats] = useState<PublicStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      try {
+        const data = await apiFetch<PublicStats>('/stats/')
+        if (!cancelled) setStats(data)
+      } catch (err) {
+        // Log instead of silently hiding so a mis-wired URL or CORS issue is
+        // visible in DevTools rather than showing "—" / 0.
+        console.error('[LandingPage] Failed to fetch public stats:', err)
+      } finally {
+        if (!cancelled) setStatsLoading(false)
+      }
+    }
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // ---------- Student sellers for the hero marquee bar ----------
+  const {
+    allProducts,
+    allOnSale,
+    listingsLoading,
+    sellerKind,
+    acctByEmail,
+    ratingOf,
+    sellerKeyByName,
+  } = useTindahan()
+
+  const studentSellers = useMemo(() => {
+    const map = new Map<string, { name: string; count: number }>()
+    allProducts
+      .filter((p: PrototypeProduct) => sellerKind(p) === 'student')
+      .forEach((p: PrototypeProduct) => {
+        const existing = map.get(p.seller)
+        if (existing) existing.count += 1
+        else map.set(p.seller, { name: p.seller, count: 1 })
+      })
+    return Array.from(map.values())
+  }, [allProducts, sellerKind])
+
+  // Duplicate when short so the marquee track is wide enough to loop on wide screens
+  const marqueeSellers = studentSellers.length < 6 ? [...studentSellers, ...studentSellers] : studentSellers
+
+  const renderSellerTrack = (suffix: string) => (
+    <div className="seller-marquee-track">
+      {marqueeSellers.map((seller) => {
+        const skey = sellerKeyByName(seller.name)
+        const acct = skey && skey !== 'official' ? acctByEmail(skey) : undefined
+        const r = ratingOf('seller', skey || seller.name)
+        return (
+          <button
+            key={`${suffix}-${seller.name}`}
+            type="button"
+            className="seller-marquee-item"
+            onClick={() => navigate('student-sellers')}
+          >
+            <span className="seller-avatar">
+              {acct?.avatar ? (
+                <img src={imgSrc(acct.avatar)} alt="" className="seller-avatar-img" />
+              ) : (
+                <span className="seller-avatar-init">{initialsOf(acct?.name || seller.name)}</span>
+              )}
+            </span>
+            <div className="seller-info">
+              <b className="seller-name">{seller.name}</b>
+              <span className="seller-meta">
+                {r.n
+                  ? `★ ${r.avg.toFixed(1)} · ${seller.count} listings`
+                  : `${seller.count} listings`}
+              </span>
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+
   return (
     <>
       {/* ---------- HERO ---------- */}
@@ -95,6 +195,16 @@ export function LandingPage() {
           <HeroCarousel />
         </div>
       </section>
+
+      {/* ---------- STUDENT SELLERS MARQUEE BAR ---------- */}
+      {marqueeSellers.length > 0 && (
+        <section className="seller-marquee-bar" aria-label="Active student sellers">
+          <div className="seller-marquee" role="marquee" aria-label="Student sellers">
+            {renderSellerTrack('a')}
+            {renderSellerTrack('b')}
+          </div>
+        </section>
+      )}
 
       {/* ---------- ABOUT ---------- */}
       <section className="ld-sec" id="about">
@@ -172,67 +282,79 @@ export function LandingPage() {
             </p>
           </div>
 
+          {/* Live public stats (no sign-in required). Falls back to the
+              listings already loaded by TindahanContext when the stats
+              endpoint is unreachable. */}
           <div className="ld-stats">
             <div className="card ld-stat">
               <span className="ld-ic"><Icon name="tag" /></span>
               <div>
-                <div className="tnum ld-num" data-num="0">0</div>
+                <div className="tnum ld-num" aria-label="Listings on sale now">
+                  {statsLoading ? '—' : String(stats?.listings_on_sale ?? allOnSale.length)}
+                </div>
                 <span className="small muted">listings on sale now</span>
               </div>
             </div>
             <div className="card ld-stat">
               <span className="ld-ic"><Icon name="check" /></span>
               <div>
-                <div className="tnum ld-num" data-num="0">0</div>
+                <div className="tnum ld-num" aria-label="Completed campus pickups">
+                  {statsLoading ? '—' : String(stats?.completed_pickups ?? 0)}
+                </div>
                 <span className="small muted">completed campus pickups</span>
               </div>
             </div>
-          </div>
-
-          <div className="g-head" style={{ marginTop: 30, textAlign: 'left' }}>
-            <h3 style={{ fontSize: 18 }}>Open to guests</h3>
-            <p className="small muted">Look around these two sections without an account.</p>
-          </div>
-          <div className="g-3">
-            <button type="button" className="card stack g-open" onClick={() => navigate('books')}>
-              <span className="avatar" style={{ background: 'var(--soft)', color: 'var(--blue)', borderRadius: 10 }}>
-                <Icon name="book" />
-              </span>
-              <b style={{ fontSize: 16 }}>Books & Academic Materials</b>
-              <span className="small muted">Textbooks, notes and supplies at student prices.</span>
-              <span className="row between">
-                <span className="tiny" style={{ color: 'var(--blue)', fontWeight: 700 }}>
-                  Browse as a guest
-                </span>
-                <span className="row small" style={{ gap: 4, color: 'var(--blue)', fontWeight: 700 }}>
-                  View as guest <Icon name="arrow" size="sm" />
-                </span>
-              </span>
-            </button>
-            <button type="button" className="card stack g-open" onClick={() => navigate('merch')}>
-              <span className="avatar" style={{ background: 'var(--soft)', color: 'var(--blue)', borderRadius: 10 }}>
-                <Icon name="shirt" />
-              </span>
-              <b style={{ fontSize: 16 }}>RTU Merchandise</b>
-              <span className="small muted">Uniforms, books and merchandise from RTU staff.</span>
-              <span className="row between">
-                <span className="tiny" style={{ color: 'var(--blue)', fontWeight: 700 }}>
-                  Browse as a guest
-                </span>
-                <span className="row small" style={{ gap: 4, color: 'var(--blue)', fontWeight: 700 }}>
-                  View as guest <Icon name="arrow" size="sm" />
-                </span>
-              </span>
-            </button>
           </div>
 
           <div className="row between wrap g-head" style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 30 }}>
             <div>
               <h3 style={{ fontSize: 18 }}>Latest on Tindahan</h3>
             </div>
+            {allOnSale.length > 0 && (
+              <button
+                type="button"
+                className="btn ghost sm"
+                onClick={() => {
+                  setAfterLogin('browse')
+                  navigate('login')
+                }}
+              >
+                Browse all listings <Icon name="arrow" size="sm" />
+              </button>
+            )}
           </div>
           <div className="pgrid pgrid4">
-            {/* Product grid populated by backend - placeholder for now */}
+            {listingsLoading ? (
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  padding: 24,
+                }}
+              >
+                <MiniLoader variant="section" size="md" label="Loading listings…" />
+              </div>
+            ) : allOnSale.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <EmptyState
+                  icon="bag"
+                  title="No listings yet"
+                >
+                  Be the first to see what RTU students are selling. Sign in to browse the full marketplace.
+                </EmptyState>
+              </div>
+            ) : (
+              allOnSale.slice(0, 8).map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  onOpen={(product) =>
+                    navigate(`product?id=${encodeURIComponent(product.id)}`)
+                  }
+                />
+              ))
+            )}
           </div>
 
           <div className="g-head" style={{ marginTop: 30, textAlign: 'left' }}>

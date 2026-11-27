@@ -120,17 +120,25 @@
   padding: 20px;
   box-shadow: 0 16px 48px rgba(10, 20, 38, 0.28);
 }
+.crop-stage {
+  width: 100%;
+  height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .crop-viewport {
   position: relative;
   width: 100%;
   max-width: 440px;
-  aspect-ratio: 4 / 3;
   margin: 0 auto;
   border-radius: 14px;
   overflow: hidden;
   background: var(--soft, #f4f6f9);
   cursor: grab;
   border: 2px solid var(--blue, #2251a3);
+  box-sizing: border-box;
 }
 :root[data-theme='dark'] .crop-viewport {
   background: #1e2026;
@@ -139,8 +147,8 @@
   cursor: grabbing;
 }
 
-/* Framing mode toggle pills */
-.mode-pill {
+/* Aspect ratio preset pills */
+.aspect-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -153,18 +161,36 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
 }
-.mode-pill:hover {
+.aspect-pill:hover {
   border-color: var(--blue, #2251a3);
   color: var(--blue, #2251a3);
 }
-.mode-pill.on {
+.aspect-pill.on {
   background: var(--blue, #2251a3);
   color: #fff;
   border-color: var(--blue, #2251a3);
 }
-.mode-pill.on:hover {
+.aspect-pill.on:hover {
   background: #1a4282;
+}
+:root[data-theme='dark'] .aspect-pill {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #2a2d33;
+  color: #c9cfd6;
+}
+:root[data-theme='dark'] .aspect-pill:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+:root[data-theme='dark'] .aspect-pill.on {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+:root[data-theme='dark'] .aspect-pill.on:hover {
+  background: #2a5db0;
 }
 .crop-grid-overlay {
   position: absolute;
@@ -183,13 +209,15 @@
   border-radius: 16px;
   overflow: hidden;
   aspect-ratio: 4 / 3;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .gal-img {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  object-position: center;
   display: block;
 }
 .gal-tag {
@@ -204,8 +232,9 @@
   border-radius: 99px;
 }
 .gal-th {
-  width: 68px;
-  aspect-ratio: 1;
+  flex: 0 0 auto;
+  width: 60px;
+  height: 60px;
   padding: 0;
   border: 2px solid transparent;
   border-radius: 10px;
@@ -222,6 +251,24 @@
   object-fit: contain;
   object-position: center;
   display: block;
+}
+
+.pdp-thumbs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 2px 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .uorder-row {

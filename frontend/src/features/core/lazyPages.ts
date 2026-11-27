@@ -77,11 +77,6 @@ export const HelpCenterPage = lazy(() =>
     default: m.HelpCenterPage,
   })),
 )
-export const GuestSectionPage = lazy(() =>
-  import('@/features/marketplace/pages/GuestSectionPage').then((m) => ({
-    default: m.GuestSectionPage,
-  })),
-)
 export const GuestStudentSellersPage = lazy(() =>
   import('@/features/marketplace/pages/GuestStudentSellersPage').then((m) => ({
     default: m.GuestStudentSellersPage,

@@ -22,7 +22,6 @@ import {
   ForumReportsPage,
   ForgotPasswordPage,
   GuestOfficialStorePage,
-  GuestSectionPage,
   GuestStudentSellersPage,
   HelpCenterPage,
   LandingPage,
@@ -44,6 +43,7 @@ import {
   UsersAuditPage,
   VerifyPage,
 } from './lazyPages'
+
 import { AppLayout } from './layouts/AppLayout'
 import { PublicLayout } from './layouts/PublicLayout'
 import { BrandLoader } from '@/common/components/BrandLoader/BrandLoader'
@@ -186,10 +186,6 @@ function renderActiveRoute(path: string, user: { email: string; role: string } |
         return <FavoritesPage />
       case 'profile':
         return <ProfilePage />
-      case 'books':
-        return <GuestSectionPage kind="books" />
-      case 'merch':
-        return <GuestSectionPage kind="merch" />
       case 'moderation':
         return <ModerationPage />
       case 'users':
@@ -237,12 +233,6 @@ function renderActiveRoute(path: string, user: { email: string; role: string } |
   if (path === 'forgot-password') {
     return <ForgotPasswordPage />
   }
-  if (path === 'books') {
-    return <GuestSectionPage kind="books" />
-  }
-  if (path === 'merch') {
-    return <GuestSectionPage kind="merch" />
-  }
   if (path === 'student-sellers') {
     return <GuestStudentSellersPage />
   }
@@ -263,6 +253,11 @@ function renderActiveRoute(path: string, user: { email: string; role: string } |
       </div>
     )
   }
+  // Lian's guest product view: a visitor may open a listing read-only, and the
+  // API answers the detail call without a token for a published row.
+  if (path === 'product') {
+    return <ProductPage />
+  }
   return <LandingPage />
 }
 
@@ -281,10 +276,9 @@ export function AppRoutes() {
     path === 'register' ||
     path === 'verify' ||
     path === 'forgot-password' ||
-    path === 'books' ||
-    path === 'merch' ||
     path === 'student-sellers' ||
     path === 'store' ||
+    path === 'product' ||            // guests may view a listing's detail page (read-only)
     path === 'help' ||
     path === 'help-center' ||
     // PR-01: the privacy notice must be readable before anyone signs up, and
@@ -354,10 +348,21 @@ export function AppRoutes() {
     }
   }, [redirectTo, user, path, params])
 
-  /** Mobile only: after signing in / creating an account from the landing page,
-   * stay at the top for 3 seconds, then scroll down with animation. The flag is
-   * set in sessionStorage by PubTop before navigation, so it survives the page
-   * change (PubTop unmounts on login/register). */
+  // Scroll to top of window, document, and .page container on every route change
+  useEffect(() => {
+    const raf = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior })
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
+      document.querySelector('.page')?.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior })
+    })
+    return () => window.cancelAnimationFrame(raf)
+  }, [path])
+
+  // Mobile only: after signing in / creating an account from the landing page,
+  // stay at the top for 3 seconds, then scroll down with animation. The flag is
+  // set in sessionStorage by PubTop before navigation, so it survives the page
+  // change (PubTop unmounts on login/register).
   useEffect(() => {
     const isMobile = window.innerWidth <= 900
     const shouldScroll = sessionStorage.getItem('rtu:scroll-after-login') === 'true'

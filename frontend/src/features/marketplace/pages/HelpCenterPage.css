@@ -177,7 +177,6 @@
   background: var(--soft);
   color: var(--blue);
   font-weight: 700;
-  box-shadow: inset 3px 0 0 var(--yellow);
 }
 .hc-nav-ic {
   width: 26px;

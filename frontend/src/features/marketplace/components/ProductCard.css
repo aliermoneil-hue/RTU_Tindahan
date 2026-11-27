@@ -2,24 +2,9 @@
    PRODUCT CARD & PHOTO TILE (prototype: .pcard, .photo, .heart, .srcpill)
    ========================================================================== */
 
-.pcard {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 11px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  cursor: pointer;
-  text-align: left;
-  box-shadow: 0 1px 2px rgba(26, 47, 87, 0.05);
-  transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
-  overflow: hidden;
-  min-width: 0;
-  box-sizing: border-box;
-  container-type: inline-size;
-  container-name: pcard;
-}
+/* Shared .pcard, .photo, .pimg, .srcpill, .tag, .heart, .rate-line rules live in prototype.css.
+   Card-specific overrides below. */
+
 .pcard:hover {
   border-color: #b9c3d8;
   box-shadow: var(--shadow);
@@ -31,74 +16,13 @@
   border-color: var(--line);
 }
 
-/* Border top color specifications:
-   - If sold by the school: Blue
-   - If student product: Yellow
-   - If service: Red
-*/
-.pcard.type-school,
-.pcard.src-school:not(.is-service) {
-  border-top: 4px solid var(--blue, #2251a3);
-}
-.pcard.type-student,
-.pcard.src-student:not(.is-service) {
-  border-top: 4px solid var(--yellow, #e5a712);
-}
-.pcard.type-service,
-.pcard.is-service,
-.pcard.src-service {
-  border-top: 4px solid var(--red, #b33939);
-}
+/* Border top color specifications removed — uniform borders on all sides */
 
-.pcard h4 {
-  font-size: clamp(12.5px, 6.2cqw, 15px);
-  font-weight: 700;
-  line-height: 1.3;
-  overflow-wrap: break-word;
-  hyphens: auto;
-  margin: 0;
-}
-
-.pcard .price {
-  font-size: clamp(13px, 7cqw, 16px);
-  flex: none;
-  white-space: nowrap;
-}
-
-.pcard .row.between:not(.wrap) {
-  flex-wrap: wrap;
-  row-gap: 2px;
-  min-width: 0;
-}
-
-.pcard .pcard-seller {
-  min-width: 0;
-  margin-left: auto;
-  text-align: right;
-  overflow-wrap: break-word;
-}
-
-.pcard .srcpill,
-.pcard .pill {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/* Shelf-specific: hide nophoto on very narrow cards */
 @container pcard (max-width: 170px) {
   .pcard .photo .nophoto { display: none; }
   .pcard .photo .tag { font-size: 9px; max-width: calc(100% - 44px); }
   .pcard .heart { width: 26px; height: 26px; top: 6px; right: 6px; }
-  .pcard .pcard-seller {
-    flex-basis: 100%;
-    margin-left: 0;
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .pcard .row.between.wrap .pill { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

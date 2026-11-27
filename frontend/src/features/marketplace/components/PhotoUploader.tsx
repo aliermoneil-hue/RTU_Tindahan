@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { Icon } from '@/common/components/Icon'
 import type { IconName } from '@/common/components/icons'
-import { IMG_RULES, imgAdd, imgSrc, imgsOf, replaceImgData } from '../imageStore'
+import { IMG_RULES, imgAdd, imgEditState, imgOriginalSrc, imgSrc, imgsOf, replaceImgData } from '../imageStore'
 import { useTindahan } from '../context/TindahanContext'
 import type { PrototypeProduct } from '../types'
 import './PhotoUploader.css'
@@ -30,14 +30,30 @@ interface CropModalProps {
   onSave: () => void
 }
 
+type AspectPreset = 'fit' | '1:1' | '4:3' | '3:4' | '16:9'
+
+const ASPECT_PRESETS: Record<AspectPreset, { label: string; ar: number; viewW: number; viewH: number }> = {
+  fit: { label: 'Fit', ar: 4 / 3, viewW: 400, viewH: 300 },
+  '1:1': { label: '1:1', ar: 1, viewW: 320, viewH: 320 },
+  '4:3': { label: '4:3', ar: 4 / 3, viewW: 400, viewH: 300 },
+  '3:4': { label: '3:4', ar: 3 / 4, viewW: 240, viewH: 320 },
+  '16:9': { label: '16:9', ar: 16 / 9, viewW: 420, viewH: 236 },
+}
+
 function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
   const { toast, bumpImgVersion } = useTindahan()
-  const src = imgSrc(imgId)
+  // Always load the full untouched original so re-adjusting never loses data.
+  const originalSrc = imgOriginalSrc(imgId)
+  const savedEdit = imgEditState(imgId)
 
-  const [zoom, setZoom] = useState(1.0)
-  const [rotation, setRotation] = useState(0) // 0, 90, 180, 270
-  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
-  const [mode, setMode] = useState<'original' | 'crop'>('original')
+  const [zoom, setZoom] = useState(() => savedEdit?.zoom ?? 1.0)
+  const [rotation, setRotation] = useState(() => savedEdit?.rotation ?? 0) // 0, 90, 180, 270
+  const [pan, setPan] = useState<{ x: number; y: number }>(
+    () => savedEdit?.pan ?? { x: 0, y: 0 },
+  )
+  const [preset, setPreset] = useState<AspectPreset>(
+    () => (savedEdit?.preset ? (savedEdit.preset as AspectPreset) : 'fit'),
+  )
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null)
   const [dragging, setDragging] = useState(false)
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -46,12 +62,11 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
-  // Viewport dimensions: always fixed 4:3 (400 × 300)
-  const VIEW_W = 400
-  const VIEW_H = 300
+  const presetMeta = ASPECT_PRESETS[preset]
+  const { viewW: VIEW_W, viewH: VIEW_H } = presetMeta
 
-  const handleModeChange = (next: 'original' | 'crop') => {
-    setMode(next)
+  const handlePresetChange = (next: AspectPreset) => {
+    setPreset(next)
     setZoom(1.0)
     setPan({ x: 0, y: 0 })
   }
@@ -71,11 +86,11 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
       const iw = isRotated90 ? imgSize.h : imgSize.w
       const ih = isRotated90 ? imgSize.w : imgSize.h
 
-      // baseScale depends on mode: 'crop' fills the 4:3 box, 'original' fits the whole image
+      // 'fit' uses Math.min (whole image visible, space around), all others use Math.max (fills the box)
       const baseScale =
-        mode === 'crop'
-          ? Math.max(VIEW_W / iw, VIEW_H / ih)
-          : Math.min(VIEW_W / iw, VIEW_H / ih)
+        preset === 'fit'
+          ? Math.min(VIEW_W / iw, VIEW_H / ih)
+          : Math.max(VIEW_W / iw, VIEW_H / ih)
 
       const renderedW = iw * baseScale * curZoom
       const renderedH = ih * baseScale * curZoom
@@ -88,7 +103,7 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
         y: Math.max(-maxPanY, Math.min(maxPanY, nextY)),
       }
     },
-    [imgSize, mode],
+    [imgSize, preset, VIEW_W, VIEW_H],
   )
 
   const handleZoomChange = (newZoom: number) => {
@@ -150,7 +165,7 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
     setDragging(false)
   }
 
-  // Save the cropped image to canvas
+  // Save the cropped image to canvas — exact WYSIWYG export
   const handleSaveCrop = () => {
     if (!imgRef.current || !imgSize) {
       onClose()
@@ -161,29 +176,27 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
     const iw = isRotated90 ? imgSize.h : imgSize.w
     const ih = isRotated90 ? imgSize.w : imgSize.h
 
-    let OUT_W: number
-    let OUT_H: number
-    let viewW: number
-
-    if (mode === 'crop') {
-      OUT_W = 800
-      OUT_H = 600
-      viewW = VIEW_W
+    // Output canvas size: 2.5x the view size, longest edge capped at 1000px
+    const scale25 = 2.5
+    let OUT_W = VIEW_W * scale25
+    let OUT_H = VIEW_H * scale25
+    const maxEdge = 1000
+    if (Math.max(OUT_W, OUT_H) > maxEdge) {
+      const fit = maxEdge / Math.max(OUT_W, OUT_H)
+      OUT_W = Math.round(OUT_W * fit)
+      OUT_H = Math.round(OUT_H * fit)
     } else {
-      // 'original' mode: preserve exact rotated aspect ratio, cap longest edge at 1600
-      const maxEdge = 1600
-      const baseScaleOrig = Math.min(VIEW_W / iw, VIEW_H / ih)
-      const fittedW = iw * baseScaleOrig
-      if (Math.max(iw, ih) <= maxEdge) {
-        OUT_W = iw
-        OUT_H = ih
-      } else {
-        const fit = maxEdge / Math.max(iw, ih)
-        OUT_W = Math.round(iw * fit)
-        OUT_H = Math.round(ih * fit)
-      }
-      viewW = fittedW
+      OUT_W = Math.round(OUT_W)
+      OUT_H = Math.round(OUT_H)
     }
+
+    const scaleFactor = OUT_W / VIEW_W
+
+    // baseScale matches preview exactly
+    const baseScale =
+      preset === 'fit'
+        ? Math.min(VIEW_W / iw, VIEW_H / ih)
+        : Math.max(VIEW_W / iw, VIEW_H / ih)
 
     const canvas = document.createElement('canvas')
     canvas.width = OUT_W
@@ -195,25 +208,27 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
       return
     }
 
-    const baseScale =
-      mode === 'crop'
-        ? Math.max(VIEW_W / iw, VIEW_H / ih)
-        : Math.min(VIEW_W / iw, VIEW_H / ih)
-    const scaleFactor = OUT_W / viewW
-
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, OUT_W, OUT_H)
-
+    // Leave uncovered space transparent (no solid white fill) so it blends
+    // with the card background in Light Mode or Dark Mode.
     ctx.save()
     ctx.translate(OUT_W / 2 + pan.x * scaleFactor, OUT_H / 2 + pan.y * scaleFactor)
     ctx.rotate((rotation * Math.PI) / 180)
     ctx.scale(baseScale * zoom * scaleFactor, baseScale * zoom * scaleFactor)
-
     ctx.drawImage(imgRef.current, -imgSize.w / 2, -imgSize.h / 2)
     ctx.restore()
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-    replaceImgData(imgId, dataUrl, OUT_W, OUT_H)
+    let dataUrl: string
+    try {
+      dataUrl = canvas.toDataURL('image/webp', 0.9)
+    } catch {
+      dataUrl = canvas.toDataURL('image/png')
+    }
+    replaceImgData(imgId, dataUrl, OUT_W, OUT_H, {
+      preset,
+      zoom,
+      rotation,
+      pan: { x: pan.x, y: pan.y },
+    })
     bumpImgVersion()
     toast('Photo adjusted.')
     onSave()
@@ -226,9 +241,9 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
   const ih = imgSize ? (isRotated90 ? imgSize.w : imgSize.h) : VIEW_H
 
   const baseScale =
-    mode === 'crop'
-      ? Math.max(VIEW_W / iw, VIEW_H / ih)
-      : Math.min(VIEW_W / iw, VIEW_H / ih)
+    preset === 'fit'
+      ? Math.min(VIEW_W / iw, VIEW_H / ih)
+      : Math.max(VIEW_W / iw, VIEW_H / ih)
 
   return (
     <div className="crop-overlay" role="dialog" aria-modal="true" aria-label="Adjust photo preview">
@@ -245,20 +260,27 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
           </button>
         </div>
 
-        <div
-          ref={viewportRef}
-          className={`crop-viewport ${dragging ? 'is-dragging' : ''}`}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          onMouseLeave={onMouseUp}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-        >
+        <div className="crop-stage">
+          <div
+            ref={viewportRef}
+            className={`crop-viewport ${dragging ? 'is-dragging' : ''}`}
+            style={{
+              width: VIEW_W + 'px',
+              height: VIEW_H + 'px',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+            }}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseUp}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
           <img
             ref={imgRef}
-            src={src}
+            src={originalSrc}
             alt="Adjusting"
             draggable={false}
             onLoad={handleImageLoad}
@@ -275,26 +297,28 @@ function ImageAdjustModal({ imgId, onClose, onSave }: CropModalProps) {
             }}
           />
           <div className="crop-grid-overlay" />
+          </div>
         </div>
 
-        {/* Framing mode toggle: Original vs Crop 4:3 */}
-        <div className="row wrap" style={{ gap: 8, justifyContent: 'center', marginTop: 10 }}>
-          <button
-            type="button"
-            className={`mode-pill ${mode === 'original' ? 'on' : ''}`}
-            aria-label="Original aspect ratio"
-            onClick={() => handleModeChange('original')}
-          >
-            Original
-          </button>
-          <button
-            type="button"
-            className={`mode-pill ${mode === 'crop' ? 'on' : ''}`}
-            aria-label="Crop 4:3"
-            onClick={() => handleModeChange('crop')}
-          >
-            Crop 4:3
-          </button>
+        {/* Aspect ratio presets */}
+        <div
+          className="row wrap"
+          style={{ gap: 6, justifyContent: 'center', marginTop: 10, flexWrap: 'wrap' }}
+        >
+          {Object.entries(ASPECT_PRESETS).map(([key, p]) => {
+            const active = preset === key
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`aspect-pill ${active ? 'on' : ''}`}
+                aria-label={`Aspect ratio ${p.label}`}
+                onClick={() => handlePresetChange(key as AspectPreset)}
+              >
+                {p.label}
+              </button>
+            )
+          })}
         </div>
 
         <div className="crop-controls stack" style={{ gap: 12, marginTop: 14 }}>
@@ -844,9 +868,13 @@ export function PhotoUploader({
 export function ProductGallery({
   product,
   favButton,
+  onMainImageClick,
+  onNavigate,
 }: {
   product: PrototypeProduct
   favButton?: ReactNode
+  onMainImageClick?: (idx: number) => void
+  onNavigate?: (dir: -1 | 1) => void
 }) {
   const list = imgsOf(product)
   const [selectedIdx, setSelectedIdx] = useState(0)
@@ -871,6 +899,13 @@ export function ProductGallery({
   const activeId = list[clampedIdx] || list[0]
   const activeSrc = imgSrc(activeId) || imgSrc(list[0]) || ''
 
+  const goTo = (dir: -1 | 1) => {
+    const next = clampedIdx + dir
+    if (next < 0 || next >= list.length) return
+    setSelectedIdx(next)
+    onNavigate?.(dir)
+  }
+
   return (
     <div className="stack" style={{ gap: 10 }}>
       <div className="rel gal-main">
@@ -878,12 +913,34 @@ export function ProductGallery({
           className="gal-img pimg"
           src={activeSrc}
           alt={`${product.name}, photo ${clampedIdx + 1} of ${list.length}`}
+          style={{ cursor: list.length > 1 ? 'zoom-in' : 'default' }}
+          onClick={() => onMainImageClick?.(clampedIdx)}
         />
         <span className="tag gal-tag">{product.tag || ''}</span>
         {favButton}
+        {list.length > 1 && (
+          <>
+            <button
+              type="button"
+              className="gal-nav gal-nav-prev"
+              aria-label="Previous photo"
+              onClick={(e) => { e.stopPropagation(); goTo(-1) }}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="gal-nav gal-nav-next"
+              aria-label="Next photo"
+              onClick={(e) => { e.stopPropagation(); goTo(1) }}
+            >
+              ›
+            </button>
+          </>
+        )}
       </div>
       {list.length > 1 && (
-        <div className="row wrap">
+        <div className="row pdp-thumbs">
           {list.map((id, i) => {
             const src = imgSrc(id)
             if (!src) return null

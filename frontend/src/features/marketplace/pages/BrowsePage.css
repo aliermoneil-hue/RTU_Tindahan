@@ -15,6 +15,112 @@
 }
 
 /* ==========================================================================
+   CUSTOM CHECKBOXES — Browse All (desktop sidebar + mobile filter sheet)
+   Matches OrdersPage.css .orders-check input (19px x 19px, 6px radius)
+   ========================================================================== */
+
+/* Parent label alignment — override prototype.css .check (align-items: flex-start) */
+.check {
+  align-items: center;
+}
+
+/* Custom checkbox input — beats prototype.css .check input via higher specificity */
+.browse-check-input,
+.check input.browse-check-input {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  flex: none;
+  width: 19px;
+  height: 19px;
+  border-radius: 6px;
+  border: 1.75px solid var(--muted);
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease;
+}
+
+.browse-check-input::after,
+.check input.browse-check-input::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: solid #ffffff;
+  border-width: 0 2.2px 2.2px 0;
+  transform: rotate(45deg) scale(0);
+  margin-top: -2px;
+  transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.browse-check-input:hover,
+.check input.browse-check-input:hover {
+  border-color: var(--navy);
+}
+
+.browse-check-input:active,
+.check input.browse-check-input:active {
+  transform: scale(0.92);
+}
+
+.browse-check-input:checked,
+.check input.browse-check-input:checked {
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.browse-check-input:checked::after,
+.check input.browse-check-input:checked::after {
+  transform: rotate(45deg) scale(1);
+}
+
+.browse-check-input:focus-visible,
+.check input.browse-check-input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(31, 95, 174, 0.25);
+}
+
+/* Dark mode */
+:root[data-theme='dark'] .browse-check-input,
+:root[data-theme='dark'] .check input.browse-check-input {
+  border-color: #4b5262;
+  background: #181a1f;
+}
+
+:root[data-theme='dark'] .browse-check-input:hover,
+:root[data-theme='dark'] .check input.browse-check-input:hover {
+  border-color: var(--yellow);
+}
+
+:root[data-theme='dark'] .browse-check-input:checked,
+:root[data-theme='dark'] .check input.browse-check-input:checked {
+  background: var(--yellow);
+  border-color: var(--yellow);
+}
+
+:root[data-theme='dark'] .browse-check-input:checked::after,
+:root[data-theme='dark'] .check input.browse-check-input:checked::after {
+  border-color: var(--yellow-ink, #16171a);
+}
+
+:root[data-theme='dark'] .browse-check-input:focus-visible,
+:root[data-theme='dark'] .check input.browse-check-input:focus-visible {
+  box-shadow: 0 0 0 3px rgba(229, 181, 76, 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .browse-check-input,
+  .check input.browse-check-input {
+    transition: none !important;
+  }
+  .browse-check-input::after,
+  .check input.browse-check-input::after {
+    transition: none !important;
+  }
+}
+
+/* ==========================================================================
    MOBILE-ONLY BROWSE CONTROLS (< 768px)
    ========================================================================== */
 
@@ -383,31 +489,52 @@
 
   .bgrid .pgrid .pcard { min-width: 0; width: 100%; overflow: hidden; }
 
-  /* Bottom sheet filter drawer */
-  .mobile-filter-sheet {
+  /* Bottom sheet filter backdrop */
+  .mobile-filter-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 80;
-    display: flex;
-    align-items: flex-end;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(2px);
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    z-index: 120;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 280ms ease, visibility 0s linear 280ms;
   }
+  .mobile-filter-backdrop.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 280ms ease, visibility 0s linear 0s;
+  }
+
+  /* Bottom sheet filter content */
   .mobile-filter-sheet-content {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 121;
     width: 100%;
-    max-width: 520px;
+    height: auto;
+    max-height: 86dvh;
+    border-radius: 18px 18px 0 0;
     background: var(--card);
-    border-radius: 16px 16px 0 0;
-    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
     display: flex;
     flex-direction: column;
-    max-height: 90vh;
-    animation: sheetSlideUp 0.25s ease-out;
-    margin: auto 0 0 auto;
+    overflow: hidden;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.35);
+    transform: translate3d(0, 100%, 0);
+    will-change: transform;
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 320ms;
   }
-  @keyframes sheetSlideUp {
-    from { transform: translateY(100%); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+  .mobile-filter-sheet-content.is-open {
+    transform: translate3d(0, 0, 0);
+    visibility: visible;
+    pointer-events: auto;
+    transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0s;
   }
 
   .mobile-filter-sheet-header {
@@ -421,6 +548,35 @@
     margin: 0;
     font-size: 17px;
     font-weight: 700;
+    color: var(--ink);
+  }
+
+  .mobile-filter-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 0;
+    background: var(--soft);
+    color: var(--muted);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .mobile-filter-close:hover {
+    background: var(--line);
+    color: var(--ink);
+  }
+
+  :root[data-theme='dark'] .mobile-filter-close {
+    background: #2a2d33;
+    color: var(--muted);
+  }
+
+  :root[data-theme='dark'] .mobile-filter-close:hover {
+    background: #353942;
     color: var(--ink);
   }
 
@@ -457,9 +613,12 @@
   }
 
   /* Lock body scroll while sheet is open */
+  html.filter-sheet-open,
   body.filter-sheet-open {
     overflow: hidden;
   }
+
+  /* Custom checkboxes for mobile filter sheet — now defined at top level (.browse-check-input) */
 }
 
 /* Desktop: keep Sort label + select side by side (original layout) */
@@ -486,7 +645,5 @@
 @media (min-width: 1024px) {
   .bgrid .pgrid { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; gap: 12px; width: 100%; }
   .bgrid .pgrid .pcard { min-width: 0; width: 100%; overflow: hidden; }
-  .bgrid .pgrid .pcard h4 { font-size: 13px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
-  .bgrid .pgrid .pcard .srcpill, .bgrid .pgrid .pcard .pill { font-size: 10px; padding: 2px 6px; }
   .bgrid .pgrid .pcard .price { white-space: nowrap; flex-shrink: 0; }
 }

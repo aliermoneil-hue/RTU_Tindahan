@@ -21,7 +21,12 @@ from django.conf import settings
 from django.db.models import Avg, Case, Count, F, IntegerField, OuterRef, Q, Subquery, Value, When
 from django.db.models.functions import Coalesce
 from rest_framework import serializers, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import (
+    action,
+    api_view,
+    authentication_classes,
+    permission_classes,
+)
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
@@ -500,3 +505,58 @@ class ListingViewSet(viewsets.ModelViewSet):
             actor=request.user,
         )
         return Response(self.get_serializer(listing).data)
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def top_selling(request):
+    """Public top-selling listings for the hero carousel.
+
+    Returns up to 5 approved listings, sorted by sold count (top sellers
+    first), then view count, then newest. Falls back to newest active
+    listings when sales are low so the carousel always has real products.
+    No authentication required.
+    """
+    # The catalogue has no single `status` column any more: moderation and
+    # availability were split in migration 0003, so the marketplace's own rule
+    # is spelled out here — approved AND still available, from an active seller.
+    # `Listing.Status.APPROVED` (what this branch was written against) does not
+    # exist and raises AttributeError, which Django answers as a 500.
+    listings = (
+        Listing.objects.select_related("seller", "category")
+        .prefetch_related("photos")
+        .filter(
+            moderation_status=Listing.ModerationStatus.APPROVED,
+            availability_status=Listing.AvailabilityStatus.AVAILABLE,
+            seller__status="active",
+        )
+        .order_by("-sold_count", "-view_count", "-created_at")[:5]
+    )
+
+    data = []
+    for listing in listings:
+        primary_photo = (
+            listing.photos.filter(sort_order=0).first() or listing.photos.first()
+        )
+        # A relative /media/ path, not build_absolute_uri: the app is served
+        # through a tunnel whose hostname rotates, and an absolute URL would
+        # freeze one rotation's hostname into the hero carousel. The browser
+        # resolves it against the site it is already on, exactly like every
+        # other photo in the API.
+        image_url = primary_photo.image.url if primary_photo else None
+        data.append(
+            {
+                "id": listing.id,
+                "slug": listing.slug,
+                "title": listing.title,
+                "price": str(listing.price),
+                "image_url": image_url,
+                "seller_name": listing.seller.display_name,
+                "is_official": listing.is_official,
+                "category_name": listing.category.name,
+                "sold_count": listing.sold_count,
+                "rating": None,
+            }
+        )
+    return Response(data)
