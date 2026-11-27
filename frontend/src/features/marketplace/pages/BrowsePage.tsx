@@ -89,7 +89,16 @@ export function BrowsePage() {
           ' ' +
           p.tag +
           ' ' +
-          (p.svcType || '')
+          (p.svcType || '') +
+          ' ' +
+          // BD-01: the seller's own description is searchable too. Without it
+          // "blue" never matched an item listed as "Upuan — Kulay blue at
+          // orange", which read as the search bar being broken.
+          (p.desc || '') +
+          ' ' +
+          // ...and the keywords the API read off the seller's photos, so an
+          // item whose colour exists only in the picture is still findable.
+          (p.searchTags || '')
         )
           .toLowerCase()
           .includes(q)

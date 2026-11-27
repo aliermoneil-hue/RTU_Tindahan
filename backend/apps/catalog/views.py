@@ -33,6 +33,7 @@ from apps.audit.services import record
 from apps.notifications.services import notify
 from apps.screening.services import record_moderator_decision, run_screening
 
+from .indexing import stamp_search_tags
 from .models import Category, Listing
 from .serializers import (
     CategorySerializer,
@@ -329,8 +330,14 @@ class ListingViewSet(viewsets.ModelViewSet):
         if category := params.get("category"):
             queryset = queryset.filter(category__slug=category)
         if search := params.get("search"):
+            # BD-01 extension: the keywords read off the seller's own photos are
+            # part of the text a buyer may search. They sit beside title and
+            # description rather than replacing them, so a listing with no
+            # picture (or a picture the model could not read) is still findable.
             queryset = queryset.filter(
-                Q(title__icontains=search) | Q(description__icontains=search)
+                Q(title__icontains=search)
+                | Q(description__icontains=search)
+                | Q(search_tags__icontains=search)
             )
         if listing_type := params.get("type"):
             queryset = queryset.filter(listing_type=listing_type)
@@ -389,6 +396,9 @@ class ListingViewSet(viewsets.ModelViewSet):
         # flagged verdict moves it to needs_review; a clean one keeps waiting
         # for a moderator, because screening never publishes on its own.
         run_screening(listing)
+        # BD-01 extension: the first picture is read for the words a buyer would
+        # search for, so an item listed as "Upuan" is still found by "blue".
+        stamp_search_tags(listing)
         # Answer with the read shape so the client gets the id and slug back.
         return Response(
             ListingReadSerializer(

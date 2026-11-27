@@ -109,6 +109,12 @@ class Listing(models.Model):
     title = models.CharField(max_length=150)
     slug = models.SlugField(max_length=170, unique=True, blank=True)
     description = models.TextField()
+    # BD-01 extension: keywords read off the listing's own photographs, so a
+    # buyer can find "blue" or "rosin" for an item whose seller never typed
+    # either word. Filled in by apps/catalog/indexing.py at publish time and by
+    # `manage.py backfill_search_tags` for rows that predate the field; searched
+    # beside the title and description, never shown as the seller's own words.
+    search_tags = models.CharField(max_length=300, blank=True)
     listing_type = models.CharField(
         max_length=20, choices=Type.choices, default=Type.PRODUCT
     )

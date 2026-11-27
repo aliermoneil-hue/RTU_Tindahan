@@ -50,6 +50,8 @@ export interface ApiListing {
   slug: string
   title: string
   description: string
+  /** BD-01: keywords read off the photos, filled by the API at post time. */
+  search_tags?: string
   category: number
   category_name: string
   category_slug: string
@@ -215,6 +217,7 @@ export function toPrototypeProduct(dto: ApiListing): PrototypeProduct {
     when: dto.meetup_place || timeAgo(dto.created_at),
     cond: service ? undefined : dto.condition === 'used' ? 'Used' : 'New',
     desc: dto.description,
+    searchTags: dto.search_tags || undefined,
     imgs: dto.photos && dto.photos.length > 0 ? dto.photos.map((p) => p.url) : undefined,
     pub: new Date(dto.created_at).getTime() || undefined,
     kind: service ? 'service' : undefined,

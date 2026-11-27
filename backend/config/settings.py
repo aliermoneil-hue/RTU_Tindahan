@@ -349,6 +349,18 @@ SCREENING_IMAGE_MAX = int(os.getenv("SCREENING_IMAGE_MAX", "4") or 0)
 # text timeout would cut it off mid-answer and turn a real verdict into a hold.
 SCREENING_IMAGE_TIMEOUT = float(os.getenv("SCREENING_IMAGE_TIMEOUT", "25"))
 
+# BD-01 extension: the first picture of a new listing is also read for the words
+# a buyer would search for (colour, material, brand), and those words are stored
+# on the listing. It is the same vision call screening already makes, a second
+# question about the same picture. `KEYWORDS_ENABLED=0` turns the indexing off
+# and leaves search on text alone. The provider follows SCREENING_PROVIDER: with
+# the stub there is no model to ask, and the suite therefore stays offline.
+KEYWORDS_ENABLED = env_bool("SEARCH_KEYWORDS", True)
+# A keyword call is smaller than a screening call (200 tokens, no reasoning),
+# but it still carries the picture, so it gets its own bound rather than the
+# 6 s text one. The post waits for it, so this is the member's worst case.
+KEYWORDS_TIMEOUT = float(os.getenv("KEYWORDS_TIMEOUT", "12"))
+
 # AI-12: below this confidence the item goes to a moderator whatever the
 # provider answered. A clean guess is still a guess; 0.7 keeps an honest model's
 # uncertainty in front of a person without turning every listing into a queue.

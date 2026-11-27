@@ -412,6 +412,39 @@ what is ambiguous, small, or deliberately obfuscated, and it says so with
 `flagged` rather than `clean` when it is unsure. The moderator queue remains the
 real control, which is why AI-03 keeps a clean verdict from publishing on its own.
 
+## 4d. The same picture is read for search keywords (an extension to BD-01)
+
+Search reads a listing's title and description, and sellers do not write what
+buyers search for. A stool is posted as "Upuan", the fact that it is blue and
+orange exists only in the photograph, and asking the marketplace for "blue"
+answered nothing — which reads as a broken search bar, not as a missing word.
+
+So the first picture of a new listing is asked one more question by the same
+provider that screens it: *what is this, in the words a buyer would type?*
+`apps/screening/keywords.py` returns a `subject` and up to eight `keywords`
+(colours, material, pattern, and a brand or model only when it is legible), which
+`apps/catalog/indexing.py` stores on `Listing.search_tags`. That column is
+searched beside the title and description, so an item whose colour exists only
+in the picture is findable without anyone typing it.
+
+Three properties matter:
+
+- **It never invents.** Optional empty-string fields in the response schema
+  invite the model to *fill* them — one bench photo produced a 300-word
+  `_none_value_not_found_…` sentinel that ran to MAX_TOKENS and carried the real
+  answer off with it. The schema asks for one string and one array, and nothing
+  that may be empty. An empty list is a legal answer.
+- **It never blocks a post.** No key, no provider, a timeout, an unreadable
+  answer: every one returns `""` and the listing is indexed on its text. The
+  extractor is also run from `manage.py backfill_search_tags` for rows that
+  predate the column (see §7).
+- **It is asked once per picture, not once per keystroke.** The model call
+  happens at post time (~1–3 s, bounded by `KEYWORDS_TIMEOUT`), and search itself
+  stays a database `icontains` over three columns — instant, offline and free.
+
+`SEARCH_KEYWORDS=0` turns the indexing off. The provider follows
+`LLM_PROVIDER`, so the stub suite makes no network call and stores nothing.
+
 ---
 
 ## 5. The moderator queue

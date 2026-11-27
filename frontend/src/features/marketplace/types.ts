@@ -43,6 +43,8 @@ export interface PrototypeProduct {
   avail?: string
   cond?: string
   desc: string
+  /** Keywords read from the seller's photos by the API; searched with desc. */
+  searchTags?: string
   imgs?: string[]
   pub?: number
   kind?: 'service'

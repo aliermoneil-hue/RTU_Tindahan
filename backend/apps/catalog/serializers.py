@@ -152,6 +152,10 @@ class ListingReadSerializer(serializers.ModelSerializer):
             "quantity",
             "meetup_place",
             "is_official",
+            # BD-01 extension: keywords read from the listing's photos. Public
+            # on purpose — the client searches the same text the server does,
+            # and a buyer gains nothing from them being hidden.
+            "search_tags",
             "moderation_status",
             "availability_status",
             "fulfillment",
