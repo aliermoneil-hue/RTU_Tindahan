@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { ItemTitleWithVariant } from '@/common/components/ItemTitleWithVariant'
 import { Icon } from '@/common/components/Icon'
 import { playMessage, playPop } from '@/common/sounds'
 import { navigate } from '@/common/router/router'
-import { ago, isSvc, refLabel, stamp } from '../constants'
+import { ago, isSvc, refLabel, peso } from '../constants'
 import { useTindahan } from '../context/TindahanContext'
-import type { Conversation, MessageRef } from '../types'
+import type { Conversation } from '../types'
 import { AvatarBadge } from '../components/AvatarBadge'
 import './MessagesPage.css'
 
@@ -22,15 +23,14 @@ export function MessagesPage() {
     byId,
     acctByEmail,
     openProduct,
-    startEditListing,
     sendChatMessage,
     reactToChatMessage,
     markConvRead,
-    openContextOrder,
   } = useTindahan()
 
   const [draftText, setDraftText] = useState('')
   const [pickerIndex, setPickerIndex] = useState<number | null>(null)
+  const [overflowOpen, setOverflowOpen] = useState(false)
   const bodyRef = useRef<HTMLDivElement | null>(null)
 
   const cur = selectedConvId
@@ -51,9 +51,21 @@ export function MessagesPage() {
     }
   }, [cur?.id, cur?.msgs.length])
 
+  // Close overflow menu when clicking outside
+  useEffect(() => {
+    if (!overflowOpen) return
+    const onDocClick = (e: MouseEvent) => {
+      const head = document.querySelector('.m-head')
+      if (head && !head.contains(e.target as Node)) {
+        setOverflowOpen(false)
+      }
+    }
+    document.addEventListener('click', onDocClick)
+    return () => document.removeEventListener('click', onDocClick)
+  }, [overflowOpen])
+
   if (!currentAccount) return null
 
-  const pool = (c: Conversation) => !c.seller && isStaffUser
   const peer = (c: Conversation) =>
     currentAccount.email === c.buyer
       ? c.seller
@@ -62,55 +74,6 @@ export function MessagesPage() {
       : c.buyerName
   const peerEmail = (c: Conversation) =>
     currentAccount.email === c.buyer ? c.seller : c.buyer
-
-  const renderCtxChip = (r: MessageRef, c: Conversation) => {
-    const isOrder = r.type === 'order'
-    const listing = !isOrder && r.id ? byId(r.id) : undefined
-    const isMyRejectedOrDraft =
-      !isOrder &&
-      r.id &&
-      currentAccount.sellerList?.some((l) => l.lid === r.id)
-    return (
-      <div className="m-ctx">
-        <span className="refchip">
-          <span>{refLabel(r)}</span>· {r.name || ''}
-        </span>
-        {isOrder ? (
-          <button
-            type="button"
-            className="link"
-            onClick={() => {
-              openContextOrder(r.id, c.id)
-            }}
-          >
-            View order {r.id}
-          </button>
-        ) : listing ? (
-          <button
-            type="button"
-            className="link"
-            onClick={() => {
-              openProduct(listing.id)
-            }}
-          >
-            View {isSvc(listing) ? 'service' : 'listing'}
-          </button>
-        ) : isMyRejectedOrDraft ? (
-          <button
-            type="button"
-            className="link"
-            onClick={() => {
-              startEditListing(r.id)
-            }}
-          >
-            Edit & resubmit listing
-          </button>
-        ) : (
-          <span className="tiny muted">Under review / not public</span>
-        )}
-      </div>
-    )
-  }
 
   const handleSend = () => {
     if (!cur) return
@@ -204,7 +167,7 @@ export function MessagesPage() {
                             maxWidth: 135,
                           }}
                         >
-                          {c.ref.name}
+                          {c.ref.name && <ItemTitleWithVariant title={c.ref.name} />}
                         </span>
                       </span>
                     </span>
@@ -237,79 +200,137 @@ export function MessagesPage() {
                   (!cur.seller && currentAccount.email === cur.buyer) ||
                   peerAcct?.role === 'moderator'
                 const listing = cur.ref.pid ? byId(cur.ref.pid) : undefined
-                const canEditRejectedListing =
-                  cur.ref.pid &&
-                  currentAccount.sellerList?.some((l) => l.lid === cur.ref.pid)
 
                 return (
-                  <div className="m-head">
-                    <button
-                      type="button"
-                      className="btn ghost sm m-back"
-                      onClick={() => {
-                        setSelectedConvId(null)
-                      }}
-                    >
-                      <Icon name="back" size="sm" />
-                      Back
-                    </button>
-                    <AvatarBadge
-                      account={peerAcct}
-                      name={nm}
-                      isStaff={isStaffPeer}
-                      size="md"
-                    />
-                    <div className="grow">
-                      <b>{nm}</b>
-                      <div className="row wrap" style={{ gap: 6 }}>
-                        <span className="refchip">
-                          {refLabel(cur.ref)}: {cur.ref.name}
-                        </span>
-                        {pool(cur) && (
-                          <span className="tiny muted">Official RTU Store inbox</span>
+                  <>
+                    <div className="m-head">
+                      <div className="m-head-row-1">
+                        <button
+                          type="button"
+                          className="btn ghost sm m-back"
+                          onClick={() => {
+                            setSelectedConvId(null)
+                          }}
+                        >
+                          <Icon name="back" size="sm" />
+                        </button>
+                        <AvatarBadge
+                          account={peerAcct}
+                          name={nm}
+                          isStaff={isStaffPeer}
+                          size="md"
+                        />
+                        <div className="m-head-identity">
+                          <b className="m-head-name">{nm}</b>
+                          <span className="m-head-subtitle">
+                            {currentAccount?.aff === 'Student'
+                              ? currentAccount.prog.replace(/^BS /, '').split(' ').map((w) => w[0]).join('') + ' · ColaCT'
+                              : currentAccount?.aff}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="m-overflow-btn"
+                          aria-label="More options"
+                          aria-expanded={overflowOpen}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setOverflowOpen((prev) => !prev)
+                          }}
+                        >
+                          <Icon name="dots" size="sm" />
+                        </button>
+                        {overflowOpen && (
+                          <div className="m-overflow-dropdown">
+                            {listing ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="m-overflow-item"
+                                  onClick={() => {
+                                    setOverflowOpen(false)
+                                    openProduct(listing.id)
+                                  }}
+                                >
+                                  View listing
+                                </button>
+                                {cur.ref.type === 'order' && (
+                                  <button
+                                    type="button"
+                                    className="m-overflow-item"
+                                    onClick={() => {
+                                      setOverflowOpen(false)
+                                      navigate('orders')
+                                    }}
+                                  >
+                                    View order
+                                  </button>
+                                )}
+                              </>
+                            ) : cur.ref.type === 'order' ? (
+                              <button
+                                type="button"
+                                className="m-overflow-item"
+                                onClick={() => {
+                                  setOverflowOpen(false)
+                                  navigate('orders')
+                                }}
+                              >
+                                View order
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="m-overflow-item"
+                                onClick={() => {
+                                  setOverflowOpen(false)
+                                }}
+                              >
+                                No related item
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
-                    {listing ? (
-                      <button
-                        type="button"
-                        className="btn ghost sm"
-                        onClick={() => {
+                    {cur.ref && (
+                      <div className="m-order-strip" onClick={() => {
+                        if (listing) {
                           openProduct(listing.id)
-                        }}
-                      >
-                        View {isSvc(listing) ? 'service' : 'listing'}
-                      </button>
-                    ) : canEditRejectedListing && cur.ref.pid ? (
-                      <button
-                        type="button"
-                        className="btn ghost sm"
-                        onClick={() => {
-                          startEditListing(cur.ref.pid!)
-                        }}
-                      >
-                        <Icon name="edit" size="sm" />
-                        Edit & resubmit
-                      </button>
-                    ) : null}
-                    {cur.ref.type === 'order' && (
-                      <button
-                        type="button"
-                        className="btn ghost sm"
-                        onClick={() => {
-                          navigate(
-                            currentAccount.email === cur.buyer
-                              ? 'orders'
-                              : pool(cur)
-                                ? 'transactions'
-                                : 'shop',
-                          )
-                        }}
-                      >
-                        View order
-                      </button>
+                        } else if (cur.ref.type === 'order') {
+                          navigate('orders')
+                        }
+                      }}>
+                        <div className="m-order-thumb">
+                          {listing ? (
+                            <span className="m-order-thumb-ico">
+                              <Icon name={isSvc(listing) ? 'print' : 'shop'} size="sm" />
+                            </span>
+                          ) : (
+                            <span className="m-order-thumb-ico">
+                              <Icon name="order" size="sm" />
+                            </span>
+                          )}
+                        </div>
+                        <div className="m-order-info">
+                          <div className="m-order-title">
+                            {listing ? listing.name : cur.ref.name || 'Order'}
+                          </div>
+                          <div className="m-order-meta">
+                            {listing ? peso(listing.price) : '₱0'} · Campus pickup · {cur.ref.id}
+                          </div>
+                        </div>
+                        <div className="m-order-status">
+                          {cur.ref.type === 'order' ? (
+                            <span className="pill pill-sm yellow">Pending</span>
+                          ) : (
+                            <span className="pill pill-sm blue">Active</span>
+                          )}
+                          <Icon name="chevR" size="sm" />
+                        </div>
+                      </div>
                     )}
-                  </div>
+                  </>
                 )
               })()}
 
@@ -340,120 +361,204 @@ export function MessagesPage() {
                   }
                   const reactionEntries = Object.entries(counts)
 
+                  // Date divider when the date changes
+                  const msgDate = new Date(m.ts).toDateString()
+                  const prevMsg = i > 0 ? cur.msgs[i - 1] : null
+                  const prevDate = prevMsg ? new Date(prevMsg.ts).toDateString() : null
+                  const showDateDivider = i === 0 || msgDate !== prevDate
+
+                  // Order switch divider when the ref changes
+                  const prevRef = prevMsg ? prevMsg.ref : null
+                  const showOrderDivider =
+                    prevRef &&
+                    (!r || prevRef.type !== r.type || prevRef.id !== r.id)
+
                   return (
-                    <div
-                      key={m.id || i}
-                      className={`m-row ${me ? 'me' : 'them'}`}
-                    >
-                      {r && !same && renderCtxChip(r, cur)}
-                      <div className="m-bub-wrap">
-                        <div
-                          className={`bub ${me ? 'me' : 'them'} ${
-                            m.adminReview ? 'admin-review-bub' : ''
-                          }`.trim()}
-                        >
-                          {m.adminReview && (
-                            <div className="m-admin-review-head">
-                              <Icon name="shield" size="sm" />
-                              <span>
-                                Administrative Listing Review · {m.adminReview.decision}
-                              </span>
-                            </div>
-                          )}
-                          {m.text}
-                          <small>
-                            {me ? 'You' : m.name} · {stamp(m.ts)}
-                          </small>
+                    <>
+                      {showDateDivider && (
+                        <div className="m-date-divider">
+                          {new Date(m.ts).toLocaleDateString('en-PH', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: new Date(m.ts).getFullYear() !== new Date().getFullYear()
+                              ? 'numeric'
+                              : undefined,
+                          })}
                         </div>
-
-                        {/* Requirement #8: Reaction button and reaction pills anchored at the bottom corner of the message bubble */}
-                        <div className="m-react-dock">
-                          {reactionEntries.length > 0 && (
-                            <div className={`m-react-pills ${me ? 'me' : 'them'}`}>
-                              {reactionEntries.map(([emoji, data]) => (
-                                <button
-                                  key={emoji}
-                                  type="button"
-                                  className={`m-react-pill ${data.hasMine ? 'active' : ''}`}
-                                  title={data.hasMine ? 'Remove reaction' : 'Add reaction'}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleReactionClick(i, emoji)
-                                  }}
-                                >
-                                  <span>{emoji}</span>
-                                  <span className="tiny tnum">{data.count}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-
-                          <button
-                            type="button"
-                            className={`m-react-trigger ${pickerIndex === i ? 'is-open' : ''}`.trim()}
-                            title="Add reaction"
-                            aria-label="Add reaction"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              playPop()
-                              setPickerIndex(pickerIndex === i ? null : i)
-                            }}
+                      )}
+                      {showOrderDivider && r && !same && (
+                        <div className="m-order-divider">
+                          {r.type === 'order' ? `Order ${r.id}` : refLabel(r)} · {r.name}
+                        </div>
+                      )}
+                      <div
+                        key={m.id || i}
+                        className={`m-row ${me ? 'me' : 'them'}`}
+                      >
+                        <div className="m-bub-wrap">
+                          <div
+                            className={`bub ${me ? 'me' : 'them'} ${
+                              m.adminReview ? 'admin-review-bub' : ''
+                            }`.trim()}
                           >
-                            <Icon name="star" size="sm" />
-                          </button>
+                            {m.adminReview && (
+                              <div className="m-admin-review-head">
+                                <Icon name="shield" size="sm" />
+                                <span>
+                                  Administrative Listing Review · {m.adminReview.decision}
+                                </span>
+                              </div>
+                            )}
+                            {m.text}
+                          </div>
+                          <div className="m-msg-footer">
+                            <span className={`m-msg-time ${me ? 'me' : 'them'}`}>
+                              {new Date(m.ts).toLocaleTimeString('en-PH', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true,
+                              })}
+                            </span>
 
-                          {pickerIndex === i && (
-                            <div
-                              className="m-react-picker"
-                              onClick={(e) => e.stopPropagation()}
+                            {/* Reaction button and reaction pills anchored at the bottom corner of the message bubble */}
+                            <div className="m-react-dock">
+                            {reactionEntries.length > 0 && (
+                              <div className={`m-react-pills ${me ? 'me' : 'them'}`}>
+                                {reactionEntries.map(([emoji, data]) => (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    className={`m-react-pill ${data.hasMine ? 'active' : ''}`}
+                                    title={data.hasMine ? 'Remove reaction' : 'Add reaction'}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleReactionClick(i, emoji)
+                                    }}
+                                  >
+                                    <span>{emoji}</span>
+                                    <span className="tiny tnum">{data.count}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            <button
+                              type="button"
+                              className={`m-react-trigger ${pickerIndex === i ? 'is-open' : ''}`.trim()}
+                              title="Add reaction"
+                              aria-label="Add reaction"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                playPop()
+                                setPickerIndex(pickerIndex === i ? null : i)
+                              }}
                             >
-                              {CHAT_EMOJIS.map((emoji) => (
-                                <button
-                                  key={emoji}
-                                  type="button"
-                                  className="m-react-emoji-btn"
-                                  onClick={() => handleReactionClick(i, emoji)}
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                              <Icon name="star" size="sm" />
+                            </button>
+
+                            {pickerIndex === i && (
+                              <div
+                                className="m-react-picker"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {CHAT_EMOJIS.map((emoji) => (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    className="m-react-emoji-btn"
+                                    onClick={() => handleReactionClick(i, emoji)}
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </>
                   )
                 })}
               </div>
 
-              <form
-                className="m-comp"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  handleSend()
-                }}
-              >
-                <textarea
-                  className="input"
-                  id="mi-text"
-                  rows={1}
-                  placeholder="Write a message or reply to the review..."
-                  aria-label="Message"
-                  value={draftText}
-                  onChange={(e) => setDraftText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      handleSend()
-                    }
+                {/* Quick-reply chips strip */}
+                <div className="m-quick-replies">
+                  <button
+                    type="button"
+                    className="m-quick-chip"
+                    onClick={() => {
+                      if (!cur) return
+                      if (sendChatMessage(cur.id, 'On my way')) {
+                        setDraftText('')
+                        playMessage()
+                      }
+                    }}
+                  >
+                    On my way
+                  </button>
+                  <button
+                    type="button"
+                    className="m-quick-chip"
+                    onClick={() => {
+                      if (!cur) return
+                      if (sendChatMessage(cur.id, 'Where to meet?')) {
+                        setDraftText('')
+                        playMessage()
+                      }
+                    }}
+                  >
+                    Where to meet?
+                  </button>
+                  <button
+                    type="button"
+                    className="m-quick-chip"
+                    onClick={() => {
+                      if (!cur) return
+                      if (sendChatMessage(cur.id, 'Confirm pickup')) {
+                        setDraftText('')
+                        playMessage()
+                      }
+                    }}
+                  >
+                    Confirm pickup
+                  </button>
+                </div>
+
+                {/* Pill composer */}
+                <form
+                  className="m-comp-wrap"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    handleSend()
                   }}
-                />
-                <button type="submit" className="btn">
-                  <Icon name="send" size="sm" />
-                  Send
-                </button>
-              </form>
-            </>
+                >
+                  <div className="m-comp">
+                    <textarea
+                      className="input"
+                      id="mi-text"
+                      rows={1}
+                      placeholder="Message"
+                      aria-label="Message"
+                      value={draftText}
+                      onChange={(e) => setDraftText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          handleSend()
+                        }
+                      }}
+                    />
+                    <button
+                      type="submit"
+                      className="m-comp-send"
+                      aria-label="Send"
+                    >
+                      <Icon name="send" size="sm" />
+                    </button>
+                  </div>
+                </form>
+              </>
           ) : (
             <div className="m-empty" style={{ margin: 'auto' }}>
               <span style={{ color: 'var(--blue)' }}>

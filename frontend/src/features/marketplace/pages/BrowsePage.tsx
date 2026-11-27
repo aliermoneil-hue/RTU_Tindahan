@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from '@/common/components/Icon'
 import { navigate, useRoute } from '@/common/router/router'
 import { MiniLoader } from '@/common/components/BrandLoader'
@@ -481,17 +482,21 @@ export function BrowsePage() {
       if (e.key === 'Escape') setFilterSheetOpen(false)
     }
 
-    if (filterSheetOpen) {
-      document.body.classList.add('filter-sheet-open')
+    const shouldLock = filterSheetOpen && isMobile
+    document.documentElement.classList.toggle('filter-sheet-open', shouldLock)
+    document.body.classList.toggle('filter-sheet-open', shouldLock)
+
+    if (shouldLock) {
       window.addEventListener('keydown', handleKeydown)
     } else {
-      document.body.classList.remove('filter-sheet-open')
+      window.removeEventListener('keydown', handleKeydown)
     }
     return () => {
+      document.documentElement.classList.remove('filter-sheet-open')
       document.body.classList.remove('filter-sheet-open')
       window.removeEventListener('keydown', handleKeydown)
     }
-  }, [filterSheetOpen])
+  }, [filterSheetOpen, isMobile])
 
   // Close sort dropdown on outside click or Escape key
   useEffect(() => {
@@ -711,6 +716,7 @@ export function BrowsePage() {
                 <label key={c} className="check">
                   <input
                     type="checkbox"
+                    className="browse-check-input"
                     checked={checked}
                     onChange={(e) => {
                       const isChecked = e.target.checked
@@ -778,6 +784,7 @@ export function BrowsePage() {
                 <label key={t} className="check">
                   <input
                     type="checkbox"
+                    className="browse-check-input"
                     checked={checked}
                     onChange={(e) => {
                       const isChecked = e.target.checked
@@ -814,6 +821,7 @@ export function BrowsePage() {
             <label className="check">
               <input
                 type="checkbox"
+                className="browse-check-input"
                 checked={browseState.onlyToday}
                 onChange={(e) =>
                   setBrowseState((prev) => ({ ...prev, onlyToday: e.target.checked, page: 1 }))
@@ -955,160 +963,163 @@ export function BrowsePage() {
         </div>
       </div>
 
-      {/* Mobile bottom sheet filter drawer */}
-      {filterSheetOpen && (
-        <div
-          className="mobile-filter-sheet"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setFilterSheetOpen(false)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setFilterSheetOpen(false)
-          }}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Filters"
-        >
-          <div className="mobile-filter-sheet-content">
-            <div className="mobile-filter-sheet-header">
-              <h2>Filters</h2>
-              <div className="row between">
-                <button
-                  type="button"
-                  className="link small"
-                  onClick={() => clearBrowseFilters()}
-                >
-                  Reset
-                </button>
-                <button
-                  type="button"
-                  className="link small"
-                  onClick={() => setFilterSheetOpen(false)}
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div className="mobile-filter-sheet-body stack">
-              <div className="mobile-filter-section">
-                <b>Category</b>
-                {allCats.map((c) => {
-                  const checked = browseState.cats.includes(c)
-                  const count = allOnSale.filter((p) => catOf(p) === c).length
-                  return (
-                    <label key={c} className="check">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked
-                          setBrowseState((prev) => {
-                            const nextCats = isChecked
-                              ? [...prev.cats, c]
-                              : prev.cats.filter((x) => x !== c)
-                            const nextSingle = nextCats.length === 1 ? nextCats[0] : ''
-                            const nextSub =
-                              prev.sub &&
-                              nextSingle &&
-                              (SUBCATS[nextSingle] || []).includes(prev.sub)
-                                ? prev.sub
-                                : ''
-                            return { ...prev, cats: nextCats, sub: nextSub, page: 1 }
-                          })
-                        }}
-                      />
-                      {c}{' '}
-                      <span className="muted tiny" style={{ marginLeft: 'auto' }}>
-                        {count}
-                      </span>
-                    </label>
-                  )
-                })}
-
-                {subsForCat.length > 0 && (
-                  <div
-                    className="stack"
-                    style={{ gap: 6, borderTop: '1px solid var(--line)', paddingTop: 10 }}
+      {/* Mobile bottom sheet filter drawer — portaled, always mounted on mobile */}
+      {isMobile && (
+        <>
+          {createPortal(
+            <div
+              className={`mobile-filter-backdrop${filterSheetOpen ? ' is-open' : ''}`}
+              onClick={() => setFilterSheetOpen(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setFilterSheetOpen(false)
+              }}
+              aria-hidden={!filterSheetOpen}
+            />,
+            document.body
+          )}
+          {createPortal(
+            <div
+              className={`mobile-filter-sheet-content${filterSheetOpen ? ' is-open' : ''}`}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Filters"
+              aria-hidden={!filterSheetOpen}
+            >
+              <div className="mobile-filter-sheet-header">
+                <h2>Filters</h2>
+                <div className="row between">
+                  <button
+                    type="button"
+                    className="mobile-filter-close"
+                    aria-label="Close filters"
+                    onClick={() => setFilterSheetOpen(false)}
                   >
-                    <b className="small">Subcategory</b>
-                    <div className="row wrap" style={{ gap: 6 }}>
-                      <button
-                        type="button"
-                        className={`btn sm ${!browseState.sub ? '' : 'ghost'}`.trim()}
-                        onClick={() => setBrowseState((prev) => ({ ...prev, sub: '', page: 1 }))}
-                      >
-                        All
-                      </button>
-                      {subsForCat.map((s) => (
+                    <Icon name="x" size="sm" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mobile-filter-sheet-body stack">
+                <div className="mobile-filter-section">
+                  <b>Category</b>
+                  {allCats.map((c) => {
+                    const checked = browseState.cats.includes(c)
+                    const count = allOnSale.filter((p) => catOf(p) === c).length
+                    return (
+                      <label key={c} className="check">
+                        <input
+                          type="checkbox"
+                          className="browse-check-input"
+                          checked={checked}
+                          onChange={(e) => {
+                            const isChecked = e.target.checked
+                            setBrowseState((prev) => {
+                              const nextCats = isChecked
+                                ? [...prev.cats, c]
+                                : prev.cats.filter((x) => x !== c)
+                              const nextSingle = nextCats.length === 1 ? nextCats[0] : ''
+                              const nextSub =
+                                prev.sub &&
+                                nextSingle &&
+                                (SUBCATS[nextSingle] || []).includes(prev.sub)
+                                  ? prev.sub
+                                  : ''
+                              return { ...prev, cats: nextCats, sub: nextSub, page: 1 }
+                            })
+                          }}
+                        />
+                        {c}{' '}
+                        <span className="muted tiny" style={{ marginLeft: 'auto' }}>
+                          {count}
+                        </span>
+                      </label>
+                    )
+                  })}
+
+                  {subsForCat.length > 0 && (
+                    <div
+                      className="stack"
+                      style={{ gap: 6, borderTop: '1px solid var(--line)', paddingTop: 10 }}
+                    >
+                      <b className="small">Subcategory</b>
+                      <div className="row wrap" style={{ gap: 6 }}>
                         <button
-                          key={s}
                           type="button"
-                          className={`btn sm ${browseState.sub === s ? '' : 'ghost'}`.trim()}
-                          onClick={() =>
+                          className={`btn sm ${!browseState.sub ? '' : 'ghost'}`.trim()}
+                          onClick={() => setBrowseState((prev) => ({ ...prev, sub: '', page: 1 }))}
+                        >
+                          All
+                        </button>
+                        {subsForCat.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            className={`btn sm ${browseState.sub === s ? '' : 'ghost'}`.trim()}
+                            onClick={() =>
+                              setBrowseState((prev) => ({
+                                ...prev,
+                                sub: prev.sub === s ? '' : s,
+                                page: 1,
+                              }))
+                            }
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <b style={{ marginTop: 14 }}>Seller type</b>
+                  {(['Student sellers', 'Official store'] as const).map((t) => {
+                    const checked = browseState.sellerType.includes(t)
+                    return (
+                      <label key={t} className="check">
+                        <input
+                          type="checkbox"
+                          className="browse-check-input"
+                          checked={checked}
+                          onChange={(e) => {
+                            const isChecked = e.target.checked
                             setBrowseState((prev) => ({
                               ...prev,
-                              sub: prev.sub === s ? '' : s,
+                              sellerType: isChecked
+                                ? [...prev.sellerType, t]
+                                : prev.sellerType.filter((x) => x !== t),
                               page: 1,
                             }))
-                          }
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <b style={{ marginTop: 14 }}>Seller type</b>
-                {(['Student sellers', 'Official store'] as const).map((t) => {
-                  const checked = browseState.sellerType.includes(t)
-                  return (
-                    <label key={t} className="check">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked
-                          setBrowseState((prev) => ({
-                            ...prev,
-                            sellerType: isChecked
-                              ? [...prev.sellerType, t]
-                              : prev.sellerType.filter((x) => x !== t),
-                            page: 1,
-                          }))
-                        }}
-                      />
-                      {t}
-                    </label>
-                  )
-                })}
+                          }}
+                        />
+                        {t}
+                      </label>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
 
-            <div className="mobile-filter-sheet-footer">
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => {
-                  clearBrowseFilters()
-                  setFilterSheetOpen(false)
-                }}
-              >
-                Clear all
-              </button>
-              <button
-                type="button"
-                className="btn yellow"
-                onClick={() => setFilterSheetOpen(false)}
-              >
-                Show results
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      </>)}
-    </>
-  )
+              <div className="mobile-filter-sheet-footer">
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => {
+                    clearBrowseFilters()
+                    setFilterSheetOpen(false)
+                  }}
+                >
+                  Clear all
+                </button>
+                <button
+                  type="button"
+                  className="btn yellow"
+                  onClick={() => setFilterSheetOpen(false)}
+                >
+                  Show results
+                </button>
+              </div>
+            </div>,
+          document.body
+        )}
+    </>)}
+    </>)}
+    </>)
 }

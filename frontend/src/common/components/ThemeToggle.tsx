@@ -101,7 +101,7 @@ export function ThemeToggle() {
       </button>
 
       {open && (
-        <div className="theme-popover" role="menu" aria-label="Appearance">
+        <div className="theme-popover theme-menu-popover" role="menu" aria-label="Appearance">
           <div className="theme-popover-head">
             <span className="theme-popover-label">APPEARANCE</span>
             <span className="theme-popover-status">{statusText}</span>

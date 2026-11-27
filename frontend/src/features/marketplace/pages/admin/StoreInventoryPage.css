@@ -8,10 +8,6 @@
   gap: 12px;
 }
 
-.inv-formula-card {
-  border-left: 4px solid var(--blue);
-}
-
 #inv-table td,
 #inv-table th {
   vertical-align: middle;

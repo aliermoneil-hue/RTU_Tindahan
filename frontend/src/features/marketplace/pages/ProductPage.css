@@ -7,17 +7,25 @@
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   gap: 22px;
   align-items: start;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
-/* Consistent product type border top accent */
-.pdetail-card.type-school {
-  border-top: 4px solid var(--blue, #2251a3);
+/* CTA row: Add to request cart + Reserve side by side */
+.cta-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
 }
-.pdetail-card.type-student {
-  border-top: 4px solid var(--yellow, #e5a712);
+.cta-row .btn {
+  min-height: 44px;
 }
-.pdetail-card.type-service {
-  border-top: 4px solid var(--red, #b33939);
+@media (max-width: 400px) {
+  .cta-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .vopt:disabled {
@@ -28,14 +36,20 @@
 
 @media (max-width: 900px) {
   .pgrid2 {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .pgrid2-left {
     display: contents;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   .pgrid2-media {
     order: 1;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   .pgrid2-right {
     order: 2;
@@ -43,4 +57,433 @@
   .pgrid2-about {
     order: 3;
   }
+}
+
+/* Mobile (<= 768px): lock gallery + thumbnail strip inside viewport to prevent horizontal overflow */
+@media (max-width: 768px) {
+  /* Main image box */
+  .gal-main {
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 4 / 3;
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  /* Main image */
+  .gal-img {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    object-position: center;
+    display: block;
+  }
+
+  /* Thumbnail strip */
+  .pdp-thumbs {
+    display: flex;
+    flex-wrap: nowrap;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    gap: 8px;
+    box-sizing: border-box;
+  }
+
+  /* Each thumbnail button */
+  .gal-th {
+    flex: 0 0 60px;
+    width: 60px;
+    height: 60px;
+  }
+}
+
+/* ==========================================================================
+   UNIFIED PRODUCT DETAIL CARD (Desktop only, >= 900px)
+   ========================================================================== */
+
+@media (min-width: 900px) {
+  .pdp-main-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+    gap: 24px;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Strip nested card chrome from the right-hand product details card
+     so gallery and details sit seamlessly inside one unified box. */
+  .pdp-main-card .pdetail-card {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    border-radius: 0;
+  }
+}
+
+/* Seller card: clickable identity link */
+.seller-card-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  border-radius: 10px;
+  text-align: left;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.seller-card-link:hover {
+  background: var(--soft);
+}
+.seller-card-link b {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.seller-card-link:hover b {
+  text-decoration: underline;
+}
+.seller-card-link .grow {
+  min-width: 0;
+}
+.seller-card-link .small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Seller card actions: favorites + message */
+.seller-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.seller-card-actions .btn {
+  height: 38px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+@media (max-width: 640px) {
+  .seller-card-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .seller-card-actions .btn {
+    height: auto;
+    padding: 9px 12px;
+  }
+}
+
+/* Info card responsive: combine meetup point, pickup window, fulfillment method */
+@media (max-width: 640px) {
+  .info-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .info-col:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 400px) {
+  .info-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   IMAGE LIGHTBOX / ZOOM MODAL (Shopee-style)
+   ========================================================================== */
+
+.lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+  animation: lightboxFadeIn 0.2s ease;
+}
+
+@keyframes lightboxFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lightbox-modal {
+  position: relative;
+  width: min(920px, 92vw);
+  height: min(640px, 84vh);
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  grid-template-rows: minmax(0, 1fr);
+  animation: lightboxSlideUp 0.25s ease;
+}
+
+@keyframes lightboxSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: background-color 0.15s ease;
+}
+.lightbox-close:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+/* Left stage */
+.lightbox-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--soft);
+  height: 100%;
+  min-height: 0;
+}
+
+.lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+}
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 5;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+.lightbox-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.lightbox-nav-prev {
+  left: 10px;
+}
+.lightbox-nav-next {
+  right: 10px;
+}
+
+.lightbox-counter {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 4px 10px;
+  border-radius: 20px;
+  z-index: 5;
+}
+
+/* Right sidebar */
+.lightbox-sidebar {
+  padding: 14px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+.lightbox-sidebar h2 {
+  font-size: 18px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.lightbox-thumbs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.lightbox-thumb {
+  position: relative;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+  aspect-ratio: 1;
+  display: block;
+}
+.lightbox-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.lightbox-thumb:hover {
+  border-color: var(--line);
+}
+.lightbox-thumb.on {
+  border-color: var(--navy);
+}
+.lightbox-thumb.on img {
+  outline: 2px solid var(--navy);
+}
+:root[data-theme='dark'] .lightbox-thumb.on {
+  border-color: var(--yellow);
+}
+:root[data-theme='dark'] .lightbox-thumb.on img {
+  outline-color: var(--yellow);
+}
+
+/* Mobile: single column layout */
+@media (max-width: 768px) {
+  .lightbox-modal {
+    width: min(920px, 92vw);
+    height: min(640px, 84vh);
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  .lightbox-sidebar {
+    padding: 12px 14px;
+  }
+
+  .lightbox-thumbs {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .lightbox-counter {
+    bottom: 10px;
+    right: 10px;
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+}
+
+/* Very narrow mobile: stack thumbnails horizontally scrollable */
+@media (max-width: 400px) {
+  .lightbox-modal {
+    padding: 0;
+  }
+  .lightbox-stage {
+    padding: 0 6px;
+  }
+  .lightbox-nav {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+  .lightbox-nav-prev { left: 4px; }
+  .lightbox-nav-next { right: 4px; }
+}
+
+/* Gallery nav arrows on main product image */
+.gal-main {
+  position: relative;
+}
+.gal-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 5;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.gal-nav:hover {
+  background: var(--soft);
+  border-color: var(--navy);
+}
+.gal-nav-prev {
+  left: 8px;
+}
+.gal-nav-next {
+  right: 8px;
+}
+:root[data-theme='dark'] .gal-nav {
+  background: var(--card);
+  border-color: var(--line);
+}
+:root[data-theme='dark'] .gal-nav:hover {
+  background: var(--soft);
+  border-color: var(--yellow);
 }

@@ -7,6 +7,27 @@
   container-type: inline-size;
 }
 
+.shelf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+
+.shelf-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.shelf-view-more {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .shelf-viewport {
   overflow-x: auto;
   overflow-y: visible;
@@ -66,22 +87,6 @@
 }
 
 /* Compact typography so seller names/prices don't wrap at 5-across width */
-.shelf-row .pcard h4 {
-  font-size: 13px;
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin: 0;
-}
-.shelf-row .pcard .srcpill,
-.shelf-row .pcard .pill {
-  font-size: 10px;
-  padding: 2px 6px;
-}
-.shelf-row .pcard .row {
-  flex-wrap: nowrap;
-}
 .shelf-row .pcard .price {
   white-space: nowrap;
 }

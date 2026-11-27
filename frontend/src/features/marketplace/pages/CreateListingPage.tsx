@@ -252,26 +252,31 @@ export function CreateListingPage() {
         ))}
       </div>
 
-      {/* 3-step stepper */}
-      <div className="steps" role="list">
+      {/* Circular stepper */}
+      <ol className="sell-bstep" aria-label="Listing progress">
         {(
           [
-            svc ? '1. Service details' : '1. Item details',
-            '2. Meetup & schedule',
-            editing ? '3. Review & save' : '3. Review & submit',
+            svc ? 'Service details' : 'Item details',
+            'Meetup & schedule',
+            editing ? 'Review & save' : 'Review & submit',
           ] as const
-        ).map((label, i) => (
-          <div
-            key={label}
-            role="listitem"
-            className={`step ${
-              listStep === i + 1 ? 'on' : listStep > i + 1 ? 'done' : ''
-            }`.trim()}
-          >
-            {label}
-          </div>
-        ))}
-      </div>
+        ).map((label, i) => {
+          const isDone = listStep > i + 1
+          const isCurrent = listStep === i + 1
+          return (
+            <li
+              key={label}
+              className={isDone ? 'done' : isCurrent ? 'cur' : 'todo'}
+              onClick={() => isDone && setListStep((i + 1) as 1 | 2 | 3)}
+            >
+              <span className="dot">
+                {isDone ? <Icon name="check" size="sm" /> : String(i + 1)}
+              </span>
+              <span className="lbl">{label}</span>
+            </li>
+          )
+        })}
+      </ol>
 
       <div className="create-two two">
         <form

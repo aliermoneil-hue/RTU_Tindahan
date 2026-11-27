@@ -1,9 +1,12 @@
-"""Project-level views: API index and health check."""
+"""Project-level views: API index, health check, and public stats."""
 
 from django.db import connection
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+
+from apps.catalog.models import Listing
+from apps.store.models import OfficialTicket
 
 
 @api_view(["GET"])
@@ -59,4 +62,27 @@ def health(request):
             "database_vendor": database_vendor,
         },
         status=status_code,
+    )
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def stats(request):
+    """Public dashboard numbers shown to logged-out visitors.
+
+    - listings_on_sale: approved, publicly visible listings.
+    - completed_pickups: Official RTU Store tickets that have been claimed
+      (picked up on campus). This is the backend's source of truth for
+      completed campus pickups; no sign-in is required to read it.
+    """
+    listings_on_sale = Listing.objects.filter(status=Listing.Status.APPROVED).count()
+    completed_pickups = OfficialTicket.objects.filter(
+        status=OfficialTicket.Status.CLAIMED
+    ).count()
+    return Response(
+        {
+            "listings_on_sale": listings_on_sale,
+            "completed_pickups": completed_pickups,
+        }
     )

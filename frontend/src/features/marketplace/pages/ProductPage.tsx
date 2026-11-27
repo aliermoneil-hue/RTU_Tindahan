@@ -1,3 +1,4 @@
+import { ItemTitleWithVariant } from '@/common/components/ItemTitleWithVariant'
 import { baoLimitFor, baoWindowState, baoWindowText } from '../baoHelpers'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { Icon } from '@/common/components/Icon'
@@ -17,6 +18,7 @@ import type { ChosenFulfillment, FulfillmentMethod, ProductVariationAttr, Produc
 import { AvatarBadge } from '../components/AvatarBadge'
 import { ProductGallery } from '../components/PhotoUploader'
 import { RatingText, StarsDisplay } from '../components/StarRating'
+import { imgsOf, imgSrc } from '../imageStore'
 import './ProductPage.css'
 
 export function ProductPage() {
@@ -40,9 +42,9 @@ export function ProductPage() {
     toggleSellerFav,
     addToCart,
     reserveNow,
-    startProductConversation,
     confirmDeleteReview,
     openModal,
+    openSellerConversation,
     toast,
   } = useTindahan()
   const urlId = params.get('id')
@@ -61,13 +63,36 @@ export function ProductPage() {
   const [variationWarned, setVariationWarned] = useState(false)
   const [qty, setQty] = useState(1)
   const [chosenFulfillment, setChosenFulfillment] = useState<ChosenFulfillment>('pickup')
-  const [showMsgForm, setShowMsgForm] = useState(false)
-  const [msgText, setMsgText] = useState('')
   const [revLimit, setRevLimit] = useState(5)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIdx, setLightboxIdx] = useState(0)
   const [particles, setParticles] = useState<
     { x: number; y: number; id: number; r: string; tx: number; ty: number }[]
   >([])
   const [ripple, setRipple] = useState<{ x: number; y: number; active: boolean } | null>(null)
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (!lightboxOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setLightboxOpen(false)
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        setLightboxIdx((i) => (i > 0 ? i - 1 : 0))
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        const list = imgsOf(p!)
+        setLightboxIdx((i) => (i < list.length - 1 ? i + 1 : i))
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [lightboxOpen, p])
 
   const sellerFulfillment: FulfillmentMethod | 'none' = useMemo(() => {
     if (!p) return 'pickup'
@@ -253,10 +278,10 @@ export function ProductPage() {
             </button>
           </>
         )}{' '}
-        / <span>{p.name}</span>
+        / <ItemTitleWithVariant title={p.name} />
       </div>
 
-      <div className="pgrid2">
+      <div className={`pgrid2 pdp-main-card ${svc ? 'type-service' : sk === 'school' ? 'type-school' : 'type-student'}`}>
         {/* Left column: gallery + about */}
         <div className="stack pgrid2-left">
           <div className="pgrid2-media">
@@ -290,7 +315,11 @@ export function ProductPage() {
                 ))}
               </button>
             }
-          />
+              onMainImageClick={(idx) => {
+                setLightboxIdx(idx)
+                setLightboxOpen(true)
+              }}
+            />
           </div>
 
           <div className="card stack pgrid2-about">
@@ -319,7 +348,7 @@ export function ProductPage() {
 
         {/* Right column: buy card + seller card */}
         <div className="stack pgrid2-right">
-          <div className={`card stack pdetail-card ${svc ? 'type-service' : sk === 'school' ? 'type-school' : 'type-student'}`}>
+          <div className="card stack pdetail-card">
             <div className="row between wrap">
               <span className="row wrap" style={{ gap: 6 }}>
                 <span className={`srcpill ${sk}`}>
@@ -344,18 +373,13 @@ export function ProductPage() {
                   <span className="pill">{p.tag}</span>
                 ) : null}
               </span>
-              <span className="pill green">
-                {svc
-                  ? `Available · ${p.avail || 'By arrangement'}`
-                  : hasVariations
-                    ? chosenVar
-                      ? `${chosenVar.qty} in stock (${varLabel(p, chosenVar)})`
-                      : `${p.left} in stock across options`
-                    : `${p.left} available`}
-              </span>
             </div>
 
-            <h1 style={{ fontSize: 22, overflowWrap: 'anywhere' }}>{p.name}</h1>
+            <ItemTitleWithVariant
+              as="h1"
+              title={p.name}
+              style={{ fontSize: 22, overflowWrap: 'anywhere', display: 'block' }}
+            />
 
             <div className="row">
               <span className="price tnum" style={{ fontSize: 26 }}>
@@ -372,106 +396,72 @@ export function ProductPage() {
               />
             </div>
 
-            <div className="row wrap" style={{ gap: 8 }}>
-              <button
-                type="button"
-                className="link"
-                onClick={() => openModal({ kind: 'seller-profile', sellerName: p.seller })}
-              >
-                {p.seller}
-              </button>
-              <span className="small muted">
-                ·{' '}
-                {sk === 'school'
-                  ? 'Pasig Campus Store (RTU)'
-                  : `Verified RTU student${svc ? '' : ' seller'}`}
-              </span>
-              <span className="small">
-                · <RatingText kind="seller" targetKey={skey} />
-              </span>
-            </div>
-
-            <div className="card flat grid2" style={{ background: 'var(--bg)' }}>
-              <div className="row" style={{ alignItems: 'flex-start' }}>
-                <Icon name="pin" />
-                <div>
-                  <span className="tiny muted">
-                    {activeFulfillmentChoice === 'delivery' ? 'DELIVERY HUB' : 'MEETUP POINT'}
-                  </span>
-                  <br />
-                  <b className="small">{place || p.when}</b>
+            {/* Combined fulfillment info card: Meetup point + Pickup window + Fulfillment method */}
+            <div className="card flat stack info-card" style={{ background: 'var(--soft)', gap: 10, padding: '12px 14px' }}>
+              <div className="info-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16, alignItems: 'start' }}>
+                <div className="info-col">
+                  <div className="row" style={{ alignItems: 'flex-start', gap: 6 }}>
+                    <Icon name="pin" size="sm" />
+                    <div>
+                      <span className="tiny muted" style={{ textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.05em' }}>
+                        {activeFulfillmentChoice === 'delivery' ? 'DELIVERY HUB' : 'MEETUP POINT'}
+                      </span>
+                      <br />
+                      <b className="small">{place || p.when}</b>
+                    </div>
+                  </div>
+                </div>
+                <div className="info-col">
+                  <div className="row" style={{ alignItems: 'flex-start', gap: 6 }}>
+                    <Icon name="clock" size="sm" />
+                    <div>
+                      <span className="tiny muted" style={{ textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.05em' }}>
+                        {activeFulfillmentChoice === 'delivery' ? 'DELIVERY WINDOW' : 'PICKUP WINDOW'}
+                      </span>
+                      <br />
+                      <b className="small">{win || '12:00 to 1:00 PM'}</b>
+                    </div>
+                  </div>
+                </div>
+                <div className="info-col">
+                  <div className="row" style={{ alignItems: 'flex-start', gap: 6 }}>
+                    <div>
+                      <span className="tiny muted" style={{ textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.05em' }}>
+                        FULFILLMENT METHOD
+                      </span>
+                      <br />
+                      <div className="row wrap" role="radiogroup" aria-label="Choose fulfillment method" style={{ gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                        {(sellerFulfillment === 'pickup' || sellerFulfillment === 'both') && (
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={activeFulfillmentChoice === 'pickup'}
+                            className={`btn sm ${activeFulfillmentChoice === 'pickup' ? '' : 'ghost'}`.trim()}
+                            onClick={() => setChosenFulfillment('pickup')}
+                          >
+                            <Icon name="pin" size="sm" />
+                            Pickup
+                            {sellerFulfillment === 'pickup' ? ' (Only option)' : ''}
+                          </button>
+                        )}
+                        {(sellerFulfillment === 'delivery' || sellerFulfillment === 'both') && (
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={activeFulfillmentChoice === 'delivery'}
+                            className={`btn sm ${activeFulfillmentChoice === 'delivery' ? '' : 'ghost'}`.trim()}
+                            onClick={() => setChosenFulfillment('delivery')}
+                          >
+                            <Icon name="bag" size="sm" />
+                            Delivery
+                            {sellerFulfillment === 'delivery' ? ' (Only option)' : ''}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="row" style={{ alignItems: 'flex-start' }}>
-                <Icon name="clock" />
-                <div>
-                  <span className="tiny muted">
-                    {activeFulfillmentChoice === 'delivery' ? 'DELIVERY WINDOW' : 'PICKUP WINDOW'}
-                  </span>
-                  <br />
-                  <b className="small">{win || '12:00 to 1:00 PM'}</b>
-                </div>
-              </div>
-            </div>
-
-            {/* Requirement #1: Buyer Fulfillment Method Selection based on Seller Configuration */}
-            <div className="card flat stack" style={{ background: 'var(--bg)', gap: 8 }}>
-              <div className="row between wrap">
-                <b className="small">Fulfillment method</b>
-                <span className="tiny muted">
-                  {sellerFulfillment === 'both'
-                    ? 'Seller offers both Pickup & Delivery'
-                    : sellerFulfillment === 'delivery'
-                      ? 'Seller offers Delivery only'
-                      : sellerFulfillment === 'pickup'
-                        ? 'Seller offers Pickup only'
-                        : 'Fulfillment not configured'}
-                </span>
-              </div>
-
-              {sellerFulfillment === 'none' ? (
-                <div className="note" style={{ background: 'var(--red-bg)', borderColor: 'transparent' }}>
-                  <Icon name="info" size="sm" />
-                  <span className="small">
-                    Neither pickup nor delivery is currently configured for this listing. You cannot
-                    place an order until the seller configures a fulfillment method.
-                  </span>
-                </div>
-              ) : (
-                <div
-                  className="row wrap"
-                  role="radiogroup"
-                  aria-label="Choose fulfillment method"
-                  style={{ gap: 8 }}
-                >
-                  {(sellerFulfillment === 'pickup' || sellerFulfillment === 'both') && (
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={activeFulfillmentChoice === 'pickup'}
-                      className={`btn sm ${activeFulfillmentChoice === 'pickup' ? '' : 'ghost'}`.trim()}
-                      onClick={() => setChosenFulfillment('pickup')}
-                    >
-                      <Icon name="pin" size="sm" />
-                      Pickup
-                      {sellerFulfillment === 'pickup' ? ' (Only option)' : ''}
-                    </button>
-                  )}
-                  {(sellerFulfillment === 'delivery' || sellerFulfillment === 'both') && (
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={activeFulfillmentChoice === 'delivery'}
-                      className={`btn sm ${activeFulfillmentChoice === 'delivery' ? '' : 'ghost'}`.trim()}
-                      onClick={() => setChosenFulfillment('delivery')}
-                    >
-                      <Icon name="bag" size="sm" />
-                      Delivery
-                      {sellerFulfillment === 'delivery' ? ' (Only option)' : ''}
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* BAO v1.6 Official Store ordering window, student limit & claim notes */}
@@ -510,9 +500,6 @@ export function ProductPage() {
                   <div key={a.name} className="stack" style={{ gap: 6 }}>
                     <div className="row between">
                       <b className="small">{a.name}</b>
-                      <span className="tiny muted">
-                        {selectedOpts[a.name] ? `Selected: ${selectedOpts[a.name]}` : 'Choose one'}
-                      </span>
                     </div>
                     <div
                       className="row wrap"
@@ -555,7 +542,7 @@ export function ProductPage() {
               </div>
             )}
 
-            <div className="row wrap">
+            <div className="row wrap" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <div className="qty" role="group" aria-label="Quantity">
                 <button
                   type="button"
@@ -582,6 +569,46 @@ export function ProductPage() {
                   +
                 </button>
               </div>
+              <span className="pill green">
+                {svc
+                  ? `Available · ${p.avail || 'By arrangement'}`
+                  : hasVariations
+                    ? chosenVar
+                      ? `${chosenVar.qty} in stock (${varLabel(p, chosenVar)})`
+                      : `${p.left} in stock across options`
+                    : `${p.left} available`}
+              </span>
+            </div>
+
+            <div className="cta-row">
+              <button
+                type="button"
+                className="btn ghost grow"
+                disabled={availStock < 1 || sellerFulfillment === 'none'}
+                onClick={() => {
+                  if (sellerFulfillment === 'none') {
+                    toast('This listing does not have an active fulfillment method.')
+                    return
+                  }
+                  if (hasVariations && !chosenVar) {
+                    setVariationWarned(true)
+                    return
+                  }
+                  const vid = ensureVariationPicked()
+                  if (vid === null) return
+                  if (addToCart(p.id, qty, vid, activeFulfillmentChoice)) {
+                    toast(
+                      `${qty} added to your request cart (${
+                        activeFulfillmentChoice === 'delivery' ? 'Delivery' : 'Pickup'
+                      }).`,
+                    )
+                    setQty(1)
+                  }
+                }}
+              >
+                <Icon name="cart" size="sm" />
+                {inCartLine ? `In cart (${inCartLine.qty})` : 'Add to request cart'}
+              </button>
               <button
                 type="button"
                 className="btn yellow grow"
@@ -622,85 +649,6 @@ export function ProductPage() {
               </div>
             )}
 
-            <div className="row">
-              <button
-                type="button"
-                className="btn ghost grow"
-                disabled={availStock < 1 || sellerFulfillment === 'none'}
-                onClick={() => {
-                  if (sellerFulfillment === 'none') {
-                    toast('This listing does not have an active fulfillment method.')
-                    return
-                  }
-                  if (hasVariations && !chosenVar) {
-                    setVariationWarned(true)
-                    return
-                  }
-                  const vid = ensureVariationPicked()
-                  if (vid === null) return
-                  if (addToCart(p.id, qty, vid, activeFulfillmentChoice)) {
-                    toast(
-                      `${qty} added to your request cart (${
-                        activeFulfillmentChoice === 'delivery' ? 'Delivery' : 'Pickup'
-                      }).`,
-                    )
-                    setQty(1)
-                  }
-                }}
-              >
-                <Icon name="cart" size="sm" />
-                {inCartLine ? `In cart (${inCartLine.qty})` : 'Add to request cart'}
-              </button>
-              <button
-                type="button"
-                className="btn ghost grow"
-                onClick={() => {
-                  if (isOwnListing) {
-                    toast('That is your own listing.')
-                    return
-                  }
-                  setShowMsgForm((prev) => !prev)
-                }}
-              >
-                <Icon name="msg" size="sm" />
-                {svc ? 'Contact provider' : 'Message seller'}
-              </button>
-            </div>
-
-            {showMsgForm && (
-              <form
-                className="stack"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  if (startProductConversation(p.id, msgText)) {
-                    setMsgText('')
-                    setShowMsgForm(false)
-                  }
-                }}
-              >
-                <textarea
-                  className="input"
-                  id="smsg"
-                  placeholder="Ask about condition, size or another pickup window..."
-                  aria-label="Message to the seller"
-                  value={msgText}
-                  onChange={(e) => setMsgText(e.target.value)}
-                />
-                <div className="row" style={{ justifyContent: 'flex-end' }}>
-                  <button
-                    type="button"
-                    className="btn ghost sm"
-                    onClick={() => setShowMsgForm(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn sm">
-                    Send message
-                  </button>
-                </div>
-              </form>
-            )}
-
             <p className="tiny muted">
               No online payment. You pay the seller in person when you meet on campus.
             </p>
@@ -726,29 +674,36 @@ export function ProductPage() {
 
           {/* Seller card */}
           <div className="card row wrap">
-            {p.cat === 'Official' ? (
-              <span className="avw av-lg">
-                <span className="avatar staff">RTU</span>
-              </span>
-            ) : (
-              <AvatarBadge
-                account={sellerAcct}
-                name={p.seller}
-                size="lg"
-              />
-            )}
-            <div className="grow">
-              <b>{p.seller}</b>
-              <div className="small muted">
-                {p.cat === 'Official'
-                  ? 'Official Pasig Campus Store'
-                  : 'Verified RTU student seller'}
+            <button
+              type="button"
+              className="seller-card-link"
+              aria-label="View seller profile"
+              onClick={() => openModal({ kind: 'seller-profile', sellerName: p.seller })}
+            >
+              {p.cat === 'Official' ? (
+                <span className="avw av-lg">
+                  <span className="avatar staff">RTU</span>
+                </span>
+              ) : (
+                <AvatarBadge
+                  account={sellerAcct}
+                  name={p.seller}
+                  size="lg"
+                />
+              )}
+              <div className="grow">
+                <b>{p.seller}</b>
+                <div className="small muted">
+                  {p.cat === 'Official'
+                    ? 'Official Pasig Campus Store'
+                    : 'Verified RTU student seller'}
+                </div>
+                <div className="small">
+                  <RatingText kind="seller" targetKey={skey} />
+                </div>
               </div>
-              <div className="small">
-                <RatingText kind="seller" targetKey={skey} />
-              </div>
-            </div>
-            <div className="row wrap" style={{ gap: 8 }}>
+            </button>
+            <div className="seller-card-actions">
               {!isOwnListing && (
                 <button
                   type="button"
@@ -760,13 +715,22 @@ export function ProductPage() {
                   {sfav ? 'Favorite seller' : 'Add seller to favorites'}
                 </button>
               )}
-              <button
-                type="button"
-                className="link"
-                onClick={() => openModal({ kind: 'seller-profile', sellerName: p.seller })}
-              >
-                View seller profile
-              </button>
+              {!isOwnListing && (
+                <button
+                  type="button"
+                  className="btn ghost sm"
+                  onClick={() => {
+                    if (isOwnListing) {
+                      toast('That is your own listing.')
+                      return
+                    }
+                    openSellerConversation(p.owner ?? null)
+                  }}
+                >
+                  <Icon name="msg" size="sm" />
+                  {svc ? 'Contact provider' : 'Message seller'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -903,6 +867,96 @@ export function ProductPage() {
           </p>
         )}
       </section>
+
+      {/* Image Lightbox Modal */}
+      {lightboxOpen && p && (
+        <div
+          className="lightbox-backdrop"
+          onClick={() => setLightboxOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image lightbox"
+        >
+          <div
+            className="lightbox-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              type="button"
+              className="lightbox-close"
+              aria-label="Close lightbox"
+              onClick={() => setLightboxOpen(false)}
+            >
+              ×
+            </button>
+
+            {/* Left stage: zoomed image */}
+            <div className="lightbox-stage">
+              <button
+                type="button"
+                className="lightbox-nav lightbox-nav-prev"
+                aria-label="Previous photo"
+                disabled={lightboxIdx === 0}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setLightboxIdx((i) => (i > 0 ? i - 1 : 0))
+                }}
+              >
+                ‹
+              </button>
+              <img
+                className="lightbox-img"
+                src={imgsOf(p)[lightboxIdx] ? imgSrc(imgsOf(p)[lightboxIdx]!) : ''}
+                alt={p.name}
+              />
+              <button
+                type="button"
+                className="lightbox-nav lightbox-nav-next"
+                aria-label="Next photo"
+                disabled={lightboxIdx >= imgsOf(p).length - 1}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const list = imgsOf(p)
+                  setLightboxIdx((i) => (i < list.length - 1 ? i + 1 : i))
+                }}
+              >
+                ›
+              </button>
+              <span className="lightbox-counter">
+                {lightboxIdx + 1} / {imgsOf(p).length}
+              </span>
+            </div>
+
+            {/* Right sidebar: title + thumbnails */}
+            <div className="lightbox-sidebar">
+              <h2 style={{ fontSize: 18, margin: 0, overflowWrap: 'anywhere' }}>
+                {p.name}
+              </h2>
+              <div className="lightbox-thumbs">
+                {imgsOf(p).map((id, i) => {
+                  const src = imgSrc(id)
+                  if (!src) return null
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`lightbox-thumb ${
+                        i === lightboxIdx ? 'on' : ''
+                      }`.trim()}
+                      aria-label={`Show photo ${i + 1}`}
+                      aria-pressed={i === lightboxIdx}
+                      onClick={() => setLightboxIdx(i)}
+                    >
+                      <img src={src} alt="" />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
         </>
       )}
     </>

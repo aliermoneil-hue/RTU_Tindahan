@@ -17,7 +17,7 @@ call, which keeps LS-05/AI-02 true even before the screening service exists.
 
 from django.db.models import F, Q
 from rest_framework import status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
@@ -165,3 +165,50 @@ class ListingViewSet(viewsets.ModelViewSet):
         listing = self.get_object()
         listing.reject(reason)
         return Response(self.get_serializer(listing).data)
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def top_selling(request):
+    """Public top-selling listings for the hero carousel.
+
+    Returns up to 5 approved listings, sorted by sold count (top sellers
+    first), then view count, then newest. Falls back to newest active
+    listings when sales are low so the carousel always has real products.
+    No authentication required.
+    """
+    listings = (
+        Listing.objects.select_related("seller", "category")
+        .prefetch_related("photos")
+        .filter(status=Listing.Status.APPROVED)
+        .order_by("-sold_count", "-view_count", "-created_at")[:5]
+    )
+
+    data = []
+    for listing in listings:
+        primary_photo = (
+            listing.photos.filter(sort_order=0).first() or listing.photos.first()
+        )
+        image_url = None
+        if primary_photo:
+            image_url = (
+                request.build_absolute_uri(primary_photo.image.url)
+                if request
+                else primary_photo.image.url
+            )
+        data.append(
+            {
+                "id": listing.id,
+                "slug": listing.slug,
+                "title": listing.title,
+                "price": str(listing.price),
+                "image_url": image_url,
+                "seller_name": listing.seller.display_name,
+                "is_official": listing.is_official,
+                "category_name": listing.category.name,
+                "sold_count": listing.sold_count,
+                "rating": None,
+            }
+        )
+    return Response(data)

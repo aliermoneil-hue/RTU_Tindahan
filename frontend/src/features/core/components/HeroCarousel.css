@@ -1,4 +1,4 @@
-/* HERO SLIDESHOW (prototype: .car, .car-slide, .car-cap ...) */
+/* HERO SLIDESHOW — live top-selling products (was prototype .car, .car-slide, .car-cap) */
 .car {
   position: relative;
   border-radius: 20px;
@@ -20,26 +20,35 @@
   visibility: hidden;
   color: #fff;
   transition: opacity 0.7s ease, visibility 0s linear 0.7s;
+  cursor: pointer;
 }
 .car-slide.on {
   opacity: 1;
   visibility: visible;
   transition-delay: 0s;
 }
-/* dark fade at the bottom so the caption is readable */
+/* dark fade at the bottom so the caption stays readable over bright photos */
 .car-slide::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, 0.62) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.08) 0%,
+    rgba(0, 0, 0, 0.15) 40%,
+    rgba(0, 0, 0, 0.78) 100%
+  );
   pointer-events: none;
 }
-.car-art {
+/* real product image filling the slide */
+.car-img {
   position: absolute;
-  left: 0;
-  top: 0;
+  inset: 0;
   width: 100%;
-  height: 62%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 .car-cap {
   position: absolute;
@@ -53,11 +62,21 @@
   gap: 6px;
   z-index: 2;
 }
+.car-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 2px;
+}
 .car-cap b {
   font-size: clamp(18px, 2.4vw, 26px);
   letter-spacing: -0.02em;
   line-height: 1.15;
   max-width: 24ch;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .car-cap p {
   font-size: 13px;
@@ -69,7 +88,7 @@
 }
 .car-nav {
   position: absolute;
-  top: 31%;
+  top: 50%;
   transform: translateY(-50%);
   z-index: 3;
   width: 38px;
@@ -81,6 +100,7 @@
   display: grid;
   place-items: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
 }
 .car-nav:hover {
   background: #fff;
@@ -122,6 +142,7 @@
   border: 0;
   background: rgba(255, 255, 255, 0.5);
   transition: background 0.2s, width 0.2s;
+  cursor: pointer;
 }
 .car-dot::before {
   content: '';
@@ -142,24 +163,76 @@
   color: #16223d;
   display: grid;
   place-items: center;
+  cursor: pointer;
 }
 
-/* Slide colours (gradients) */
-.t-food { background: linear-gradient(135deg, #c9772b, #7a3e12); }
-.t-study { background: linear-gradient(135deg, #5b86b8, #26466f); }
-.t-print { background: linear-gradient(135deg, #8e7ab5, #4c3d80); }
-.t-merch { background: linear-gradient(135deg, #d7b377, #8c6a2c); }
+/* Loading skeleton */
+.car-skeleton {
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+.car-skeleton-img {
+  width: 100%;
+  height: 62%;
+  background: var(--line);
+  border-radius: 0;
+  position: relative;
+  overflow: hidden;
+}
+.car-skeleton-img::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--line) 0%, var(--soft) 50%, var(--line) 100%);
+  background-size: 200% 100%;
+  animation: carShimmer 1.6s infinite;
+}
+.car-skeleton-cap {
+  padding: 18px 20px 54px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.car-skeleton-pill {
+  width: 80px;
+  height: 18px;
+  background: var(--line);
+  border-radius: 99px;
+}
+.car-skeleton-title {
+  width: 60%;
+  height: 28px;
+  background: var(--line);
+  border-radius: 4px;
+}
+.car-skeleton-sub {
+  width: 45%;
+  height: 16px;
+  background: var(--line);
+  border-radius: 4px;
+}
+@keyframes carShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
+/* Empty state fallback */
+.car-empty {
+  background: var(--bg);
+  color: var(--muted);
+}
+
+/* Slide colours (gradients) — removed; real product photos provide the colour */
+
+/* Mobile */
 @media (max-width: 640px) {
   .car {
     aspect-ratio: 1 / 1;
     border-radius: 16px;
   }
-  .car-art {
-    height: 52%;
-  }
   .car-nav {
-    top: 26%;
+    top: 50%;
     width: 34px;
     height: 34px;
   }
@@ -172,7 +245,9 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .car-slide,
-  .car-dot {
+  .car-dot,
+  .car-skeleton-img::after {
     transition: none;
+    animation: none;
   }
 }

@@ -6,7 +6,82 @@
   background: var(--navy);
   color: #fff;
   border-color: transparent;
-  border-left: 6px solid var(--yellow);
   position: relative;
   overflow: hidden;
+}
+
+/* ==========================================================================
+   OFFICIAL RTU STORE — mobile category dropdown (shares .orders-tab-dropdown styles from prototype.css)
+   Desktop (> 768px): pill tabs unchanged; mobile dropdown hidden.
+   Mobile (<= 768px): pill tabs hidden; custom dropdown shown full-width.
+   ========================================================================== */
+.official-cats-mobile {
+  display: none;
+}
+.official-cats-desktop {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .official-cats-desktop {
+    display: none;
+  }
+  .official-cats-mobile {
+    display: block;
+    margin-bottom: 14px;
+  }
+}
+
+/* ==========================================================================
+   OFFICIAL RTU STORE — mobile 2-column product grid (matches BrowsePage)
+   Desktop (> 768px) untouched; prototype.css .pgrid keeps auto-fill columns.
+   Uses !important to beat global prototype.css .pgrid rules.
+   ========================================================================== */
+@media (max-width: 768px) {
+  .pgrid.official-store-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+  .pgrid.official-store-grid .pcard {
+    min-width: 0 !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    padding: 8px !important;
+    border-radius: 12px !important;
+  }
+  .pgrid.official-store-grid .pcard .photo {
+    aspect-ratio: 4 / 3 !important;
+    height: auto !important;
+    border-radius: 10px !important;
+  }
+  .pgrid.official-store-grid .pcard h4 {
+    font-size: 13px !important;
+    line-height: 1.3 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+  }
+  .pgrid.official-store-grid .pcard .rate-line {
+    font-size: 11.5px !important;
+  }
+  .pgrid.official-store-grid .pcard .price {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+  .pgrid.official-store-grid .pcard .pcard-seller {
+    font-size: 11.5px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .pgrid.official-store-grid .pcard .srcpill,
+  .pgrid.official-store-grid .pcard .pill {
+    font-size: 10px !important;
+    padding: 2px 8px !important;
+  }
 }

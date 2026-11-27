@@ -37,7 +37,6 @@
 }
 .m-item.on {
   background: var(--soft);
-  box-shadow: inset 3px 0 0 var(--yellow);
 }
 .m-item .m-t {
   min-width: 0;
@@ -167,21 +166,14 @@
   white-space: normal;
 }
 
-/* Update #8: Bottom-corner reaction dock (Messenger-style) */
+/* Reaction dock: inline beside the timestamp (no absolute positioning) */
 .m-react-dock {
-  position: absolute;
-  bottom: -2px;
+  position: static;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   z-index: 4;
-}
-.m-row.them .m-react-dock {
-  right: 8px;
-}
-.m-row.me .m-react-dock {
-  left: 8px;
-  flex-direction: row-reverse;
+  margin-left: 4px;
 }
 
 /* Reaction trigger button anchored at the bottom corner of the message bubble */
@@ -218,19 +210,25 @@
   bottom: calc(100% + 6px);
   background: var(--card);
   border: 1px solid var(--line);
+  box-shadow: var(--shadow);
   border-radius: 24px;
   padding: 3px 6px;
   display: flex;
   gap: 4px;
-  box-shadow: 0 6px 18px rgba(10, 20, 38, 0.18);
-  z-index: 12;
+  z-index: 30;
+  white-space: nowrap;
+  max-width: calc(100vw - 32px);
   animation: popIn 0.15s ease-out;
 }
 .m-row.me .m-react-picker {
-  left: 0;
+  right: 0;
+  left: auto;
+  transform: none;
 }
 .m-row.them .m-react-picker {
-  right: 0;
+  left: 0;
+  right: auto;
+  transform: none;
 }
 .m-react-emoji-btn {
   background: none;
@@ -289,15 +287,24 @@
 
 .m-comp {
   display: flex;
+  align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  border-top: 1px solid var(--line);
-  align-items: flex-end;
+  width: 100%;
+  max-width: 100%;
 }
 .m-comp textarea {
-  min-height: 42px;
-  max-height: 120px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 40px;
+  max-height: 100px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  padding: 9px 16px;
+  line-height: 1.35;
+  font-size: 14px;
   resize: none;
+  outline: none;
 }
 .m-empty {
   margin: auto;

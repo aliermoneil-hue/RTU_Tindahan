@@ -9,40 +9,127 @@
   align-items: start;
 }
 
-/* Selection bar — design-system card pattern */
-.selection-bar {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 10px 14px;
-  color: var(--ink);
+/* Selection bar — locked dimensions, zero layout shift on mobile */
+.cart-select-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  flex-wrap: wrap;
+  height: 56px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 12px;
 }
 
-/* Checkbox wrapper — clean .check pattern beside thumbnail */
+/* View summary trigger — mobile only, shown in place of the total text */
+.cart-summary-trigger {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 8px 14px;
+  line-height: 1.2;
+  margin: 0;
+  transition: opacity 0.16s ease, visibility 0.16s ease;
+}
+
+.cart-summary-trigger.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Checkbox wrapper — clean .cart-check pattern beside thumbnail */
 .cart-check {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: none;
-  gap: 9px;
+  gap: 8px;
   cursor: pointer;
   margin: 0;
 }
 
 .cart-check input[type="checkbox"] {
-  margin-top: 2px;
-  accent-color: var(--navy);
-  width: 15px;
-  height: 15px;
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  flex: none;
+  width: 19px;
+  height: 19px;
+  border-radius: 6px;
+  border: 1.75px solid var(--muted);
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease;
+}
+
+.cart-check input[type="checkbox"]::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: solid #ffffff;
+  border-width: 0 2.2px 2.2px 0;
+  transform: rotate(45deg) scale(0);
+  margin-top: -2px;
+  transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cart-check input[type="checkbox"]:hover {
+  border-color: var(--navy);
+}
+
+.cart-check input[type="checkbox"]:active {
+  transform: scale(0.92);
+}
+
+.cart-check input[type="checkbox"]:checked {
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.cart-check input[type="checkbox"]:checked::after {
+  transform: rotate(45deg) scale(1);
+}
+
+.cart-check input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(31, 95, 174, 0.25);
 }
 
 :root[data-theme='dark'] .cart-check input[type="checkbox"] {
-  accent-color: var(--yellow);
+  border-color: #4b5262;
+  background: #181a1f;
+}
+
+:root[data-theme='dark'] .cart-check input[type="checkbox"]:hover {
+  border-color: var(--yellow);
+}
+
+:root[data-theme='dark'] .cart-check input[type="checkbox"]:checked {
+  background: var(--yellow);
+  border-color: var(--yellow);
+}
+
+:root[data-theme='dark'] .cart-check input[type="checkbox"]:checked::after {
+  border-color: var(--yellow-ink, #16171a);
+}
+
+:root[data-theme='dark'] .cart-check input[type="checkbox"]:focus-visible {
+  box-shadow: 0 0 0 3px rgba(229, 181, 76, 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart-check input[type="checkbox"] {
+    transition: none !important;
+  }
+  .cart-check input[type="checkbox"]::after {
+    transition: none !important;
+  }
 }
 
 /* Dim unselected cart items — subtle, clean state */
@@ -63,6 +150,303 @@
 }
 :root[data-theme='dark'] .cart-item-selected {
   border-color: var(--line);
+}
+
+/* Cart item card — outer container stacks vertically (3 blocks) */
+.cart-item-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  padding: 12px 14px;
+  border-radius: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Block 1: top header row (desktop) */
+.cart-item-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.cart-item-top .cart-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cart-item-top .cart-item-right {
+  flex: none;
+}
+
+.cart-item-top .cart-item-check-col {
+  flex: none;
+}
+
+/* Left: thumbnail + meta stack */
+.cart-item-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cart-item-main .photo.cart-photo {
+  width: 56px;
+  height: 56px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  flex: none;
+}
+
+.cart-item-main .cart-meta-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cart-item-main .cart-item-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.3;
+}
+
+.cart-item-main .cart-item-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.cart-item-main .cart-item-seller {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Middle-right: qty stepper + trash on top, price below */
+.cart-item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  flex: none;
+}
+
+.cart-item-right .cart-item-qty-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cart-item-right .cart-item-price {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Far-right checkbox column with vertical divider */
+.cart-item-check-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+  flex: none;
+}
+
+/* Block 2: horizontal divider between top section and fulfillment */
+.cart-item-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--line);
+  border: 0;
+  margin: 12px 0;
+  flex: none;
+}
+
+/* Block 3: fulfillment sub-card — stacked vertically */
+.cart-item-fulfillment {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--soft);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+/* Fulfillment top row: info + Change button side by side */
+.cart-item-fulfill-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.cart-item-fulfillment .cart-item-fulfill-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Expanded editor blocks below the top row, full width */
+.cart-item-fulfillment > .note,
+.cart-item-fulfillment > .row,
+.cart-item-fulfillment > .stack {
+  width: 100%;
+}
+
+.cart-item-fulfillment .cart-item-fulfill-line {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.cart-item-fulfillment .cart-item-fulfill-line .muted {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.cart-item-fulfillment .cart-item-change-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+  white-space: nowrap;
+  flex: none;
+  text-decoration: none;
+}
+
+.cart-item-fulfillment .cart-item-change-link:hover {
+  text-decoration: underline;
+}
+
+:root[data-theme='dark'] .cart-item-fulfillment .cart-item-change-link {
+  color: var(--yellow);
+}
+
+/* Cart item card — mobile layout (<= 600px) */
+@media (max-width: 600px) {
+  .cart-item-card {
+    padding: 12px;
+  }
+
+  /* Block 1: top header row → 2-col, 2-row grid */
+  .cart-item-top {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 12px;
+    column-gap: 10px;
+    align-items: start;
+    width: 100%;
+  }
+
+  /* Row 1, Left: Thumbnail side-by-side with Title + Pickup pill + Seller */
+  .cart-item-top .cart-item-main {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .cart-item-top .cart-item-main img,
+  .cart-item-thumb {
+    width: 52px;
+    height: 52px;
+    flex: none;
+    border-radius: 10px;
+    object-fit: cover;
+  }
+
+  .cart-item-top .cart-item-main .cart-item-meta {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .cart-item-top .cart-item-main .cart-item-seller-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .cart-item-top .cart-item-main .cart-item-seller-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  /* Row 1, Right: Checkbox aligned to top-right, no vertical divider */
+  .cart-item-top .cart-item-check-col {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    border-left: 0 !important;
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+    padding-top: 2px;
+  }
+
+  /* Row 2, Full Width: Horizontal divider above, Stepper + Trash on left, Price on right */
+  .cart-item-top .cart-item-right {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100%;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  /* Hide the desktop divider below .cart-item-top since Row 2 now has the divider above it */
+  .cart-item-divider {
+    display: none;
+  }
+
+  /* spacing before Fulfillment sub-card */
+  .cart-item-fulfillment {
+    margin-top: 12px;
+    background: var(--soft);
+    border-radius: 10px;
+    padding: 12px;
+  }
+
+  /* Stack the inner Fulfillment row vertically on mobile so the Change button sits below-left */
+  .cart-item-fulfillment > div:first-child,
+  .cart-item-fulfillment-row,
+  .cart-fulfillment-header {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px;
+    width: 100%;
+  }
+
+  /* Hide the secondary "· Seller offers Pickup only" note on mobile */
+  .cart-fulfillment-note {
+    display: none;
+  }
 }
 
 .photo.cart-photo {
@@ -201,5 +585,508 @@
   }
   .sent-details {
     animation: none;
+  }
+}
+
+/* ==========================================================================
+   CART REQUEST STEPPER (matches CreateListingPage .sell-bstep design)
+   ========================================================================== */
+.cart-bstep {
+  list-style: none;
+  margin: 16px 0 20px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  width: 100%;
+}
+
+.cart-bstep li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  min-width: 0;
+  padding: 0 6px;
+}
+
+.cart-bstep li.todo {
+  cursor: default;
+}
+
+.cart-bstep li:nth-child(2)::before,
+.cart-bstep li:nth-child(3)::before {
+  content: '';
+  position: absolute;
+  top: 13.5px;
+  left: calc(-50% + 21px);
+  right: calc(50% + 21px);
+  height: 3px;
+  border-radius: 99px;
+  background: var(--line, #dbe2ec);
+  z-index: 0;
+}
+
+.cart-bstep li.done:nth-child(2)::before,
+.cart-bstep li.cur:nth-child(2)::before,
+.cart-bstep li.done:nth-child(3)::before,
+.cart-bstep li.cur:nth-child(3)::before {
+  background: var(--green, #1e8e5a);
+}
+
+.cart-bstep .dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 12px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  color: var(--muted);
+  flex: none;
+  padding: 0;
+  inset: auto;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  margin: 0;
+}
+
+.cart-bstep .dot svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: block;
+}
+
+.cart-bstep li.done .dot {
+  background: var(--green, #1e8e5a);
+  border-color: var(--green, #1e8e5a);
+  color: #fff;
+  cursor: pointer;
+}
+
+.cart-bstep li.cur .dot {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--navy);
+}
+
+.cart-bstep li.done .lbl {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.cart-bstep li.cur .lbl {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.cart-bstep li.todo .lbl {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.cart-bstep .lbl {
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: center;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* Dark mode: neutral charcoal palette — crisp contrast, no hue shift */
+:root[data-theme='dark'] .cart-bstep li.done .dot {
+  background: #1e8e5a;
+  border-color: #1e8e5a;
+  color: #ffffff;
+}
+:root[data-theme='dark'] .cart-bstep li.done .lbl {
+  color: var(--ink, #e4e6eb);
+  font-weight: 600;
+}
+:root[data-theme='dark'] .cart-bstep li.cur .dot {
+  background: var(--yellow, #e5b54c);
+  border-color: var(--yellow, #e5b54c);
+  color: var(--yellow-ink, #16171a);
+}
+:root[data-theme='dark'] .cart-bstep li.cur .lbl {
+  color: var(--ink, #e4e6eb);
+  font-weight: 700;
+}
+:root[data-theme='dark'] .cart-bstep li.todo .dot {
+  background: var(--card, #1f2125);
+  border-color: #3a3f4a;
+  color: var(--muted, #9aa0aa);
+}
+:root[data-theme='dark'] .cart-bstep li.todo .lbl {
+  color: var(--muted, #9aa0aa);
+}
+:root[data-theme='dark'] .cart-bstep li:nth-child(2)::before,
+:root[data-theme='dark'] .cart-bstep li:nth-child(3)::before {
+  background: #343944;
+}
+:root[data-theme='dark'] .cart-bstep li.done:nth-child(2)::before,
+:root[data-theme='dark'] .cart-bstep li.cur:nth-child(2)::before,
+:root[data-theme='dark'] .cart-bstep li.done:nth-child(3)::before,
+:root[data-theme='dark'] .cart-bstep li.cur:nth-child(3)::before {
+  background: #1e8e5a;
+}
+
+@media (max-width: 480px) {
+  .cart-bstep {
+    margin: 12px 0 16px;
+  }
+
+  .cart-bstep li {
+    gap: 6px;
+  }
+
+  .cart-bstep .dot {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+
+  .cart-bstep li:nth-child(2)::before,
+  .cart-bstep li:nth-child(3)::before {
+    top: 11.5px;
+    left: calc(-50% + 19px);
+    right: calc(50% + 19px);
+  }
+
+  .cart-bstep .lbl {
+    font-size: 11px;
+    line-height: 1.25;
+  }
+}
+
+/* ==========================================================================
+   MOBILE PICKUP CART BOTTOM SHEET (<= 1000px)
+   ========================================================================== */
+
+.cart-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 120;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 280ms ease, visibility 0s linear 280ms;
+}
+
+.cart-detail-backdrop.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 280ms ease, visibility 0s linear 0s;
+}
+
+.cart-detail.mobile-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 121;
+  height: auto;
+  max-height: 86dvh;
+  border-radius: 18px 18px 0 0;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.35);
+  transform: translate3d(0, 100%, 0);
+  will-change: transform;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 320ms;
+}
+
+.cart-detail.mobile-sheet.is-open {
+  transform: translate3d(0, 0, 0);
+  visibility: visible;
+  pointer-events: auto;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0s;
+}
+
+/* ==========================================================================
+   CART REQUEST SUMMARY BOTTOM SHEET (<= 1000px)
+   ========================================================================== */
+
+.cart-summary-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 120;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 280ms ease, visibility 0s linear 280ms;
+}
+
+.cart-summary-backdrop.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 280ms ease, visibility 0s linear 0s;
+}
+
+.cart-summary-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 121;
+  width: 100%;
+  height: auto;
+  max-height: 95dvh;
+  border-radius: 18px 18px 0 0;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.35);
+  transform: translate3d(0, 100%, 0);
+  will-change: transform;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 320ms;
+}
+
+.cart-summary-sheet.is-open {
+  transform: translate3d(0, 0, 0);
+  visibility: visible;
+  pointer-events: auto;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0s;
+}
+
+.mobile-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--card);
+}
+
+.mobile-sheet-header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobile-sheet-header h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.sheet-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--soft);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+:root[data-theme='dark'] .sheet-close {
+  background: var(--soft);
+  color: var(--ink);
+}
+
+@media (max-width: 1000px) {
+  .mobile-sheet-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* Form controls inside mobile sheets fill the available width */
+  .mobile-sheet-body .input,
+  .mobile-sheet-body select,
+  .mobile-sheet-body textarea {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .cart-summary-sheet-body .field textarea {
+    min-height: 68px;
+  }
+
+  .cart-summary-sheet-body {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Scrollable fulfillment list — shows up to 3 items without scroll, 4+ scrolls within the list */
+  .cart-fulfillment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 102px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+  }
+
+  /* Spacing inside Request summary mobile sheet */
+  .cart-summary-sheet-body > .row.between.small {
+    margin-bottom: 10px;
+  }
+
+  .cart-summary-sheet-body > .stack {
+    margin-top: 14px;
+    margin-bottom: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    gap: 8px;
+  }
+
+  .cart-summary-sheet-body > hr {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .cart-summary-sheet-body > .row.between {
+    margin-bottom: 14px;
+  }
+
+  .cart-summary-sheet-body > .note {
+    margin-bottom: 14px;
+  }
+
+  .cart-summary-sheet-body > .btn {
+    width: 100%;
+    padding: 12px 16px;
+  }
+
+  /* Note to seller textarea in mobile sheet */
+  .cart-summary-sheet-body .field textarea {
+    width: 100%;
+    min-height: 84px;
+    padding: 10px 12px;
+    font-size: 14px;
+    line-height: 1.45;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    resize: vertical;
+  }
+
+  /* Custom agreement checkbox in mobile sheet — matches cart-item .cart-check style */
+  .cart-summary-sheet-body .check {
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+  }
+
+  .cart-summary-sheet-body .check input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 0;
+    flex: none;
+    width: 19px;
+    height: 19px;
+    border-radius: 6px;
+    border: 1.75px solid var(--muted);
+    background: var(--card);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.12s ease, box-shadow 0.16s ease;
+  }
+
+  .cart-summary-sheet-body .check input[type="checkbox"]::after {
+    content: '';
+    width: 5px;
+    height: 9px;
+    border: solid #ffffff;
+    border-width: 0 2.2px 2.2px 0;
+    transform: rotate(45deg) scale(0);
+    margin-top: -2px;
+    transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .cart-summary-sheet-body .check input[type="checkbox"]:checked {
+    background: var(--navy);
+    border-color: var(--navy);
+  }
+
+  .cart-summary-sheet-body .check input[type="checkbox"]:checked::after {
+    transform: rotate(45deg) scale(1);
+  }
+
+  :root[data-theme='dark'] .cart-summary-sheet-body .check input[type="checkbox"] {
+    border-color: #4b5262;
+    background: #181a1f;
+  }
+
+  :root[data-theme='dark'] .cart-summary-sheet-body .check input[type="checkbox"]:checked {
+    background: var(--yellow);
+    border-color: var(--yellow);
+  }
+
+  :root[data-theme='dark'] .cart-summary-sheet-body .check input[type="checkbox"]:checked::after {
+    border-color: var(--yellow-ink, #16171a);
+  }
+
+  html.cart-sheet-open,
+  body.cart-sheet-open,
+  body.cart-sheet-open .page {
+    overflow: hidden !important;
+    overscroll-behavior: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart-detail-backdrop,
+  .cart-detail.sheet-open {
+    transition: none !important;
+  }
+  .cart-detail-backdrop.is-open,
+  .cart-detail.mobile-sheet.is-open {
+    transition: none !important;
   }
 }

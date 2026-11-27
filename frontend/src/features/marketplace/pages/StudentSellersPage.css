@@ -12,7 +12,6 @@
   padding: 18px;
   border: 1px solid var(--line);
   background: var(--card);
-  border-left: 6px solid var(--coral, #c25a5a);
 }
 .heart.sfav-ico {
   position: static;
@@ -23,4 +22,153 @@
 }
 .heart.sfav-ico.on {
   color: #d6336c;
+}
+
+/* ==========================================================================
+   STUDENT SELLERS — mobile 2-column product grid (matches BrowsePage)
+   Desktop (> 600px) untouched; prototype.css .pgrid keeps auto-fill columns.
+   Uses !important to beat global prototype.css .pgrid rules.
+   ========================================================================== */
+@media (max-width: 600px) {
+  .pgrid.student-sellers-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+  .pgrid.student-sellers-grid .pcard {
+    min-width: 0 !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    padding: 8px !important;
+    border-radius: 12px !important;
+  }
+  .pgrid.student-sellers-grid .pcard .photo {
+    aspect-ratio: 4 / 3 !important;
+    height: auto !important;
+    border-radius: 10px !important;
+  }
+  .pgrid.student-sellers-grid .pcard h4 {
+    font-size: 13px !important;
+    line-height: 1.3 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+  }
+  .pgrid.student-sellers-grid .pcard .rate-line {
+    font-size: 11.5px !important;
+  }
+  .pgrid.student-sellers-grid .pcard .price {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+  .pgrid.student-sellers-grid .pcard .pcard-seller {
+    font-size: 11.5px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .pgrid.student-sellers-grid .pcard .srcpill,
+  .pgrid.student-sellers-grid .pcard .pill {
+    font-size: 10px !important;
+    padding: 2px 8px !important;
+  }
+}
+
+/* ==========================================================================
+   STUDENT SELLERS — single-line moving marquee strip
+   Matches the Marketplace category strip motion pattern (auto-scroll,
+   pause on hover/focus/touch, edge fade masks).
+   ========================================================================== */
+
+.seller-wrap {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Edge fade masks — match card background in both light and dark mode */
+.seller-wrap::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 24px;
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(to right, var(--card), transparent);
+}
+.seller-wrap::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(to left, var(--card), transparent);
+}
+
+/* Scrollable row — single horizontal line, no visible scrollbar, edge-to-edge */
+.seller-row {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0 8px 0;
+  outline-offset: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.seller-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* Single-line track — chips never wrap or squish */
+.seller-track {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 14px;
+  width: max-content;
+  will-change: transform;
+}
+
+/* Duplicated group for seamless loop */
+.seller-group {
+  display: flex;
+  flex-wrap: nowrap;
+}
+
+/* Each seller chip — fixed size, no wrapping */
+.seller-chip {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* Chip link button inside the strip — keep existing interactions intact */
+.seller-chip .row {
+  background: none;
+  border: 0;
+  gap: 8;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Reduced motion — disable auto-movement, keep horizontal scroll functional */
+@media (prefers-reduced-motion: reduce) {
+  .seller-track {
+    animation: none !important;
+  }
+  .seller-row {
+    scroll-behavior: smooth;
+  }
 }

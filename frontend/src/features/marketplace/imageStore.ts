@@ -22,12 +22,23 @@ export const IMG_RULES = {
 
 export const IMG_URL = /^data:image\/(jpeg|png|webp);base64,/
 
+export interface ImageEditState {
+  preset: string
+  zoom: number
+  rotation: number
+  pan: { x: number; y: number }
+}
+
 export interface StoredImage {
   d: string
   w: number
   h: number
   n: string
   t: number
+  /** Untouched original image as first uploaded (never overwritten by edits). */
+  o?: string
+  /** Last-used edit settings for this image. */
+  e?: ImageEditState
 }
 
 let IMGS: Record<string, StoredImage> = {}
@@ -95,14 +106,39 @@ export function removeImg(id: string) {
   }
 }
 
-export function replaceImgData(id: string, dataUrl: string, width = 800, height = 600): boolean {
+export function replaceImgData(
+  id: string,
+  dataUrl: string,
+  width = 800,
+  height = 600,
+  editState?: ImageEditState,
+): boolean {
   ensureLoaded()
-  if (id in IMGS) {
-    IMGS[id] = { ...IMGS[id], d: dataUrl, w: width, h: height, t: Date.now() }
+  const existing = IMGS[id]
+  if (existing) {
+    // Preserve the untouched original: copy existing src into o on first edit.
+    const originalSrc = existing.o ?? existing.d
+    IMGS[id] = {
+      ...existing,
+      o: originalSrc,
+      d: dataUrl,
+      w: width,
+      h: height,
+      t: Date.now(),
+      e: editState,
+    }
     return saveImgs()
   }
   const newId = 'im_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7)
-  IMGS[newId] = { d: dataUrl, w: width, h: height, n: 'adjusted_photo.jpg', t: Date.now() }
+  IMGS[newId] = {
+    d: dataUrl,
+    w: width,
+    h: height,
+    n: 'adjusted_photo.jpg',
+    t: Date.now(),
+    o: dataUrl, // brand-new edited image: its own data is the original
+    e: editState,
+  }
   saveImgs()
   return true
 }
@@ -130,6 +166,32 @@ export function imgSrc(id?: string | null): string {
   }
   const m = IMGS[id]
   return m && typeof m.d === 'string' && IMG_URL.test(m.d) ? m.d : ''
+}
+
+/** Returns the untouched original image source for an id, falling back to src. */
+export function imgOriginalSrc(id?: string | null): string {
+  ensureLoaded()
+  if (!id) return ''
+  if (
+    id.startsWith('data:image/') ||
+    id.startsWith('/') ||
+    id.startsWith('http') ||
+    id.startsWith('blob:') ||
+    id.includes('/')
+  ) {
+    return id
+  }
+  const m = IMGS[id]
+  if (!m) return ''
+  return m.o || m.d || ''
+}
+
+/** Returns the saved edit state for an image id, if any. */
+export function imgEditState(id?: string | null): ImageEditState | undefined {
+  ensureLoaded()
+  if (!id) return undefined
+  const m = IMGS[id]
+  return m?.e
 }
 
 export function imgsOf(o?: { imgs?: string[] } | null): string[] {

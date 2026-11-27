@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '@/common/components/Icon'
+import { ItemTitleWithVariant } from '@/common/components/ItemTitleWithVariant'
 import { imgSrc, imgsOf } from '../imageStore'
 import { peso } from '../constants'
 import type { OrderRecord, PrototypeProduct } from '../types'
@@ -77,9 +78,11 @@ export function RequestSentView({
                     {thumbnailFor(ord)}
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <b style={{ overflowWrap: 'anywhere', display: 'block', marginBottom: 2 }}>
-                      {ord.title}
-                    </b>
+                    <ItemTitleWithVariant
+                      as="b"
+                      title={ord.title}
+                      style={{ overflowWrap: 'anywhere', display: 'block', marginBottom: 2 }}
+                    />
                     <div className="row wrap" style={{ gap: 6, marginBottom: 2 }}>
                       <span className="pill">#{ord.id}</span>
                       {fulfillmentPill(ord)}
@@ -109,15 +112,7 @@ export function RequestSentView({
                             style={{ gap: 8 }}
                           >
                             <span style={{ overflowWrap: 'anywhere' }}>
-                              {line.qty} × {lineName}
-                              {line.vlabel && (
-                                <span
-                                  className="pill"
-                                  style={{ fontSize: 10, marginLeft: 6 }}
-                                >
-                                  {line.vlabel}
-                                </span>
-                              )}
+                              {line.qty} × <ItemTitleWithVariant title={lineName} variant={line.vlabel || undefined} />
                             </span>
                             <span>{peso((lp?.price ?? 0) * line.qty)}</span>
                           </div>
@@ -193,7 +188,18 @@ export function RequestSentView({
                   maxWidth: 165,
                 }}
               >
-                {ord.title}
+                <ItemTitleWithVariant
+                  as="span"
+                  title={ord.title}
+                  style={{
+                    overflowWrap: 'anywhere',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: 165,
+                    display: 'block',
+                  }}
+                />
               </span>
               {fulfillmentPill(ord)}
             </div>

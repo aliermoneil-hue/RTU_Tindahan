@@ -3,11 +3,12 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
-from config.views import api_root, health
+from config.views import api_root, health, stats
 
 urlpatterns = [
     path("", api_root, name="api-root"),
     path("health/", health, name="health"),
+    path("api/v1/stats/", stats, name="api-stats"),
     path("admin/", admin.site.urls),
     # Exact /api/v1/ shows the index; sub-paths go to the app routers.
     path("api/v1/", api_root, name="api-v1-root"),

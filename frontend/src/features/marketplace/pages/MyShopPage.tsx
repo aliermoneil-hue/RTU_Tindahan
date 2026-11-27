@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { ItemTitleWithVariant } from '@/common/components/ItemTitleWithVariant'
 import { Icon } from '@/common/components/Icon'
 import { navigate } from '@/common/router/router'
 import { baoItemType, baoReserved, baoUnits } from '../baoHelpers'
@@ -29,8 +30,6 @@ export function MyShopPage() {
     deleteOfficialProduct,
     respondSellerRequest,
     openSellerRequestChat,
-    toggleChecklist,
-    continueSellerSetup,
     confirmDeleteReview,
     openModal,
     setDraft,
@@ -462,116 +461,42 @@ export function MyShopPage() {
             ))}
           </div>
 
-          {/* Requirement #1: Removed ADMIN | RTU Shop Guide for staff; keep First-time seller guide for students */}
-          {isStaffUser ? (
-            <div className="card stack">
-              <div className="row between">
-                <b>Views by listing</b>
-                <span className="tiny muted">Since you posted each item</span>
-              </div>
-              {sellerList.length ? (
-                <div className="stack" style={{ gap: 10 }}>
-                  {sellerList.map((l, i) => (
-                    <div key={`${l.lid || l.name}-${i}`} className="stack" style={{ gap: 4 }}>
-                      <div className="row between small">
-                        <span style={{ overflowWrap: 'anywhere' }}>{l.name}</span>
-                        <span className="tnum muted">
-                          {l.views} view{l.views === 1 ? '' : 's'} · {l.req} req
-                        </span>
-                      </div>
-                      <div style={{ height: 8, background: 'var(--soft)', borderRadius: 6 }}>
-                        <div
-                          style={{
-                            width: `${Math.round((l.views / maxViews) * 100)}%`,
-                            height: 8,
-                            background: 'var(--blue)',
-                            borderRadius: 6,
-                          }}
-                        />
-                      </div>
+          <div className="card stack">
+            <div className="row between">
+              <b>Views by listing</b>
+              <span className="tiny muted">Since you posted each item</span>
+            </div>
+            {sellerList.length ? (
+              <div className="stack" style={{ gap: 10 }}>
+                {sellerList.map((l, i) => (
+                  <div key={`${l.lid || l.name}-${i}`} className="stack" style={{ gap: 4 }}>
+                    <div className="row between small">
+                      <span style={{ overflowWrap: 'anywhere' }}>
+                        <ItemTitleWithVariant title={l.name} />
+                      </span>
+                      <span className="tnum muted">
+                        {l.views} view{l.views === 1 ? '' : 's'} · {l.req} req
+                      </span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="small muted">
-                  Post a listing to see how many students view and request it.
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="seller-overview-two two">
-              <div
-                className="card stack"
-                style={{ background: 'var(--navy)', color: '#fff', border: 0 }}
-              >
-                <span className="pill yellow" style={{ alignSelf: 'flex-start' }}>
-                  First-time seller guide
-                </span>
-                <h3>Build trust from your first listing</h3>
-                <p className="small" style={{ opacity: 0.85 }}>
-                  Finish these three quick steps so buyers know who they are meeting.
-                </p>
-                {(
-                  [
-                    ['profile', 'Profile verified (RTU email & student ID)'],
-                    ['pickup', 'Pickup location added'],
-                    ['rules', 'Read prohibited items guide'],
-                  ] as const
-                ).map(([k, label]) => (
-                  <label key={k} className="check" style={{ color: '#fff' }}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(currentAccount.checklist[k])}
-                      onChange={(e) => toggleChecklist(k, e.target.checked)}
-                    />
-                    {label}
-                  </label>
-                ))}
-                <button
-                  type="button"
-                  className="btn yellow block"
-                  onClick={continueSellerSetup}
-                >
-                  Continue setup
-                </button>
-              </div>
-
-              <div className="card stack">
-                <div className="row between">
-                  <b>Views by listing</b>
-                  <span className="tiny muted">Since you posted each item</span>
-                </div>
-                {sellerList.length ? (
-                  <div className="stack" style={{ gap: 10 }}>
-                    {sellerList.map((l, i) => (
-                      <div key={`${l.lid || l.name}-${i}`} className="stack" style={{ gap: 4 }}>
-                        <div className="row between small">
-                          <span style={{ overflowWrap: 'anywhere' }}>{l.name}</span>
-                          <span className="tnum muted">
-                            {l.views} view{l.views === 1 ? '' : 's'} · {l.req} req
-                          </span>
-                        </div>
-                        <div style={{ height: 8, background: 'var(--soft)', borderRadius: 6 }}>
-                          <div
-                            style={{
-                              width: `${Math.round((l.views / maxViews) * 100)}%`,
-                              height: 8,
-                              background: 'var(--blue)',
-                              borderRadius: 6,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                    <div style={{ height: 8, background: 'var(--soft)', borderRadius: 6 }}>
+                      <div
+                        style={{
+                          width: `${Math.round((l.views / maxViews) * 100)}%`,
+                          height: 8,
+                          background: 'var(--blue)',
+                          borderRadius: 6,
+                        }}
+                      />
+                    </div>
                   </div>
-                ) : (
-                  <p className="small muted">
-                    Post a listing to see how many students view and request it.
-                  </p>
-                )}
+                ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="small muted">
+                Post a listing to see how many students view and request it.
+              </p>
+            )}
+          </div>
 
           {openReqs.length > 0 && (
             <div className="card stack">
@@ -828,7 +753,7 @@ export function MyShopPage() {
                           return (
                             <tr key={p.id}>
                               <td>
-                                <b>{p.name}</b>
+                                <ItemTitleWithVariant as="b" title={p.name} />
                               </td>
                               <td>
                                 <span
@@ -1009,7 +934,7 @@ export function MyShopPage() {
                         return (
                           <tr key={`${l.lid || l.name}-${i}`}>
                             <td>
-                              <b>{l.name}</b>
+                              <ItemTitleWithVariant as="b" title={l.name} />
                             </td>
                             <td>
                               <span className={`pill ${sv ? 'purple' : ''}`.trim()}>
